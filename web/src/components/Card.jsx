@@ -46,8 +46,8 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
         >
             <div className="nd-card-inner">
                 <div className="flex items-start justify-between gap-[2cqi]">
-                    <div className="nd-name line-clamp-2">{card.name}</div>
-                    <div className="flex items-center gap-[1.5cqi]">
+                    <div className="nd-name line-clamp-2 min-w-0 break-words">{card.name}</div>
+                    <div className="flex shrink-0 items-center gap-[1.5cqi]">
                         {hp != null && <div className="nd-hp"><small>PV </small>{hp}</div>}
                         <TypeBadge type={card.type} />
                     </div>

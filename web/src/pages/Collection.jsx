@@ -36,7 +36,7 @@ export default function Collection() {
         return numbered
             .filter((c) => (!type || c.type === type) && (!rarity || c.rarity === rarity) && (!onlyOwned || owned[c.id]))
             .filter((c) => !q || (owned[c.id] && (c.name.toLowerCase().includes(q) || c.sci_name?.toLowerCase().includes(q))))
-            .sort((a, b) => RARITIES[b.rarity].order - RARITIES[a.rarity].order || a.number - b.number);
+            .sort((a, b) => !owned[a.id] - !owned[b.id] || RARITIES[b.rarity].order - RARITIES[a.rarity].order || a.number - b.number);
     }, [numbered, type, rarity, onlyOwned, query, owned]);
 
     const duplicates = useMemo(() => {
