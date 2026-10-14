@@ -155,7 +155,9 @@ function SellForm({ card, info, total, busy, onSubmit, onClose }) {
                 <div className="w-44 sm:w-full mx-auto"><Card card={card} number={card.num} total={total} /></div>
                 <div>
                     <h2 className="font-display text-2xl text-white pr-10">Mettre en vente</h2>
-                    <p className="mt-1 text-sm text-ink-soft">Tu en as {card.count} : un exemplaire part en vente, les autres restent dans ta collection.</p>
+                    <p className="mt-1 text-sm text-ink-soft">{card.count > 1
+                        ? `Tu en as ${card.count} : un exemplaire part en vente, les autres restent dans ta collection.`
+                        : <><b className="text-[#ffb4a2]">C'est ton seul exemplaire</b> : il quittera ta collection pendant la vente, et pour de bon s'il est vendu.</>}</p>
                     <div className="mt-5 space-y-4">
                         <label className="block">
                             <span className="text-xs font-bold uppercase tracking-wider text-white/60">Mise de départ</span>
@@ -194,7 +196,7 @@ function SellTab({ total, preselect, onListed }) {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        api('sellable').then((res) => {
+        api('sellable', { cardId: preselect }).then((res) => {
             setInfo(res);
             if (preselect) setPicked(res.cards.find((c) => c.id === preselect) || null);
         }).catch((e) => setError(e.message));
@@ -217,16 +219,16 @@ function SellTab({ total, preselect, onListed }) {
     if (!info) return <div className="py-20 text-center font-display text-lg text-ink-soft">{error || 'Chargement…'}</div>;
     return (
         <>
-            <p className="text-ink-soft max-w-2xl">Seuls les <b className="text-white">doublons</b> se vendent : ta collection garde toujours au moins un exemplaire de chaque espèce. Choisis une carte :</p>
+            <p className="text-ink-soft max-w-2xl">Toutes tes cartes peuvent se vendre. Attention : si tu vends ton dernier exemplaire, la carte quitte ta collection (elle te revient si personne ne l'achète). Choisis une carte :</p>
             {error && <p className="mt-3 text-sm font-semibold text-[#ffb4a2]">{error}</p>}
             {info.cards.length === 0 ? (
-                <p className="py-16 text-center text-ink-soft">Aucun doublon pour l'instant. Ouvre des boosters !</p>
+                <p className="py-16 text-center text-ink-soft">Aucune carte pour l'instant. Ouvre des boosters !</p>
             ) : (
                 <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
                     {info.cards.map((c) => (
                         <button key={c.id} onClick={() => setPicked(c)} className="relative text-left transition-transform hover:-translate-y-1">
                             <Card card={c} number={c.num} total={total} />
-                            <span className="absolute -top-2 -right-2 min-w-8 h-8 px-1.5 grid place-items-center rounded-full bg-rust text-paper font-display font-black text-sm shadow-lg">×{c.count}</span>
+                            {c.count > 1 && <span className="absolute -top-2 -right-2 min-w-8 h-8 px-1.5 grid place-items-center rounded-full bg-rust text-paper font-display font-black text-sm shadow-lg">×{c.count}</span>}
                         </button>
                     ))}
                 </div>
@@ -294,7 +296,7 @@ export default function Auctions() {
                 <div>
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Hôtel des ventes</p>
                     <h1 className="mt-1 font-display text-4xl sm:text-5xl font-medium text-white">Enchères</h1>
-                    <p className="mt-3 text-ink-soft max-w-xl">Vends tes doublons et trouve les espèces qui te manquent auprès des autres joueurs. Ici, on paie en pépites.</p>
+                    <p className="mt-3 text-ink-soft max-w-xl">Vends tes cartes et trouve les espèces qui te manquent auprès des autres joueurs. Ici, on paie en pépites.</p>
                 </div>
                 <div className="rounded-2xl nd-glass px-5 py-3">
                     <div className="text-[11px] uppercase tracking-wider text-white/50">Tes pépites</div>
@@ -327,7 +329,7 @@ export default function Auctions() {
                                 <p className="mt-3 text-ink-soft">
                                     {tab === 'market' ? 'Aucune carte en vente pour le moment.' : tab === 'selling' ? 'Tu n\'as encore rien mis en vente.' : 'Tu n\'as encore fait aucune offre.'}
                                 </p>
-                                {tab !== 'bidding' && <button onClick={() => switchTab('sell')} className="mt-5 nd-cta-gold px-5 py-2.5 rounded-full font-bold">Vendre un doublon</button>}
+                                {tab !== 'bidding' && <button onClick={() => switchTab('sell')} className="mt-5 nd-cta-gold px-5 py-2.5 rounded-full font-bold">Vendre une carte</button>}
                             </div>
                         ) : (
                             <>

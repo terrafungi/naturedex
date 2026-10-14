@@ -638,13 +638,13 @@ const actions = {
         };
     },
 
-    // Duplicates that can be put up for auction (the collection always keeps one copy).
+    // Every owned card can be put up for auction, even the last copy.
     async sellable(db, body, event) {
         const user = await requireUser(db, event);
         const { rows } = await db.query(
             `SELECT ${LIGHT_FIELDS}, uc.count FROM user_cards uc JOIN cards c ON c.id = uc.card_id
-             WHERE uc.user_id = $1 AND uc.count > 1 ORDER BY ${RARITY_ORDER} DESC, c.views DESC LIMIT 400`,
-            [user.id]
+             WHERE uc.user_id = $1 ORDER BY c.id = $2 DESC, ${RARITY_ORDER} DESC, c.views DESC LIMIT 400`,
+            [user.id, Number(body.cardId) || 0]
         );
         return { cards: rows, hours: AUCTION_HOURS, fee: AUCTION_FEE, recycleValue: RECYCLE_VALUE };
     },
@@ -665,11 +665,13 @@ const actions = {
                 `SELECT COUNT(*)::int AS open FROM auctions WHERE seller_id = $1 AND status = 'open'`, [user.id]
             );
             if (open >= MAX_LISTINGS) throw new HttpError(429, `${MAX_LISTINGS} ventes en cours au maximum`);
-            const { rowCount } = await client.query(
-                `UPDATE user_cards SET count = count - 1 WHERE user_id = $1 AND card_id = $2 AND count > 1`,
+            const { rows: [left] } = await client.query(
+                `UPDATE user_cards SET count = count - 1 WHERE user_id = $1 AND card_id = $2 AND count >= 1 RETURNING count`,
                 [user.id, Number(body.cardId)]
             );
-            if (!rowCount) throw new HttpError(400, 'Tu ne peux vendre que tes doublons');
+            if (!left) throw new HttpError(400, 'Tu ne possèdes pas cette carte');
+            // Selling the last copy removes it from the collection (it comes back if unsold).
+            if (left.count === 0) await client.query(`DELETE FROM user_cards WHERE user_id = $1 AND card_id = $2`, [user.id, Number(body.cardId)]);
             const { rows: [auction] } = await client.query(
                 `INSERT INTO auctions (seller_id, card_id, start_price, buyout, ends_at)
                  VALUES ($1, $2, $3, $4, now() + make_interval(hours => $5)) RETURNING id`,
