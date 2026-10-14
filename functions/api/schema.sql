@@ -1,4 +1,4 @@
--- NaturDex schema (idempotent)
+-- NatureDex schema (idempotent)
 
 CREATE TABLE IF NOT EXISTS cards (
     id          SERIAL PRIMARY KEY,
@@ -49,4 +49,13 @@ CREATE TABLE IF NOT EXISTS openings (
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     card_ids    INTEGER[] NOT NULL,
     at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- daily challenges already rewarded (day = Europe/Paris calendar day)
+CREATE TABLE IF NOT EXISTS challenge_claims (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day         DATE NOT NULL,
+    key         TEXT NOT NULL,
+    at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, day, key)
 );

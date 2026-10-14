@@ -1,5 +1,5 @@
 /**
- * NaturDex API
+ * NatureDex API
  *
  * Endpoint: https://yourdomain.com/api — POST { action, ...params }
  * Auth: `Authorization: Bearer <token>` (from register / login)
@@ -141,6 +141,60 @@ function drawBooster(pools) {
         picked.add(id);
         return id;
     });
+}
+
+// ---------- daily challenges ----------
+
+// Progress counts what the player pulled from boosters today. Types roughly match their
+// share of the catalogue, so goals stay reachable with the daily coins.
+const CHALLENGES = [
+    { key: 'forest', icon: 'leaf', title: 'Gardiens de la Forêt', text: 'Obtiens 3 cartes Forêt (plante, arbre, champignon)', goal: 3, reward: 100, types: ['plant', 'tree', 'fungus', 'mold'] },
+    { key: 'water', icon: 'drop', title: 'Sources de Vie', text: 'Obtiens 2 cartes Eau (poisson, créature marine, algue)', goal: 2, reward: 100, types: ['fish', 'marine', 'alga'] },
+    { key: 'sky', icon: 'bird', title: 'Maîtres du Ciel', text: 'Obtiens 2 cartes Oiseau', goal: 2, reward: 80, types: ['bird'] },
+    { key: 'scales', icon: 'sun', title: 'Sang-froid', text: 'Obtiens 2 cartes Reptile ou amphibien', goal: 2, reward: 80, types: ['reptile'] },
+    { key: 'bugs', icon: 'bug', title: 'Petites Bêtes', text: 'Obtiens 2 cartes Insecte ou arachnide', goal: 2, reward: 80, types: ['arthropod'] },
+    { key: 'wild', icon: 'paw', title: 'Instinct Sauvage', text: 'Obtiens 1 carte Mammifère', goal: 1, reward: 80, types: ['mammal'] },
+    { key: 'ages', icon: 'bone', title: 'Mémoire des Âges', text: 'Obtiens 1 carte Fossile', goal: 1, reward: 80, types: ['fossil'] },
+    { key: 'explorer', icon: 'compass', title: 'Explorateur', text: 'Ouvre 2 boosters', goal: 2, reward: 60, kind: 'open' },
+    { key: 'expert', icon: 'gem', title: 'Œil d\'Expert', text: 'Obtiens une carte Rare ou mieux', goal: 1, reward: 60, kind: 'rare' },
+    { key: 'naturalist', icon: 'sparkles', title: 'Naturaliste', text: 'Découvre 5 nouvelles espèces', goal: 5, reward: 100, kind: 'new' },
+];
+const DAILY_CHALLENGES = 4;
+
+// Same picks for every player on a given day: the two "type" challenges first, then two others.
+function challengesOf(day) {
+    let seed = Number(day.replaceAll('-', ''));
+    const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const shuffle = (list) => list.map((c) => [rand(), c]).sort((a, b) => a[0] - b[0]).map(([, c]) => c);
+    const byType = shuffle(CHALLENGES.filter((c) => c.types));
+    const others = shuffle(CHALLENGES.filter((c) => !c.types));
+    return [...byType.slice(0, 2), ...others.slice(0, 1), ...byType.slice(2, DAILY_CHALLENGES - 1)];
+}
+
+async function dailyChallenges(db, userId) {
+    const { rows: [{ day }] } = await db.query(`SELECT to_char((now() AT TIME ZONE 'Europe/Paris')::date, 'YYYY-MM-DD') AS day`);
+    const today = `(o.at AT TIME ZONE 'Europe/Paris')::date = $2::date`;
+    const [{ rows: pulled }, { rows: [stats] }, { rows: claims }] = await Promise.all([
+        db.query(`SELECT c.type, c.rarity FROM openings o CROSS JOIN unnest(o.card_ids) AS id JOIN cards c ON c.id = id
+                  WHERE o.user_id = $1 AND ${today}`, [userId, day]),
+        db.query(`SELECT (SELECT COUNT(*)::int FROM openings o WHERE o.user_id = $1 AND ${today}) AS opened,
+                         (SELECT COUNT(*)::int FROM user_cards uc WHERE uc.user_id = $1 AND (uc.first_at AT TIME ZONE 'Europe/Paris')::date = $2::date) AS discovered`,
+        [userId, day]),
+        db.query(`SELECT key FROM challenge_claims WHERE user_id = $1 AND day = $2`, [userId, day]),
+    ]);
+    const claimed = new Set(claims.map((r) => r.key));
+    const progressOf = (c) => {
+        if (c.kind === 'open') return stats.opened;
+        if (c.kind === 'new') return stats.discovered;
+        if (c.kind === 'rare') return pulled.filter((p) => ['rare', 'epic', 'legendary'].includes(p.rarity)).length;
+        return pulled.filter((p) => c.types.includes(p.type)).length;
+    };
+    return {
+        day,
+        challenges: challengesOf(day).map(({ types, kind, ...c }) => ({
+            ...c, progress: Math.min(progressOf({ types, kind }), c.goal), claimed: claimed.has(c.key),
+        })),
+    };
 }
 
 const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.image_url, c.thumb_url,
@@ -333,6 +387,26 @@ const actions = {
         if (!card.count) return { card: { id: card.id, num: card.num, type: card.type, rarity: card.rarity, count: 0 } };
         if (!card.extract) card.extract = await fillExtract(db, card);
         return { card };
+    },
+
+    async challenges(db, body, event) {
+        const user = await requireUser(db, event);
+        return dailyChallenges(db, user.id);
+    },
+
+    async claimChallenge(db, body, event) {
+        const user = await requireUser(db, event);
+        const { day, challenges } = await dailyChallenges(db, user.id);
+        const challenge = challenges.find((c) => c.key === body.key);
+        if (!challenge) throw new HttpError(404, 'Ce défi n\'est pas proposé aujourd\'hui');
+        if (challenge.progress < challenge.goal) throw new HttpError(400, 'Défi pas encore terminé');
+        const { rowCount } = await db.query(
+            `INSERT INTO challenge_claims (user_id, day, key) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+            [user.id, day, challenge.key]
+        );
+        if (!rowCount) throw new HttpError(409, 'Récompense déjà récupérée');
+        const { rows: [updated] } = await db.query(`UPDATE users SET coins = coins + $2 WHERE id = $1 RETURNING *`, [user.id, challenge.reward]);
+        return { user: await publicUser(db, updated), ...(await dailyChallenges(db, user.id)) };
     },
 
     async recycle(db, body, event) {
