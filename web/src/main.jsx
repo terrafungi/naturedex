@@ -12,6 +12,7 @@ import CardPage from './pages/CardPage.jsx';
 import Challenges from './pages/Challenges.jsx';
 import Profile from './pages/Profile.jsx';
 import Trophies from './pages/Trophies.jsx';
+import Leaderboard from './pages/Leaderboard.jsx';
 import Auctions from './pages/Auctions.jsx';
 import Friends from './pages/Friends.jsx';
 import Quiz from './pages/Quiz.jsx';
@@ -36,6 +37,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/booster" element={<Private><Boosters /></Private>} />
                         <Route path="/defis" element={<Private><Challenges /></Private>} />
                         <Route path="/trophees" element={<Private><Trophies /></Private>} />
+                        <Route path="/classement" element={<Private><Leaderboard /></Private>} />
                         <Route path="/encheres" element={<Private><Auctions /></Private>} />
                         <Route path="/quiz" element={<Private><Quiz /></Private>} />
                         <Route path="/boutique" element={<Private><Shop /></Private>} />

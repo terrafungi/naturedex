@@ -299,6 +299,20 @@ const TROPHIES = [
     ...series('Enchères', 'recycle', 'recycled', [[10, 'Tri sélectif'], [100, 'Recycleur'], [1000, 'Compost géant']], (g) => `Recycle ${n(g)} doublons`),
 ];
 
+// Leaderboards: one (user_id, score, extra) query per board; `extra` breaks ties.
+const RARITY_POINTS = `CASE c.rarity WHEN 'secret' THEN 100 WHEN 'legendary' THEN 25 WHEN 'epic' THEN 8 WHEN 'rare' THEN 3 WHEN 'uncommon' THEN 1 ELSE 0 END`;
+const BOARDS = {
+    quiz: (week) => `SELECT user_id, SUM(score)::int AS score,
+                            COUNT(*) FILTER (WHERE score = jsonb_array_length(questions))::int AS extra
+                     FROM quizzes WHERE status = 'done' ${week ? `AND day >= current_date - 6` : ''} GROUP BY 1`,
+    species: () => `SELECT user_id, COUNT(*)::int AS score, SUM(count)::int AS extra FROM user_cards GROUP BY 1`,
+    cards: () => `SELECT user_id, SUM(count)::int AS score, COUNT(*)::int AS extra FROM user_cards GROUP BY 1`,
+    prestige: () => `SELECT uc.user_id, SUM(${RARITY_POINTS})::int AS score,
+                            COUNT(*) FILTER (WHERE c.rarity IN ('legendary', 'secret'))::int AS extra
+                     FROM user_cards uc JOIN cards c ON c.id = uc.card_id GROUP BY 1`,
+    trophies: () => `SELECT user_id, COUNT(*)::int AS score, 0 AS extra FROM trophy_claims GROUP BY 1`,
+};
+
 async function trophyList(db, userId) {
     const [{ rows: [m] }, { rows: groups }, { rows: claims }] = await Promise.all([
         db.query(`SELECT
@@ -809,6 +823,37 @@ const actions = {
     async trophies(db, body, event) {
         const user = await requireUser(db, event);
         return { trophies: await trophyList(db, user.id) };
+    },
+
+    // Top 50 of a board (everyone or friends only) plus the caller's own row.
+    async leaderboard(db, body, event) {
+        const user = await requireUser(db, event);
+        const board = BOARDS[body.board] ? body.board : 'quiz';
+        const week = board === 'quiz' && body.period === 'week';
+        const friends = body.scope === 'friends';
+        const { rows } = await db.query(
+            `WITH s AS (${BOARDS[board](week)}),
+             r AS (
+                SELECT u.username, s.score, s.extra, u.id = $1 AS me,
+                       RANK() OVER (ORDER BY s.score DESC, s.extra DESC)::int AS rank,
+                       COUNT(*) OVER ()::int AS players
+                FROM s JOIN users u ON u.id = s.user_id
+                WHERE s.score > 0
+                  AND (u.username NOT LIKE 'zz\\_test\\_%' OR u.id = $1)
+                  AND (NOT $2 OR u.id = $1 OR EXISTS (
+                        SELECT 1 FROM friendships f WHERE f.status = 'accepted'
+                          AND ((f.requester_id = $1 AND f.addressee_id = u.id) OR (f.addressee_id = $1 AND f.requester_id = u.id))))
+             )
+             SELECT * FROM r WHERE rank <= 50 OR me ORDER BY rank, username`,
+            [user.id, friends]
+        );
+        const me = rows.find((r) => r.me) || null;
+        return {
+            board, period: week ? 'week' : 'all', scope: friends ? 'friends' : 'all',
+            players: rows[0]?.players || 0,
+            top: rows.filter((r) => r.rank <= 50).slice(0, 50).map(({ players, ...r }) => r),
+            me: me && (({ players, ...r }) => r)(me),
+        };
     },
 
     async claimTrophy(db, body, event) {

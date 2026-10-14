@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, Brain, Gavel, Home, Layers, Package, Plus, ShoppingBag, Trophy, User, Users } from 'lucide-react';
+import { Award, Brain, Gavel, Home, Layers, Medal, Package, Plus, ShoppingBag, Trophy, User, Users } from 'lucide-react';
 import { Nugget, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
@@ -9,6 +9,7 @@ export const NAV = [
     { to: '/collection', label: 'Collection', Icon: Layers },
     { to: '/booster', label: 'Booster', Icon: Package },
     { to: '/quiz', label: 'Quiz', Icon: Brain },
+    { to: '/classement', label: 'Classement', Icon: Medal },
     { to: '/encheres', label: 'Enchères', Icon: Gavel },
     { to: '/amis', label: 'Amis', Icon: Users },
     { to: '/defis', label: 'Défis', Icon: Trophy },
