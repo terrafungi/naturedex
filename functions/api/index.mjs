@@ -1,63 +1,327 @@
 /**
- * API Function
+ * NaturDex API
  *
- * Endpoint: https://yourdomain.com/api
+ * Endpoint: https://yourdomain.com/api — POST { action, ...params }
+ * Auth: `Authorization: Bearer <token>` (from register / login)
  *
  * Environment variables:
  * - DATABASE_URL (Postgres connection string)
- * - STORAGE_BUCKET (S3 bucket name)
- * - OPENKBS_PROJECT_ID (your project short ID)
  */
+import crypto from 'node:crypto';
+import { promisify } from 'node:util';
+import pg from 'pg';
+
+const scrypt = promisify(crypto.scrypt);
+
+const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+};
+
+const BOOSTER_PRICE = 100;
+const DAILY_COINS = 100;
+const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
+const SESSION_DAYS = 60;
+const RECYCLE_VALUE = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150 };
+
+// One booster = 6 slots, each a weighted rarity table.
+const BOOSTER_SLOTS = [
+    ...Array(4).fill({ common: 70, uncommon: 30 }),
+    { uncommon: 80, rare: 17, epic: 3 },
+    { rare: 70, epic: 22, legendary: 8 },
+];
+
+class HttpError extends Error {
+    constructor(status, message) { super(message); this.status = status; }
+}
+
+const json = (data, statusCode = 200) => ({ statusCode, headers, body: JSON.stringify(data) });
+
+let pool;
+function getPool() {
+    if (!pool) {
+        pool = new pg.Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: true },
+            max: 3,
+            idleTimeoutMillis: 60_000,
+            connectionTimeoutMillis: 5_000,
+        });
+        pool.on('error', (err) => console.error('[pg] idle connection dropped:', err.message));
+    }
+    return pool;
+}
+
+// ---------- auth ----------
+
+async function hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = await scrypt(password, salt, 64);
+    return `${salt}:${hash.toString('hex')}`;
+}
+
+async function verifyPassword(password, stored) {
+    const [salt, hex] = stored.split(':');
+    const hash = await scrypt(password, salt, 64);
+    return crypto.timingSafeEqual(hash, Buffer.from(hex, 'hex'));
+}
+
+async function createSession(db, userId) {
+    const token = crypto.randomBytes(32).toString('hex');
+    await db.query(
+        `INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, now() + interval '${SESSION_DAYS} days')`,
+        [token, userId]
+    );
+    return token;
+}
+
+async function requireUser(db, event) {
+    const auth = event.headers?.authorization || event.headers?.Authorization || '';
+    const token = auth.replace(/^Bearer\s+/i, '');
+    if (!token) throw new HttpError(401, 'Non connecté');
+    const { rows } = await db.query(
+        `SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = $1 AND s.expires_at > now()`,
+        [token]
+    );
+    if (!rows[0]) throw new HttpError(401, 'Session expirée');
+    return rows[0];
+}
+
+async function publicUser(db, user) {
+    const { rows } = await db.query(
+        `SELECT COUNT(*)::int AS discovered, COALESCE(SUM(count), 0)::int AS owned,
+                (SELECT COUNT(*)::int FROM cards) AS total
+         FROM user_cards WHERE user_id = $1`,
+        [user.id]
+    );
+    const nextDaily = user.last_daily ? new Date(user.last_daily).getTime() + DAILY_COOLDOWN_MS : 0;
+    return {
+        username: user.username,
+        coins: user.coins,
+        boosters: user.boosters,
+        boosterPrice: BOOSTER_PRICE,
+        dailyCoins: DAILY_COINS,
+        nextDailyAt: nextDaily > Date.now() ? new Date(nextDaily).toISOString() : null,
+        recycleValue: RECYCLE_VALUE,
+        ...rows[0],
+    };
+}
+
+// ---------- booster draw ----------
+
+let rarityPools; // { rarity: [cardId, ...] } — cached per Lambda container
+async function getRarityPools(db) {
+    if (!rarityPools) {
+        const { rows } = await db.query(`SELECT rarity, array_agg(id) AS ids FROM cards GROUP BY rarity`);
+        rarityPools = Object.fromEntries(rows.map((r) => [r.rarity, r.ids]));
+    }
+    return rarityPools;
+}
+
+function rollRarity(table, pools) {
+    const entries = Object.entries(table).filter(([r]) => pools[r]?.length);
+    const total = entries.reduce((sum, [, w]) => sum + w, 0);
+    let roll = crypto.randomInt(total);
+    for (const [rarity, weight] of entries) {
+        if ((roll -= weight) < 0) return rarity;
+    }
+    return entries[0][0];
+}
+
+function drawBooster(pools) {
+    const picked = new Set();
+    return BOOSTER_SLOTS.map((table) => {
+        const ids = pools[rollRarity(table, pools)];
+        let id;
+        do { id = ids[crypto.randomInt(ids.length)]; } while (picked.has(id) && picked.size < ids.length);
+        picked.add(id);
+        return id;
+    });
+}
+
+const CARD_FIELDS = `c.id, c.name, c.sci_name, c.type, c.rarity, c.views, c.image_url, c.thumb_url,
+                     c.extract, c.wiki_url, c.iucn, c.stats`;
+
+// ---------- actions ----------
+
+const actions = {
+    async register(db, body) {
+        const username = String(body.username || '').trim();
+        const password = String(body.password || '');
+        if (!/^[\p{L}\p{N}_.-]{3,20}$/u.test(username)) {
+            throw new HttpError(400, 'Pseudo : 3 à 20 caractères (lettres, chiffres, _ . -)');
+        }
+        if (password.length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
+        const exists = await db.query(`SELECT 1 FROM users WHERE lower(username) = lower($1)`, [username]);
+        if (exists.rows[0]) throw new HttpError(409, 'Ce pseudo est déjà pris');
+        const { rows } = await db.query(
+            `INSERT INTO users (username, pass_hash) VALUES ($1, $2) RETURNING *`,
+            [username, await hashPassword(password)]
+        );
+        return { token: await createSession(db, rows[0].id), user: await publicUser(db, rows[0]) };
+    },
+
+    async login(db, body) {
+        const { rows } = await db.query(`SELECT * FROM users WHERE lower(username) = lower($1)`, [String(body.username || '').trim()]);
+        if (!rows[0] || !(await verifyPassword(String(body.password || ''), rows[0].pass_hash))) {
+            throw new HttpError(401, 'Pseudo ou mot de passe incorrect');
+        }
+        return { token: await createSession(db, rows[0].id), user: await publicUser(db, rows[0]) };
+    },
+
+    async logout(db, body, event) {
+        const token = (event.headers?.authorization || '').replace(/^Bearer\s+/i, '');
+        await db.query(`DELETE FROM sessions WHERE token = $1`, [token]);
+        return { ok: true };
+    },
+
+    async me(db, body, event) {
+        return { user: await publicUser(db, await requireUser(db, event)) };
+    },
+
+    async claimDaily(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows } = await db.query(
+            `UPDATE users SET coins = coins + $2, last_daily = now()
+             WHERE id = $1 AND (last_daily IS NULL OR last_daily < now() - make_interval(secs => $3))
+             RETURNING *`,
+            [user.id, DAILY_COINS, DAILY_COOLDOWN_MS / 1000]
+        );
+        if (!rows[0]) throw new HttpError(429, 'Bonus déjà récupéré, reviens plus tard');
+        return { user: await publicUser(db, rows[0]) };
+    },
+
+    async buyBooster(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows } = await db.query(
+            `UPDATE users SET coins = coins - $2, boosters = boosters + 1
+             WHERE id = $1 AND coins >= $2 RETURNING *`,
+            [user.id, BOOSTER_PRICE]
+        );
+        if (!rows[0]) throw new HttpError(402, 'Pas assez de pièces');
+        return { user: await publicUser(db, rows[0]) };
+    },
+
+    async openBooster(db, body, event) {
+        const user = await requireUser(db, event);
+        const pools = await getRarityPools(db);
+        const client = await db.connect();
+        try {
+            await client.query('BEGIN');
+            const { rows: [locked] } = await client.query(
+                `UPDATE users SET boosters = boosters - 1 WHERE id = $1 AND boosters > 0 RETURNING *`,
+                [user.id]
+            );
+            if (!locked) throw new HttpError(402, 'Aucun booster à ouvrir');
+
+            const ids = drawBooster(pools);
+            const { rows: before } = await client.query(
+                `SELECT card_id FROM user_cards WHERE user_id = $1 AND card_id = ANY($2)`,
+                [user.id, ids]
+            );
+            const ownedBefore = new Set(before.map((r) => r.card_id));
+            for (const id of ids) {
+                await client.query(
+                    `INSERT INTO user_cards (user_id, card_id) VALUES ($1, $2)
+                     ON CONFLICT (user_id, card_id) DO UPDATE SET count = user_cards.count + 1`,
+                    [user.id, id]
+                );
+            }
+            await client.query(`INSERT INTO openings (user_id, card_ids) VALUES ($1, $2)`, [user.id, ids]);
+            await client.query('COMMIT');
+
+            const { rows: cards } = await db.query(`SELECT ${CARD_FIELDS} FROM cards c WHERE c.id = ANY($1)`, [ids]);
+            const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
+            const seen = new Set();
+            const pack = ids.map((id) => {
+                const isNew = !ownedBefore.has(id) && !seen.has(id);
+                seen.add(id);
+                return { ...byId[id], isNew };
+            });
+            return { cards: pack, user: await publicUser(db, locked) };
+        } catch (err) {
+            await client.query('ROLLBACK').catch(() => {});
+            throw err;
+        } finally {
+            client.release();
+        }
+    },
+
+    async catalog(db) {
+        const { rows } = await db.query(
+            `SELECT id, name, sci_name, type, rarity, views, thumb_url, (stats->>'hp')::int AS hp
+             FROM cards ORDER BY type, views DESC`
+        );
+        return { cards: rows };
+    },
+
+    async collection(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows } = await db.query(`SELECT card_id, count FROM user_cards WHERE user_id = $1`, [user.id]);
+        return { owned: Object.fromEntries(rows.map((r) => [r.card_id, r.count])) };
+    },
+
+    async card(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows: [card] } = await db.query(
+            `SELECT ${CARD_FIELDS}, COALESCE(uc.count, 0) AS count FROM cards c
+             LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $2 WHERE c.id = $1`,
+            [Number(body.id), user.id]
+        );
+        if (!card) throw new HttpError(404, 'Carte introuvable');
+        // Undiscovered cards stay a mystery.
+        if (!card.count) return { card: { id: card.id, type: card.type, rarity: card.rarity, count: 0 } };
+        return { card };
+    },
+
+    async recycle(db, body, event) {
+        const user = await requireUser(db, event);
+        const cardId = body.cardId ? Number(body.cardId) : null; // null = every duplicate
+        const client = await db.connect();
+        try {
+            await client.query('BEGIN');
+            const { rows } = await client.query(
+                `WITH old AS (
+                    SELECT card_id, count FROM user_cards
+                    WHERE user_id = $1 AND count > 1 AND ($2::int IS NULL OR card_id = $2) FOR UPDATE
+                 )
+                 UPDATE user_cards uc SET count = 1 FROM old JOIN cards c ON c.id = old.card_id
+                 WHERE uc.user_id = $1 AND uc.card_id = old.card_id
+                 RETURNING c.rarity, old.count - 1 AS extra`,
+                [user.id, cardId]
+            );
+            const recycled = rows.reduce((sum, r) => sum + r.extra, 0);
+            const coins = rows.reduce((sum, r) => sum + r.extra * RECYCLE_VALUE[r.rarity], 0);
+            const { rows: [updated] } = await client.query(
+                `UPDATE users SET coins = coins + $2 WHERE id = $1 RETURNING *`,
+                [user.id, coins]
+            );
+            await client.query('COMMIT');
+            return { recycled, coins, user: await publicUser(db, updated) };
+        } catch (err) {
+            await client.query('ROLLBACK').catch(() => {});
+            throw err;
+        } finally {
+            client.release();
+        }
+    },
+};
 
 export const handler = async (event) => {
-    const headers = {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type'
-    };
-
     if (event.requestContext?.http?.method === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
     }
 
     try {
         const body = JSON.parse(event.body || '{}');
-        const { action } = body;
-
-        switch (action) {
-            case 'hello':
-                return {
-                    statusCode: 200,
-                    headers,
-                    body: JSON.stringify({
-                        message: 'Hello from OpenKBS!',
-                        timestamp: new Date().toISOString()
-                    })
-                };
-
-            case 'status':
-                return {
-                    statusCode: 200,
-                    headers,
-                    body: JSON.stringify({
-                        postgres: !!process.env.DATABASE_URL,
-                        storage: !!process.env.STORAGE_BUCKET,
-                        projectId: process.env.OPENKBS_PROJECT_ID
-                    })
-                };
-
-            default:
-                return {
-                    statusCode: 400,
-                    headers,
-                    body: JSON.stringify({ error: 'Unknown action', available: ['hello', 'status'] })
-                };
-        }
+        const fn = actions[body.action];
+        if (!fn) return json({ error: 'Unknown action', available: Object.keys(actions) }, 400);
+        return json(await fn(getPool(), body, event));
     } catch (error) {
-        return {
-            statusCode: 500,
-            headers,
-            body: JSON.stringify({ error: error.message })
-        };
+        if (error instanceof HttpError) return json({ error: error.message }, error.status);
+        console.error(error);
+        return json({ error: 'Erreur serveur' }, 500);
     }
 };
