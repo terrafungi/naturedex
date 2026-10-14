@@ -101,13 +101,21 @@ export function intro(text, max = 300) {
 }
 
 // Hide every word that would give the answer away (names, genus, plurals).
+// Words too common to give the answer away: masking them only makes the text unreadable.
+const GENERIC = new Set(['virus', 'bactérie', 'champignon', 'plante', 'arbre', 'oiseau', 'poisson', 'algue', 'commun', 'commune',
+    'grand', 'grande', 'petit', 'petite', 'europe', 'européen', 'européenne', 'sauvage', 'famille', 'espèce', 'genre', 'avec', 'dans']);
+
+const ACCENTS = { a: '[aàâä]', e: '[eéèêë]', i: '[iîï]', o: '[oôö]', u: '[uùûü]', c: '[cç]' };
+
 function maskText(text, card) {
     const words = new Set([card.name, card.sci_name]);
-    for (const w of `${card.name} ${card.sci_name || ''}`.split(/[\s'’,()-]+/)) if (w.length > 3) words.add(w);
+    for (const w of `${card.name} ${card.sci_name || ''}`.split(/[\s'’,()-]+/)) if (w.length > 3 && !GENERIC.has(w.toLowerCase())) words.add(w);
     let t = text;
     for (const w of [...words].filter(Boolean).sort((a, b) => b.length - a.length)) {
         const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        t = t.replace(new RegExp(`${esc}[\\p{L}]*`, 'giu'), '▢▢▢');
+        // Accent-insensitive, so "Dimetrodon" also hides "dimétrodon".
+        const loose = esc.normalize('NFD').replace(/\p{M}/gu, '').replace(/[aeiouc]/gi, (ch) => ACCENTS[ch.toLowerCase()]);
+        t = t.replace(new RegExp(`(?<!\\p{L})${loose}[\\p{L}]*`, 'giu'), '▢▢▢');
     }
     return t.replace(/▢▢▢(?:[\s-]*▢▢▢)+/g, '▢▢▢');
 }
