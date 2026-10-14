@@ -114,8 +114,9 @@ export default function LiveAuction({ id, total, onClose, onChange }) {
     const a = data?.auction;
     const ended = a && (a.status !== 'open' || new Date(a.ends_at).getTime() <= now);
     const soon = a && !ended && new Date(a.ends_at).getTime() - now < 2 * 60_000;
-    const quick = a ? [...new Set([a.minBid, Math.ceil((a.bid ?? a.start_price) * 1.1), Math.ceil((a.bid ?? a.start_price) * 1.25)])]
-        .filter((v) => v >= a.minBid && (!a.buyout || v < a.buyout)) : [];
+    const base = a ? a.bid ?? a.start_price : 0;
+    const quick = a ? [['Minimum', a.minBid], ['+10 %', Math.ceil(base * 1.1)], ['+25 %', Math.ceil(base * 1.25)]]
+        .filter(([, v], i, all) => v >= a.minBid && (!a.buyout || v < a.buyout) && all.findIndex(([, w]) => w === v) === i) : [];
 
     return (
         <motion.div className="fixed inset-0 z-50 grid place-items-center p-3 sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -171,10 +172,10 @@ export default function LiveAuction({ id, total, onClose, onChange }) {
                                         {!(a.buyout && a.minBid >= a.buyout) && (
                                             <>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {quick.map((v) => (
-                                                        <button key={v} type="button" onClick={() => setAmount(v)}
+                                                    {quick.map(([label, v]) => (
+                                                        <button key={label} type="button" onClick={() => setAmount(v)}
                                                             className={`px-3 py-1.5 rounded-full text-xs font-bold ring-1 ${Number(amount) === v ? 'bg-[#e9c46a] text-[#05130d] ring-[#e9c46a]' : 'bg-white/5 text-white/80 ring-white/10'}`}>
-                                                            {v === a.minBid ? 'Minimum' : `+${Math.round((v / (a.bid ?? a.start_price) - 1) * 100)} %`} · {v}
+                                                            {label} · {v}
                                                         </button>
                                                     ))}
                                                 </div>
