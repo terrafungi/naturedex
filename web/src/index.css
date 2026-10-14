@@ -77,12 +77,13 @@ body {
 .nd-box { container-type: inline-size; }
 .nd-card {
     --type: #6b8e23;
+    --rar: #a7aea9; /* frame colour = rarity, the type keeps its badge and photo ring */
     position: relative;
     aspect-ratio: 5 / 7;
     border-radius: 4.5cqi;
     padding: 3.2cqi;
     background:
-        linear-gradient(160deg, color-mix(in oklab, var(--type) 85%, white) 0%, var(--type) 45%, color-mix(in oklab, var(--type) 70%, black) 100%);
+        linear-gradient(160deg, color-mix(in oklab, var(--rar) 55%, white) 0%, var(--rar) 45%, color-mix(in oklab, var(--rar) 55%, black) 100%);
     box-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset, 0 10px 24px -12px rgb(20 30 20 / 0.6), 0 2px 4px rgb(20 30 20 / 0.2);
     color: #1b211e;
     overflow: hidden;
@@ -94,9 +95,9 @@ body {
     display: flex;
     flex-direction: column;
     border-radius: 2.6cqi;
-    background: linear-gradient(180deg, #f8f2e2, #efe5cc);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--rar) 9%, #f8f2e2), color-mix(in oklab, var(--rar) 20%, #efe5cc));
     padding: 3cqi 3.4cqi 2.6cqi;
-    box-shadow: 0 0 0 0.6cqi rgb(201 162 74 / 0.9) inset, 0 0 0 1.1cqi rgb(255 255 255 / 0.35) inset;
+    box-shadow: 0 0 0 0.6cqi color-mix(in oklab, var(--rar) 75%, black) inset, 0 0 0 1.1cqi rgb(255 255 255 / 0.35) inset;
 }
 .nd-card .nd-name { font-family: var(--font-display); font-weight: 700; font-size: 7.2cqi; line-height: 1.05; }
 .nd-card .nd-hp { font-family: var(--font-display); font-weight: 800; font-size: 7cqi; color: #e0413a; white-space: nowrap; }
@@ -108,14 +109,16 @@ body {
     border-radius: 1.6cqi;
     overflow: hidden;
     background: color-mix(in oklab, var(--type) 30%, #e8dec6);
-    box-shadow: 0 0 0 0.8cqi var(--color-brass) , 0 0 0 1.4cqi color-mix(in oklab, var(--type) 60%, black);
+    box-shadow: 0 0 0 0.8cqi color-mix(in oklab, var(--rar) 70%, white), 0 0 0 1.4cqi color-mix(in oklab, var(--type) 60%, black);
 }
 .nd-card .nd-window img { width: 100%; height: 100%; object-fit: cover; }
 /* keep the artwork readable: the foil passes behind it, only a soft sheen on top */
 .nd-card[data-rarity="epic"] .nd-window,
-.nd-card[data-rarity="legendary"] .nd-window { z-index: 3; }
+.nd-card[data-rarity="legendary"] .nd-window,
+.nd-card[data-rarity="secret"] .nd-window { z-index: 3; }
 .nd-card[data-rarity="epic"] .nd-window::after,
-.nd-card[data-rarity="legendary"] .nd-window::after {
+.nd-card[data-rarity="legendary"] .nd-window::after,
+.nd-card[data-rarity="secret"] .nd-window::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;
     mix-blend-mode: soft-light; opacity: 0.45;
     background: linear-gradient(115deg, transparent 20%, rgb(255 255 255 / 0.7) var(--my, 50%), transparent 80%);
@@ -143,14 +146,21 @@ body {
 }
 .nd-type-icon svg { width: 5cqi; height: 5cqi; }
 
-/* rare+: gold frame */
-.nd-card[data-rarity="rare"] .nd-card-inner { box-shadow: 0 0 0 0.8cqi #d8b25a inset, 0 0 0 1.3cqi rgb(255 255 255 / 0.5) inset; }
+/* one frame colour per rarity */
+.nd-card[data-rarity="uncommon"] { --rar: #2fbf7a; }
+.nd-card[data-rarity="rare"] { --rar: #3d97f5; }
+.nd-card[data-rarity="epic"] { --rar: #9b4dff; }
+.nd-card[data-rarity="legendary"] { --rar: #e0a92e; }
+.nd-card[data-rarity="secret"] { --rar: #ff5fd2; }
+.nd-card[data-rarity="rare"] .nd-card-inner { box-shadow: 0 0 0 0.8cqi #2a6fc0 inset, 0 0 0 1.3cqi rgb(255 255 255 / 0.55) inset; }
 
-/* epic + legendary: holographic foil that follows the pointer */
+/* epic + legendary + secret: holographic foil that follows the pointer */
 .nd-card[data-rarity="epic"],
-.nd-card[data-rarity="legendary"] { --mx: 50%; --my: 50%; }
+.nd-card[data-rarity="legendary"],
+.nd-card[data-rarity="secret"] { --mx: 50%; --my: 50%; }
 .nd-card[data-rarity="epic"]::after,
-.nd-card[data-rarity="legendary"]::after {
+.nd-card[data-rarity="legendary"]::after,
+.nd-card[data-rarity="secret"]::after {
     content: "";
     position: absolute; inset: 0;
     border-radius: inherit;
@@ -171,8 +181,32 @@ body {
 }
 .nd-card[data-rarity="legendary"] .nd-card-inner { background: linear-gradient(180deg, #fbf3dc, #f1e1b4); }
 
+/* secret: spinning prismatic frame on a night-sky card */
+@property --spin { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.nd-card[data-rarity="secret"] {
+    color: #f6efff;
+    background: conic-gradient(from var(--spin), #ff5fd2, #ffd36e, #7dffb0, #6ec8ff, #c18bff, #ff5fd2);
+    animation: nd-frame-spin 5s linear infinite;
+}
+@keyframes nd-frame-spin { to { --spin: 360deg; } }
+.nd-card[data-rarity="secret"]::after { opacity: 0.4; }
+.nd-card[data-rarity="secret"] .nd-card-inner {
+    background:
+        radial-gradient(1.2px 1.2px at 18% 22%, #fff, transparent), radial-gradient(1px 1px at 72% 12%, #fff, transparent),
+        radial-gradient(1.4px 1.4px at 88% 64%, #fff, transparent), radial-gradient(1px 1px at 30% 88%, #fff, transparent),
+        radial-gradient(120% 80% at 50% 0%, #3a1d6e, transparent 70%),
+        linear-gradient(180deg, #1b1035, #0a0718);
+    box-shadow: 0 0 0 0.6cqi rgb(255 255 255 / 0.55) inset, 0 0 4cqi rgb(255 95 210 / 0.35) inset;
+}
+.nd-card[data-rarity="secret"] .nd-hp { color: #ff9fb8; }
+.nd-card[data-rarity="secret"] .nd-strip { background: linear-gradient(90deg, rgb(255 255 255 / 0.14), transparent); }
+.nd-card[data-rarity="secret"] .nd-attack { border-color: rgb(255 255 255 / 0.14); }
+.nd-card[data-rarity="secret"] .nd-foot { color: #c8bde6; }
+.nd-card[data-rarity="secret"] .nd-window { box-shadow: 0 0 0 0.8cqi #fff, 0 0 0 1.4cqi #ff5fd2, 0 0 5cqi rgb(255 95 210 / 0.6); }
+
 /* undiscovered silhouette */
 .nd-mystery {
+    position: relative;
     aspect-ratio: 5 / 7;
     border-radius: 4.5cqi;
     border: 0.7cqi dashed color-mix(in oklab, var(--type) 55%, transparent);
@@ -181,6 +215,17 @@ body {
         color-mix(in oklab, var(--type) 12%, #0e1222);
     display: grid; place-items: center;
     color: color-mix(in oklab, var(--type) 70%, white);
+}
+.nd-mystery[data-secret] {
+    border: none;
+    padding: 1cqi;
+    background: conic-gradient(from var(--spin), #ff5fd2, #ffd36e, #7dffb0, #6ec8ff, #c18bff, #ff5fd2);
+    animation: nd-frame-spin 5s linear infinite;
+    color: #f6efff;
+}
+.nd-mystery[data-secret] > div {
+    width: 100%; height: 100%; border-radius: 3.8cqi; display: grid; place-items: center;
+    background: radial-gradient(90% 60% at 50% 30%, #3a1d6e, transparent 70%), #0a0718;
 }
 
 /* booster pack */
@@ -367,3 +412,12 @@ body {
     backdrop-filter: blur(18px);
     padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* "Carte secrète" banner */
+.nd-secret-text {
+    background: linear-gradient(90deg, #ff5fd2, #ffd36e, #7dffb0, #6ec8ff, #c18bff, #ff5fd2) 0 0 / 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgb(255 95 210 / 0.7));
+    animation: nd-hue 3s linear infinite;
+}
+.nd-secret-glow .nd-card, .nd-secret-glow .nd-mystery { box-shadow: 0 0 60px 10px rgb(255 95 210 / 0.45), 0 0 120px 20px rgb(110 200 255 / 0.25); }

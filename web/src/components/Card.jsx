@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Eye, HelpCircle } from 'lucide-react';
+import { Eye, HelpCircle, Sparkles } from 'lucide-react';
 import { RARITIES, TYPES, attacksFor, formatViews } from '../game.jsx';
 
 export function TypeBadge({ type, className = '' }) {
@@ -24,7 +24,8 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
     const t = TYPES[card.type] || TYPES.plant;
     const r = RARITIES[card.rarity] || RARITIES.common;
     const hp = card.hp ?? card.stats?.hp;
-    const foil = card.rarity === 'epic' || card.rarity === 'legendary';
+    const foil = ['epic', 'legendary', 'secret'].includes(card.rarity);
+    const ink = card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
 
     function onMove(e) {
         if (!foil && !tilt) return;
@@ -63,7 +64,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                 </div>
                 <div className="nd-strip">
                     <span className="nd-sci">{card.sci_name || t.label}</span>
-                    <span className="shrink-0 font-semibold" style={{ color: `color-mix(in oklab, ${r.color} 72%, black)` }}>{t.label}</span>
+                    <span className="shrink-0 font-semibold" style={{ color: ink }}>{t.label}</span>
                 </div>
                 <div className="mt-[1.5cqi]">
                     {attacksFor(card).map((a) => (
@@ -78,7 +79,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                     <span className="flex items-center gap-[1cqi]" title="Lectures Wikipédia par an (estimation)">
                         {card.views != null && <><Eye className="w-[3.6cqi] h-[3.6cqi]" />{formatViews(Number(card.views))}</>}
                     </span>
-                    <span className="font-bold tracking-wide" style={{ color: `color-mix(in oklab, ${r.color} 72%, black)` }} title={r.label}>
+                    <span className="font-bold tracking-wide" style={{ color: ink }} title={r.label}>
                         {r.symbol} {r.label}
                     </span>
                     {number != null && <span>{String(number).padStart(3, '0')}/{total}</span>}
@@ -91,6 +92,19 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
 
 export function MysteryCard({ card, number }) {
     const t = TYPES[card.type] || TYPES.plant;
+    if (card.rarity === 'secret') return (
+        <div className="nd-box">
+        <div className="nd-mystery" data-secret title="Carte secrète">
+            <div>
+                <div className="flex flex-col items-center gap-[3cqi] text-center">
+                    <Sparkles style={{ width: '16cqi', height: '16cqi' }} className="text-[#ff9fe6] drop-shadow-[0_0_10px_#ff5fd2]" />
+                    <span style={{ fontSize: '6cqi' }} className="font-display font-semibold">Carte secrète</span>
+                    {card.type && <span style={{ fontSize: '4cqi' }} className="opacity-60">{t.label}</span>}
+                </div>
+            </div>
+        </div>
+        </div>
+    );
     return (
         <div className="nd-box">
         <div className="nd-mystery" style={{ '--type': t.color }}>

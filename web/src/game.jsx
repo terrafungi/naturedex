@@ -55,6 +55,7 @@ export const RARITIES = {
     rare:      { label: 'Rare', symbol: '★', order: 2, color: '#4ea8ff' },
     epic:      { label: 'Épique', symbol: '★★', order: 3, color: '#a855f7' },
     legendary: { label: 'Légendaire', symbol: '★★★', order: 4, color: '#ffc53d' },
+    secret:    { label: 'Secrète', symbol: '✦', order: 5, color: '#ff5fd2' },
 };
 
 export const IUCN = {

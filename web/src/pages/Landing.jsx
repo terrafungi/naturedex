@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowRight, ChevronRight, Compass, Dices, Eye, GalleryVerticalEnd, Gem, Leaf, PackageOpen, Shield, Sparkles, Zap } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
-import { Card, TypeBadge } from '../components/Card.jsx';
+import { Card, MysteryCard, TypeBadge } from '../components/Card.jsx';
 import { ChallengeCard, SAMPLE_CHALLENGES } from '../components/Challenge.jsx';
 import { Pack } from '../components/Pack.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
@@ -15,6 +15,7 @@ const RARITY_TIERS = {
     rare: 'Top 20 % de son type',
     epic: 'Top 6 % de son type',
     legendary: 'Top 1 % de son type',
+    secret: 'Les 50 espèces stars',
 };
 
 // Same odds as the server draw (functions/api).
@@ -333,7 +334,7 @@ function Rarity({ show }) {
         <section className="relative isolate overflow-hidden py-24">
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(50%_45%_at_80%_30%,rgb(233_196_106/0.14),transparent),radial-gradient(45%_50%_at_10%_80%,rgb(79_209_139/0.14),transparent)]" />
             <div className="max-w-7xl mx-auto px-5">
-                <SectionTitle kicker="Les raretés" sub="On compte les lectures de chaque article Wikipédia, puis on classe chaque espèce parmi celles de son type. Le lion, le koala ou l'amanite tue-mouches sont Légendaires, et même les bactéries ont leurs stars.">
+                <SectionTitle kicker="Les raretés" sub="On compte les lectures de chaque article Wikipédia, puis on classe chaque espèce parmi celles de son type. Chaque type a ses Légendaires, même les bactéries. Et les 50 espèces les plus célèbres sont des cartes Secrètes, presque introuvables.">
                     La célébrité fait <span className="nd-gold-text">la rareté</span>.
                 </SectionTitle>
 
@@ -354,6 +355,15 @@ function Rarity({ show }) {
                                 </Reveal>
                             );
                         })}
+                        <Reveal delay={show.ladder.length * 0.1} className="flex-1 flex flex-col items-center">
+                            <motion.div className="nd-secret-glow" style={{ width: '100%' }} whileHover={{ y: -12, rotate: 2 }}>
+                                <MysteryCard card={{ rarity: 'secret' }} />
+                            </motion.div>
+                            <div className="mt-5 text-center">
+                                <div className="font-display text-lg font-bold nd-secret-text">{RARITIES.secret.symbol} {RARITIES.secret.label}</div>
+                                <div className="text-xs uppercase tracking-[0.15em] text-white/45 mt-1">{RARITY_TIERS.secret}</div>
+                            </div>
+                        </Reveal>
                     </div>
                 </div>
 
@@ -361,7 +371,7 @@ function Rarity({ show }) {
                     <Reveal>
                         <h3 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-white">Le panthéon du NatureDex</h3>
                         <p className="mt-4 text-ink-soft leading-relaxed">
-                            Les espèces les plus lues de toute la collection, en lectures estimées par an. Une Légendaire apparaît dans environ
+                            Les Légendaires les plus lues de la collection (les Secrètes restent cachées), en lectures estimées par an. Une Légendaire apparaît dans environ
                             <b className="text-amber-300"> 1 booster sur 12</b>.
                         </p>
                         <Link to={user ? '/booster' : '/connexion?mode=register'} className="mt-8 inline-flex items-center gap-2 font-semibold text-[#f4d88f] hover:text-white transition-colors">

@@ -13,6 +13,8 @@
  * Article intros are fetched lazily by the API the first time a card is looked at.
  *
  * Rarity = popularity, ranked by percentile inside each card type (every type gets its own legendaries).
+ * The most famous species become secret cards: the top SECRETS_PER_TYPE of each type, topped up
+ * to SECRET_COUNT with the next most read ones overall.
  * Wikidata responses are cached in scripts/.cache so re-runs are cheap.
  */
 import fs from 'node:fs';
@@ -179,10 +181,13 @@ async function fetchDetails(qids, out = {}) {
 }
 
 function hpFor(views, rarity) {
-    const bonus = { common: 0, uncommon: 10, rare: 20, epic: 40, legendary: 60 }[rarity];
+    const bonus = { common: 0, uncommon: 10, rare: 20, epic: 40, legendary: 60, secret: 80 }[rarity];
     const base = Math.round((30 + 22 * Math.log10(views + 1)) / 10) * 10;
-    return Math.min(260, Math.max(30, base + bonus));
+    return Math.min(rarity === 'secret' ? 300 : 260, Math.max(30, base + bonus));
 }
+
+const SECRET_COUNT = 50;
+const SECRETS_PER_TYPE = 3;
 
 function assignRarity(cards) {
     const byType = {};
@@ -200,6 +205,10 @@ function assignRarity(cards) {
             c.rarity = i < cut.legendary ? 'legendary' : i < cut.epic ? 'epic' : i < cut.rare ? 'rare' : i < cut.uncommon ? 'uncommon' : 'common';
         });
     }
+    const secrets = new Set(Object.values(byType).flatMap((list) => list.slice(0, SECRETS_PER_TYPE)));
+    const rest = cards.filter((c) => !secrets.has(c)).sort((a, b) => b.views - a.views);
+    for (const c of rest.slice(0, SECRET_COUNT - secrets.size)) secrets.add(c);
+    for (const c of secrets) c.rarity = 'secret';
 }
 
 // ---------- main ----------
