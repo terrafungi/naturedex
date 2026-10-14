@@ -447,7 +447,7 @@ function FinalCta() {
                     <div>
                         <Sparkles className="w-8 h-8 text-amber-300" />
                         <h2 className="mt-4 font-display text-4xl sm:text-6xl font-semibold tracking-[-0.01em] text-white leading-[1]">Ton premier booster<br /><span className="nd-grad-text">t'attend.</span></h2>
-                        <p className="mt-5 text-white/70 text-lg max-w-md">Crée ton compte en 10 secondes, avec un pseudo et un mot de passe. 10 ouvertures gratuites t'attendent, rechargées toutes les 30 minutes.</p>
+                        <p className="mt-5 text-white/70 text-lg max-w-md">Crée ton compte en 10 secondes, avec un pseudo et un mot de passe. 10 ouvertures gratuites t'attendent, rechargées toutes les heures.</p>
                         <div className="mt-8 flex flex-wrap gap-3">
                             <Link to="/connexion?mode=register" className="nd-btn inline-flex items-center gap-2.5 px-7 py-4 rounded-2xl font-bold text-lg">
                                 <PackageOpen className="w-5 h-5" />Commencer la collection

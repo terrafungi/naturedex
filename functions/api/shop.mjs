@@ -21,13 +21,16 @@ export const ASSOCIATIONS = {
 };
 
 // cents, EUR. `bonus` is only shown in the shop (already included in the amounts).
+// The more you spend, the more you get per euro (500 → 700 → 1 000 graines per euro).
+// `once`: one purchase per account, double the smallest pack, to make the first step easy.
 export const PACKS = {
+    welcome: { label: 'Offre de bienvenue', coins: 2000, nuggets: 300, price: 199, once: true },
     seeds_s: { label: 'Sachet de graines', coins: 1000, nuggets: 0, price: 199 },
     seeds_m: { label: 'Sac de graines', coins: 3500, nuggets: 0, price: 499, bonus: 500 },
-    seeds_l: { label: 'Grenier à graines', coins: 8500, nuggets: 0, price: 999, bonus: 1500 },
+    seeds_l: { label: 'Grenier à graines', coins: 10000, nuggets: 0, price: 999, bonus: 3000 },
     nuggets_s: { label: 'Bourse de pépites', coins: 0, nuggets: 500, price: 299 },
     nuggets_m: { label: 'Coffret de pépites', coins: 0, nuggets: 1800, price: 799, bonus: 300 },
-    naturalist: { label: 'Pack du naturaliste', coins: 6000, nuggets: 1200, price: 1299, best: true },
+    naturalist: { label: 'Pack du naturaliste', coins: 7000, nuggets: 1500, price: 1299, best: true },
 };
 
 // Stripe tax code, required when Managed Payments is on: "electronically supplied services".

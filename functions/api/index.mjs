@@ -34,7 +34,7 @@ const headers = {
 const BOOSTER_PRICE = 100; // graines for one opening once the free charges are spent
 const DAILY_COINS = 100;
 const MAX_CHARGES = 10;
-const CHARGE_MS = 30 * 60 * 1000;
+const CHARGE_MS = 60 * 60 * 1000; // a full refill takes 10 h: one in the evening, one in the morning
 const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
 const SESSION_DAYS = 60;
 // Invitations and sharing. The sponsor is paid only once the invitee has really played
@@ -45,7 +45,7 @@ const INVITE_DAYS = 2;
 const INVITE_CAP = 30;
 const SHARE_COINS = 100; // once per account, for sharing the game link
 // pépites per recycled duplicate
-const RECYCLE_VALUE = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, secret: 1000 };
+const RECYCLE_VALUE = { common: 2, uncommon: 4, rare: 10, epic: 25, legendary: 60, secret: 400 };
 
 // One booster = 6 slots, each a weighted rarity table. The last slot hides the 50 secret
 // cards: 1 booster in 500 (0.2 %), so one given secret card about 1 in 25,000.
@@ -111,7 +111,7 @@ async function requireUser(db, event) {
     return rows[0];
 }
 
-// Free openings: `charges` as of `charges_at`, plus one every 30 minutes up to the cap.
+// Free openings: `charges` as of `charges_at`, plus one every hour up to the cap.
 function chargeState(user, now = Date.now()) {
     const from = new Date(user.charges_at).getTime();
     const ticks = Math.max(0, Math.floor((now - from) / CHARGE_MS));
@@ -198,16 +198,16 @@ function drawBooster(pools) {
 // Progress counts what the player pulled from boosters today. Types roughly match their
 // share of the catalogue, so goals stay reachable with the daily coins.
 const CHALLENGES = [
-    { key: 'forest', icon: 'leaf', title: 'Gardiens de la Forêt', text: 'Obtiens 3 cartes Forêt : plante, arbre ou champignon', goal: 3, reward: 100, types: ['plant', 'tree', 'fungus', 'mold'] },
-    { key: 'water', icon: 'drop', title: 'Sources de Vie', text: 'Obtiens 2 cartes Eau : poisson, créature marine ou algue', goal: 2, reward: 100, types: ['fish', 'marine', 'alga'] },
-    { key: 'sky', icon: 'bird', title: 'Maîtres du Ciel', text: 'Obtiens 2 cartes Oiseau', goal: 2, reward: 80, types: ['bird'] },
-    { key: 'scales', icon: 'sun', title: 'Sang-froid', text: 'Obtiens 2 cartes Reptile ou amphibien', goal: 2, reward: 80, types: ['reptile'] },
-    { key: 'bugs', icon: 'bug', title: 'Petites Bêtes', text: 'Obtiens 2 cartes Insecte ou arachnide', goal: 2, reward: 80, types: ['arthropod'] },
-    { key: 'wild', icon: 'paw', title: 'Instinct Sauvage', text: 'Obtiens 1 carte Mammifère', goal: 1, reward: 80, types: ['mammal'] },
-    { key: 'ages', icon: 'bone', title: 'Mémoire des Âges', text: 'Obtiens 1 carte Fossile', goal: 1, reward: 80, types: ['fossil'] },
-    { key: 'explorer', icon: 'compass', title: 'Explorateur', text: 'Ouvre 2 boosters', goal: 2, reward: 60, kind: 'open' },
-    { key: 'expert', icon: 'gem', title: 'Œil d\'Expert', text: 'Obtiens une carte Rare ou mieux', goal: 1, reward: 60, kind: 'rare' },
-    { key: 'naturalist', icon: 'sparkles', title: 'Naturaliste', text: 'Découvre 5 nouvelles espèces', goal: 5, reward: 100, kind: 'new' },
+    { key: 'forest', icon: 'leaf', title: 'Gardiens de la Forêt', text: 'Obtiens 3 cartes Forêt : plante, arbre ou champignon', goal: 3, reward: 60, types: ['plant', 'tree', 'fungus', 'mold'] },
+    { key: 'water', icon: 'drop', title: 'Sources de Vie', text: 'Obtiens 2 cartes Eau : poisson, créature marine ou algue', goal: 2, reward: 60, types: ['fish', 'marine', 'alga'] },
+    { key: 'sky', icon: 'bird', title: 'Maîtres du Ciel', text: 'Obtiens 2 cartes Oiseau', goal: 2, reward: 50, types: ['bird'] },
+    { key: 'scales', icon: 'sun', title: 'Sang-froid', text: 'Obtiens 2 cartes Reptile ou amphibien', goal: 2, reward: 50, types: ['reptile'] },
+    { key: 'bugs', icon: 'bug', title: 'Petites Bêtes', text: 'Obtiens 2 cartes Insecte ou arachnide', goal: 2, reward: 50, types: ['arthropod'] },
+    { key: 'wild', icon: 'paw', title: 'Instinct Sauvage', text: 'Obtiens 1 carte Mammifère', goal: 1, reward: 50, types: ['mammal'] },
+    { key: 'ages', icon: 'bone', title: 'Mémoire des Âges', text: 'Obtiens 1 carte Fossile', goal: 1, reward: 50, types: ['fossil'] },
+    { key: 'explorer', icon: 'compass', title: 'Explorateur', text: 'Ouvre 2 boosters', goal: 2, reward: 40, kind: 'open' },
+    { key: 'expert', icon: 'gem', title: 'Œil d\'Expert', text: 'Obtiens une carte Rare ou mieux', goal: 1, reward: 40, kind: 'rare' },
+    { key: 'naturalist', icon: 'sparkles', title: 'Naturaliste', text: 'Découvre 5 nouvelles espèces', goal: 5, reward: 60, kind: 'new' },
 ];
 const DAILY_CHALLENGES = 4;
 
@@ -257,8 +257,8 @@ const TYPE_NAMES = {
     arthropod: 'Insectes & arachnides', marine: 'Créatures marines', plant: 'Plantes', tree: 'Arbres',
     alga: 'Algues', fungus: 'Champignons', mold: 'Moisissures & levures', bacteria: 'Bactéries', virus: 'Virus', fossil: 'Fossiles',
 };
-const TIER_COINS = [50, 100, 200, 300, 500, 800, 1200, 2000, 3000];
-const TIER_NUGGETS = [20, 50, 100, 150, 250, 400, 600, 1000, 1500];
+const TIER_COINS = [30, 60, 120, 200, 300, 500, 800, 1200, 2000];
+const TIER_NUGGETS = [10, 25, 50, 80, 120, 200, 300, 500, 800];
 
 function series(group, icon, metric, steps, text) {
     return steps.map(([goal, title], i) => ({
@@ -1523,18 +1523,21 @@ const actions = {
             await Promise.all(pending.map((p) => refreshPurchase(db, p).catch((err) => console.error('refresh', p.id, err.message))));
         }
         const live = !stripeTestMode();
-        const [{ rows: totals }, { rows: mine }] = await Promise.all([
+        const [{ rows: totals }, { rows: mine }, { rows: bought }] = await Promise.all([
             db.query(`SELECT association, SUM(donation_cents)::int AS donated, COUNT(*)::int AS purchases
                       FROM purchases WHERE status = 'paid' AND livemode = $1 GROUP BY 1`, [live]),
             db.query(`SELECT * FROM purchases WHERE user_id = $1 AND status <> 'pending' OR (user_id = $1 AND created_at > now() - interval '1 hour')
                       ORDER BY id DESC LIMIT 20`, [user.id]),
+            db.query(`SELECT DISTINCT pack FROM purchases WHERE user_id = $1 AND status = 'paid'`, [user.id]),
         ]);
         const byAssoc = Object.fromEntries(totals.map((t) => [t.association, t]));
         return {
             ready: stripeReady(),
             testMode: stripeReady() && stripeTestMode(),
             donationShare: DONATION_SHARE,
-            packs: Object.entries(PACKS).map(([id, p]) => ({ id, ...p, donation: donationOf(p.price) })),
+            packs: Object.entries(PACKS).map(([id, p]) => ({
+                id, ...p, donation: donationOf(p.price), available: !p.once || !bought.some((b) => b.pack === id),
+            })),
             associations: Object.entries(ASSOCIATIONS).map(([id, a]) => ({
                 id, ...a, donated: byAssoc[id]?.donated || 0, purchases: byAssoc[id]?.purchases || 0,
             })),
@@ -1551,6 +1554,10 @@ const actions = {
         if (!pack) throw new HttpError(400, 'Pack inconnu');
         if (!ASSOCIATIONS[body.association]) throw new HttpError(400, 'Choisis une association');
         if (body.consent !== true) throw new HttpError(400, 'Confirme la livraison immédiate des crédits');
+        if (pack.once) {
+            const { rows: [done] } = await db.query(`SELECT 1 FROM purchases WHERE user_id = $1 AND pack = $2 AND status = 'paid'`, [user.id, body.pack]);
+            if (done) throw new HttpError(409, 'Cette offre n\'est valable qu\'une fois par compte');
+        }
         const { rows: [{ recent }] } = await db.query(
             `SELECT COUNT(*)::int AS recent FROM purchases WHERE user_id = $1 AND created_at > now() - interval '10 minutes'`, [user.id]);
         if (recent >= 5) throw new HttpError(429, 'Trop de tentatives, réessaie dans quelques minutes');

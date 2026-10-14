@@ -118,16 +118,19 @@ function Associations({ list, pick, setPick, share }) {
 }
 
 function PackCard({ pack, assoc, selected, onSelect }) {
+    const used = pack.once && !pack.available;
     return (
-        <button onClick={onSelect}
-            className={`relative text-left rounded-3xl p-5 transition ring-1 flex flex-col ${selected ? 'bg-[#e9c46a]/10 ring-[#e9c46a]/70 shadow-[0_0_40px_-12px_#e9c46a]' : 'nd-glass ring-white/10 hover:-translate-y-0.5'}`}>
+        <button onClick={onSelect} disabled={used}
+            className={`relative text-left rounded-3xl p-5 transition ring-1 flex flex-col disabled:opacity-45 disabled:hover:translate-y-0 ${selected ? 'bg-[#e9c46a]/10 ring-[#e9c46a]/70 shadow-[0_0_40px_-12px_#e9c46a]' : pack.once && !used ? 'bg-[#4fd18b]/[0.07] ring-[#4fd18b]/40 hover:-translate-y-0.5' : 'nd-glass ring-white/10 hover:-translate-y-0.5'}`}>
             {pack.best && <span className="absolute -top-2.5 right-4 rounded-full bg-[#e9c46a] text-[#2a1c00] text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1">Meilleure offre</span>}
+            {pack.once && <span className="absolute -top-2.5 right-4 rounded-full bg-[#4fd18b] text-[#05130d] text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1">{used ? 'Déjà utilisée' : 'Une seule fois'}</span>}
             <PackIcon pack={pack} />
             <p className="mt-3 font-display text-lg text-white">{pack.label}</p>
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-lg">
                 {pack.coins > 0 && <Amount seeds={pack.coins} />}
                 {pack.nuggets > 0 && <Amount nuggets={pack.nuggets} />}
             </div>
+            {pack.once && <p className="mt-1 text-xs font-semibold text-[#a8f0c6]"><Sparkles className="inline w-3.5 h-3.5 -mt-0.5" /> 2× le sachet de graines, pépites en plus</p>}
             {pack.bonus && <p className="mt-1 text-xs font-semibold text-[#a8f0c6]"><Sparkles className="inline w-3.5 h-3.5 -mt-0.5" /> dont {pack.bonus.toLocaleString('fr-FR')} offertes</p>}
             <div className="mt-auto pt-4 flex items-end justify-between gap-2">
                 <span className="font-display text-2xl font-bold text-white tabular-nums">{euros(pack.price)}</span>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Gift, Zap } from 'lucide-react';
 import { Amount, Seed } from '../components/Currency.jsx';
@@ -21,7 +22,7 @@ export function useCountdown(iso, onDone) {
     return h ? `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s` : `${m}m ${String(s).padStart(2, '0')}s`;
 }
 
-// Ten free openings, refilled one by one every 30 minutes.
+// Ten free openings, refilled one by one every hour.
 function ChargeGauge({ user }) {
     return (
         <div className="relative w-full max-w-xs mt-6">
@@ -112,7 +113,7 @@ export default function Boosters() {
                     <ChargeGauge user={user} />
                     <p className="relative mt-2 w-full max-w-xs text-xs text-white/60 flex justify-between gap-2">
                         <span>{nextCharge ? <>Prochaine charge dans <b className="text-white tabular-nums">{nextCharge}</b></> : 'Jauge pleine'}</span>
-                        <span>+1 toutes les {user.chargeMinutes} min</span>
+                        <span>+1 {user.chargeMinutes === 60 ? 'toutes les heures' : `toutes les ${user.chargeMinutes} min`}</span>
                     </p>
                     <button
                         disabled={busy || !canOpen}
@@ -122,7 +123,12 @@ export default function Boosters() {
                         {payWith === 'charge' ? 'Ouvrir un booster' : payWith === 'booster' ? `Ouvrir un booster bonus (${user.boosters})` : <>Ouvrir pour <Seed className="w-5 h-5" />{user.boosterPrice}</>}
                     </button>
                     {payWith === 'coins' && !canOpen && (
-                        <p className="relative mt-3 text-sm text-white/70 text-center max-w-xs">Plus de charge ni de graines : attends la prochaine charge, ou gagne des graines avec les défis et les trophées.</p>
+                        <p className="relative mt-3 text-sm text-white/70 text-center max-w-xs">Plus de charge ni de graines : attends la prochaine charge, ou gagne des graines avec les défis, le quiz et les trophées.</p>
+                    )}
+                    {payWith !== 'charge' && (
+                        <Link to="/boutique" className="relative mt-3 w-full max-w-xs py-2.5 rounded-full nd-cta-gold font-bold text-sm text-center">
+                            Continuer maintenant · 10 boosters dès 1,99 €
+                        </Link>
                     )}
                     {error && <p className="relative mt-3 text-sm font-semibold text-[#ffb4a2]">{error}</p>}
                 </div>
@@ -146,6 +152,7 @@ export default function Boosters() {
                                 Tu as <Amount seeds={user.coins} />. Elles servent uniquement à ouvrir des boosters
                                 ({user.boosterPrice} l'ouverture) une fois tes charges épuisées. Gagne-en avec le bonus du jour, les défis et les trophées.
                             </p>
+                            <Link to="/boutique" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#f4d88f] hover:underline">Recharger en boutique →</Link>
                         </div>
                     </div>
 

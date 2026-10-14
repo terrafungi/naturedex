@@ -5,9 +5,9 @@ import crypto from 'node:crypto';
 export const QUIZ_PER_DAY = 3;
 export const QUIZ_LENGTH = 10;
 export const LEVELS = [0, 0, 0, 1, 1, 1, 1, 2, 2, 2]; // difficulty of each question, easy → expert
-export const LEVEL_COINS = [3, 5, 8]; // graines per right answer
-export const PERFECT_COINS = 30;
-export const PERFECT_NUGGETS = 15;
+export const LEVEL_COINS = [2, 3, 5]; // graines per right answer
+export const PERFECT_COINS = 20;
+export const PERFECT_NUGGETS = 10;
 export const CARD_SCORE = 8; // right answers needed to win a card
 const GRACE_MS = 3000; // network latency allowance on the timer
 
