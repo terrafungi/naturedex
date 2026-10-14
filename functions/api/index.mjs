@@ -27,11 +27,11 @@ const SESSION_DAYS = 60;
 const RECYCLE_VALUE = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, secret: 1000 };
 
 // One booster = 6 slots, each a weighted rarity table. The last slot hides the 50 secret
-// cards: 1 booster in 200 (0.5 %), so one given secret card about 1 in 10,000.
+// cards: 1 booster in 500 (0.2 %), so one given secret card about 1 in 25,000.
 const BOOSTER_SLOTS = [
     ...Array(4).fill({ common: 70, uncommon: 30 }),
     { uncommon: 80, rare: 17, epic: 3 },
-    { rare: 695, epic: 220, legendary: 80, secret: 5 },
+    { rare: 698, epic: 220, legendary: 80, secret: 2 },
 ];
 
 class HttpError extends Error {

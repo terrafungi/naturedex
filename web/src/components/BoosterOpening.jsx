@@ -127,7 +127,7 @@ function RarityBanner({ card }) {
     if (fx.level === 5) return (
         <motion.div initial={{ opacity: 0, scale: 2.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', damping: 9, stiffness: 120, delay: 0.25 }}>
             <div className="nd-secret-text font-display text-3xl sm:text-4xl font-black uppercase tracking-[0.08em]">✦ Carte secrète ✦</div>
-            <div className="text-white/80 text-sm mt-1 [text-shadow:0_1px_8px_rgb(0_0_0/0.8)]">Environ 1 booster sur 200 en cache une. Touche pour continuer</div>
+            <div className="text-white/80 text-sm mt-1 [text-shadow:0_1px_8px_rgb(0_0_0/0.8)]">Environ 1 booster sur 500 en cache une. Touche pour continuer</div>
         </motion.div>
     );
     return (
