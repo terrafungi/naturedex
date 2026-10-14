@@ -48,29 +48,33 @@ export function LeafLogo({ className = 'w-9 h-9' }) {
     );
 }
 
-function Brand() {
+// `compact` (logged in, wallet shown): smaller wordmark and no tagline on phones,
+// so the wallet never overlaps the name; below 360 px only the leaf stays.
+function Brand({ compact }) {
     return (
-        <Link to="/" className="group flex items-center gap-2.5 mr-auto min-w-0">
-            <LeafLogo className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 drop-shadow-[0_0_12px_rgba(79,209,139,0.45)] transition-transform group-hover:-rotate-12" />
-            <span className="leading-none min-w-0">
-                <span className="block font-display text-[1.6rem] sm:text-[1.8rem] font-semibold text-white">NatureDex</span>
-                <span className="block lg:hidden xl:block mt-1 text-[8.5px] sm:text-[9.5px] font-semibold uppercase tracking-[0.2em] text-white/55 truncate">Des cartes pour un monde plus vivant</span>
+        <Link to="/" className="group flex items-center gap-2 sm:gap-2.5 mr-auto min-w-0" aria-label="NatureDex, accueil">
+            <LeafLogo className={`${compact ? 'w-8 h-8' : 'w-9 h-9'} sm:w-10 sm:h-10 shrink-0 drop-shadow-[0_0_12px_rgba(79,209,139,0.45)] transition-transform group-hover:-rotate-12`} />
+            <span className={`leading-none min-w-0 ${compact ? 'max-[359px]:hidden' : ''}`}>
+                <span className={`block font-display ${compact ? 'text-[1.2rem]' : 'text-[1.6rem]'} sm:text-[1.8rem] font-semibold text-white truncate`}>NatureDex</span>
+                <span className={`${compact ? 'hidden sm:block' : 'block'} lg:hidden xl:block mt-1 text-[8.5px] sm:text-[9.5px] font-semibold uppercase tracking-[0.2em] text-white/55 truncate`}>Des cartes pour un monde plus vivant</span>
             </span>
         </Link>
     );
 }
 
 const fmt = (n) => Number(n).toLocaleString('fr-FR');
+// Header wallet only: 12 345 → "12,3 k" so the name keeps its room on phones.
+const short = (n) => (n >= 10_000 ? `${(Math.floor(n / 100) / 10).toLocaleString('fr-FR')} k` : fmt(n));
 
 function Wallet({ user }) {
     return (
-        <div className="flex items-center rounded-full bg-white/[0.06] ring-1 ring-white/12 text-sm font-bold tabular-nums">
-            <Link to="/booster" className="flex items-center gap-1 pl-2.5 pr-2 py-1.5 text-[#8ee6a8]" title="Graines : pour ouvrir des boosters">
-                <Seed />{fmt(user.coins)}
+        <div className="shrink-0 flex items-center rounded-full bg-white/[0.06] ring-1 ring-white/12 text-[13px] sm:text-sm font-bold tabular-nums">
+            <Link to="/booster" className="flex items-center gap-1 pl-2 sm:pl-2.5 pr-1.5 sm:pr-2 py-1.5 text-[#8ee6a8]" title="Graines : pour ouvrir des boosters">
+                <Seed />{short(user.coins)}
             </Link>
             <span className="w-px h-4 bg-white/15" />
-            <Link to="/encheres" className="flex items-center gap-1 pl-2 pr-2.5 py-1.5 text-[#f4c25b]" title="Pépites : pour les enchères">
-                <Nugget />{fmt(user.nuggets)}
+            <Link to="/encheres" className="flex items-center gap-1 pl-1.5 sm:pl-2 pr-2 sm:pr-2.5 py-1.5 text-[#f4c25b]" title="Pépites : pour les enchères">
+                <Nugget />{short(user.nuggets)}
             </Link>
             <Link to="/boutique" className="grid place-items-center w-6 h-6 mr-1 rounded-full bg-[#e9c46a] text-[#2a1c00] hover:brightness-110" title="Boutique solidaire : acheter des crédits">
                 <Plus className="w-4 h-4" strokeWidth={3} />
@@ -150,8 +154,8 @@ export default function Layout() {
     return (
         <div className="min-h-screen flex flex-col">
             <header className={`${home ? 'absolute' : 'sticky bg-[#05130d]/75 backdrop-blur-xl border-b border-white/[0.07]'} top-0 inset-x-0 z-40`}>
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-3">
-                    <Brand />
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-2 sm:gap-3">
+                    <Brand compact={!!user} />
                     <nav className="hidden lg:flex items-center gap-0.5">
                         {NAV.filter(({ to }) => to !== '/' && to !== '/boutique').map(({ to, label, end }) => (
                             <NavLink key={to} to={to} end={end}
@@ -161,7 +165,7 @@ export default function Layout() {
                         ))}
                     </nav>
                     {user && <Wallet user={user} />}
-                    <button onClick={() => setMenu(true)} className="grid place-items-center w-11 h-11 rounded-full nd-cta-glass shrink-0" aria-label="Ouvrir le menu">
+                    <button onClick={() => setMenu(true)} className="grid place-items-center w-10 h-10 sm:w-11 sm:h-11 rounded-full nd-cta-glass shrink-0" aria-label="Ouvrir le menu">
                         <Menu className="w-5 h-5 text-white" />
                     </button>
                 </div>
