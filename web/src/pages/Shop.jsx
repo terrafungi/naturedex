@@ -200,7 +200,7 @@ export default function Shop() {
 
             <div className="mt-6 rounded-3xl p-5 sm:p-6 ring-1 ring-[#4fd18b]/35 bg-[linear-gradient(135deg,rgba(79,209,139,0.16),rgba(79,209,139,0.03))] flex flex-col sm:flex-row sm:items-center gap-5">
                 <div className="flex items-center gap-4 flex-1">
-                    <span className="font-display text-6xl sm:text-7xl font-bold text-[#4fd18b] leading-none">{share} %</span>
+                    <span className="font-display text-5xl sm:text-7xl font-bold text-[#4fd18b] leading-none whitespace-nowrap">{share} %</span>
                     <p className="text-white/90 leading-snug">
                         <b className="text-white">du prix que tu paies est reversé</b> à l'association de protection de la nature que tu choisis :
                         LPO, WWF France ou Humanité & Biodiversité.
