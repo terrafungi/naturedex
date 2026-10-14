@@ -30,6 +30,9 @@ export const PACKS = {
     naturalist: { label: 'Pack du naturaliste', coins: 6000, nuggets: 1200, price: 1299, best: true },
 };
 
+// Stripe tax code, required when Managed Payments is on: "electronically supplied services".
+const TAX_CODE = process.env.STRIPE_TAX_CODE || 'txcd_10000000';
+
 export const donationOf = (cents) => Math.round(cents * DONATION_SHARE);
 export const euros = (cents) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
@@ -77,6 +80,7 @@ export function createCheckout({ purchaseId, pack, association, username, origin
                     currency: 'eur',
                     unit_amount: p.price,
                     product_data: {
+                        tax_code: TAX_CODE,
                         name: `${p.label} NatureDex : ${content}`,
                         description: `Dont ${euros(donationOf(p.price))} reversés à ${a.name}. Compte joueur : ${username}.`,
                     },
