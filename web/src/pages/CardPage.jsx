@@ -68,7 +68,7 @@ export default function CardPage() {
                         <span className="px-2.5 py-1 rounded-full border" style={{ color: r.color, borderColor: r.color }}>{r.symbol} {r.label}</span>
                         {iucn && <span className="px-2.5 py-1 rounded-full text-paper" style={{ background: iucn.color }} title="Statut UICN">UICN · {iucn.label}</span>}
                     </div>
-                    <h1 className="mt-4 font-display text-4xl sm:text-5xl font-black text-white leading-none break-words">{card.name}</h1>
+                    <h1 className="mt-4 font-display text-4xl sm:text-5xl font-semibold text-white leading-none break-words">{card.name}</h1>
                     {card.sci_name && card.sci_name !== card.name && <p className="mt-2 font-display italic text-xl text-ink-soft">{card.sci_name}</p>}
                     <p className="mt-6 text-lg leading-relaxed max-w-prose">{card.extract}</p>
                     <a href={card.wiki_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white underline underline-offset-4">

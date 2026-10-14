@@ -9,17 +9,13 @@ import Auth from './pages/Auth.jsx';
 import Boosters from './pages/Boosters.jsx';
 import Collection from './pages/Collection.jsx';
 import CardPage from './pages/CardPage.jsx';
+import Challenges from './pages/Challenges.jsx';
+import Profile from './pages/Profile.jsx';
 
 function Private({ children }) {
     const { user, ready } = useGame();
     if (!ready) return <div className="py-32 text-center font-display text-xl text-ink-soft">Chargement…</div>;
     return user ? children : <Navigate to="/connexion" replace />;
-}
-
-function Home() {
-    const { user, ready } = useGame();
-    if (!ready) return null;
-    return user ? <Boosters /> : <Landing />;
 }
 
 createRoot(document.getElementById('root')).render(
@@ -28,8 +24,11 @@ createRoot(document.getElementById('root')).render(
             <GameProvider>
                 <Routes>
                     <Route element={<Layout />}>
-                        <Route path="/" element={<Home />} />
+                        <Route path="/" element={<Landing />} />
                         <Route path="/connexion" element={<Auth />} />
+                        <Route path="/booster" element={<Private><Boosters /></Private>} />
+                        <Route path="/defis" element={<Private><Challenges /></Private>} />
+                        <Route path="/profil" element={<Private><Profile /></Private>} />
                         <Route path="/collection" element={<Private><Collection /></Private>} />
                         <Route path="/carte/:id" element={<Private><CardPage /></Private>} />
                         <Route path="*" element={<Navigate to="/" replace />} />

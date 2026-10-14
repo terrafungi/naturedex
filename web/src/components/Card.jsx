@@ -110,14 +110,14 @@ export function MysteryCard({ card, number }) {
 export function CardBack() {
     return (
         <div className="nd-box">
-        <div className="nd-card" style={{ '--type': '#4c3bd1' }}>
+        <div className="nd-card" style={{ '--type': '#1f6b44' }}>
             <div className="h-full rounded-[2.6cqi] grid place-items-center"
                 style={{
-                    background: 'radial-gradient(circle at 50% 45%, rgb(255 255 255 / 0.25), transparent 45%), repeating-linear-gradient(45deg, rgb(255 255 255 / 0.06) 0 4cqi, transparent 4cqi 8cqi), conic-gradient(from 200deg, #14c8d6, #7c5cff, #ff4f9a, #ffc53d, #3cf29b, #14c8d6)',
-                    boxShadow: '0 0 0 0.8cqi rgb(255 255 255 / 0.6) inset',
+                    background: 'radial-gradient(circle at 50% 45%, rgb(255 255 255 / 0.25), transparent 45%), repeating-linear-gradient(45deg, rgb(255 255 255 / 0.06) 0 4cqi, transparent 4cqi 8cqi), linear-gradient(160deg, #2f7d52, #0c2e1d 55%, #6b5320)',
+                    boxShadow: '0 0 0 0.8cqi #e9c46a inset',
                 }}>
-                <div className="font-display font-extrabold text-white text-center tracking-tight" style={{ fontSize: '11cqi', lineHeight: 0.95, textShadow: '0 1cqi 4cqi rgb(30 0 80 / 0.5)' }}>
-                    Natur<br />Dex
+                <div className="font-display font-semibold text-[#f4d88f] text-center" style={{ fontSize: '11cqi', lineHeight: 0.95, textShadow: '0 1cqi 4cqi rgb(0 20 10 / 0.6)' }}>
+                    Nature<br />Dex
                 </div>
             </div>
         </div>

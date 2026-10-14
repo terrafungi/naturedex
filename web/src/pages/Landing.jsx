@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, animate, motion, useInView, useMotionValue, useSpring, useTransform } from 'motion/react';
-import { ArrowRight, Dices, Eye, PackageOpen, Sparkles, Zap } from 'lucide-react';
-import { useGame } from '../api.jsx';
-import { Card, CardBack, TypeBadge } from '../components/Card.jsx';
+import { AnimatePresence, motion } from 'motion/react';
+import { ArrowRight, ChevronRight, Compass, Dices, Eye, GalleryVerticalEnd, Gem, Leaf, PackageOpen, Shield, Sparkles, Zap } from 'lucide-react';
+import { api, useGame } from '../api.jsx';
+import { Card, TypeBadge } from '../components/Card.jsx';
+import { ChallengeCard, SAMPLE_CHALLENGES } from '../components/Challenge.jsx';
 import { Pack } from '../components/Pack.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
-import { RARITIES, TYPES, formatViews } from '../game.jsx';
+import { RARITIES, TYPES, attacksFor, formatViews } from '../game.jsx';
 
 const RARITY_TIERS = {
     common: 'Le reste des espèces',
@@ -15,8 +16,6 @@ const RARITY_TIERS = {
     epic: 'Top 6 % de son type',
     legendary: 'Top 1 % de son type',
 };
-
-const WORDS = ['les lions', 'les champignons', 'les bactéries', 'les dinosaures', 'les séquoias', 'les virus', 'les axolotls', 'les orques'];
 
 // Same odds as the server draw (functions/api).
 const SLOTS = [
@@ -42,6 +41,9 @@ function distinctTypes(list, count) {
     return out;
 }
 
+// Featured carousel order mirrors the mockup: legendary, rare, epic, …
+const FEATURED_ORDER = ['legendary', 'rare', 'epic'];
+
 function useShowcase(catalog) {
     return useMemo(() => {
         const cards = (catalog?.cards || []).filter((c) => c.thumb_url).map((c) => ({ ...c, views: Number(c.views) }));
@@ -49,11 +51,9 @@ function useShowcase(catalog) {
         const byViews = [...cards].sort((a, b) => b.views - a.views);
         const of = (...rarities) => byViews.filter((c) => rarities.includes(c.rarity));
 
-        const legends = distinctTypes(of('legendary'), 8);
-        const sides = distinctTypes(of('epic').filter((c) => !legends.some((l) => l.type === c.type)), 2);
         const usedTypes = new Set();
         const ladder = Object.keys(RARITIES).map((r) => {
-            const c = of(r).find((c) => !legends.includes(c) && !usedTypes.has(c.type));
+            const c = of(r).find((c) => !usedTypes.has(c.type));
             if (c) usedTypes.add(c.type);
             return c;
         }).filter(Boolean);
@@ -63,16 +63,12 @@ function useShowcase(catalog) {
         }).sort((a, b) => (b.star?.views || 0) - (a.star?.views || 0));
         const pools = Object.fromEntries(Object.keys(RARITIES).map((r) => [r, cards.filter((c) => c.rarity === r)]));
 
-        return {
-            legends,
-            sides,
-            ladder,
-            types,
-            pools,
-            top: of('legendary').slice(0, 6),
-            rowA: scramble(of('legendary', 'epic')).slice(0, 14),
-            rowB: scramble(of('rare', 'uncommon')).slice(0, 14),
-        };
+        const named = (list) => list.filter((c) => c.sci_name && c.name !== c.sci_name);
+        const lanes = FEATURED_ORDER.map((r) => distinctTypes(named(r === 'rare' ? scramble(of(r)) : of(r)), 6));
+        const featured = [];
+        for (let k = 0; k < 6; k++) for (const lane of lanes) if (lane[k]) featured.push(lane[k]);
+
+        return { ladder, types, pools, featured, top: of('legendary').slice(0, 6) };
     }, [catalog]);
 }
 
@@ -90,18 +86,6 @@ function drawDemo(pools) {
         picked.add(card.id);
         return card;
     });
-}
-
-function CountUp({ to, className }) {
-    const ref = useRef(null);
-    const inView = useInView(ref, { once: true });
-    const [value, setValue] = useState(0);
-    useEffect(() => {
-        if (!inView || !to) return;
-        const controls = animate(0, to, { duration: 1.8, ease: EASE, onUpdate: (v) => setValue(Math.round(v)) });
-        return () => controls.stop();
-    }, [inView, to]);
-    return <span ref={ref} className={className}>{value.toLocaleString('fr-FR')}</span>;
 }
 
 function Pill({ children, className = '' }) {
@@ -124,211 +108,9 @@ function Reveal({ children, delay = 0, className = '' }) {
 function Aurora({ className = '' }) {
     return (
         <div className={`nd-aurora ${className}`} aria-hidden>
-            <i style={{ width: '45vw', height: '45vw', left: '-10%', top: '-15%', background: '#10e08a' }} />
-            <i style={{ width: '40vw', height: '40vw', right: '-8%', top: '-10%', background: '#7c5cff', animationDelay: '-6s' }} />
-            <i style={{ width: '35vw', height: '35vw', left: '30%', bottom: '-25%', background: '#ff4f9a', opacity: 0.35, animationDelay: '-11s' }} />
-            <i style={{ width: '30vw', height: '30vw', right: '20%', bottom: '-10%', background: '#14c8d6', opacity: 0.4, animationDelay: '-3s' }} />
-        </div>
-    );
-}
-
-function RotatingWord() {
-    const [i, setI] = useState(0);
-    useEffect(() => {
-        const t = setInterval(() => setI((i) => (i + 1) % WORDS.length), 2200);
-        return () => clearInterval(t);
-    }, []);
-    return (
-        <span className="relative block h-[1.12em] overflow-hidden">
-            <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span key={WORDS[i]} className="nd-grad-text absolute left-0 top-0 whitespace-nowrap pb-[0.1em]"
-                    initial={{ y: '100%', opacity: 0, filter: 'blur(8px)' }} animate={{ y: '0%', opacity: 1, filter: 'blur(0px)' }}
-                    exit={{ y: '-100%', opacity: 0, filter: 'blur(8px)' }} transition={{ duration: 0.55, ease: EASE }}>
-                    {WORDS[i]}
-                </motion.span>
-            </AnimatePresence>
-        </span>
-    );
-}
-
-/* ---------- hero ---------- */
-
-const BUBBLES = [
-    { type: 'bird', x: '6%', y: '12%', size: 54, delay: 0 },
-    { type: 'fungus', x: '86%', y: '8%', size: 46, delay: -2 },
-    { type: 'virus', x: '88%', y: '62%', size: 58, delay: -4 },
-    { type: 'fish', x: '2%', y: '68%', size: 44, delay: -1 },
-    { type: 'fossil', x: '72%', y: '84%', size: 40, delay: -3 },
-    { type: 'bacteria', x: '20%', y: '86%', size: 38, delay: -5 },
-];
-
-function HeroStage({ show }) {
-    const [i, setI] = useState(0);
-    const px = useMotionValue(0);
-    const py = useMotionValue(0);
-    const sx = useSpring(px, { stiffness: 60, damping: 15 });
-    const sy = useSpring(py, { stiffness: 60, damping: 15 });
-    const rotateY = useTransform(sx, [-1, 1], [-14, 14]);
-    const rotateX = useTransform(sy, [-1, 1], [10, -10]);
-    const farX = useTransform(sx, [-1, 1], [-30, 30]);
-    const farY = useTransform(sy, [-1, 1], [-20, 20]);
-    const nearX = useTransform(sx, [-1, 1], [24, -24]);
-    const nearY = useTransform(sy, [-1, 1], [16, -16]);
-
-    const legends = show.legends;
-    useEffect(() => {
-        if (legends.length < 2) return;
-        const t = setInterval(() => setI((i) => (i + 1) % legends.length), 3200);
-        return () => clearInterval(t);
-    }, [legends.length]);
-
-    function onMove(e) {
-        const box = e.currentTarget.getBoundingClientRect();
-        px.set(((e.clientX - box.left) / box.width) * 2 - 1);
-        py.set(((e.clientY - box.top) / box.height) * 2 - 1);
-    }
-
-    const featured = legends[i];
-    if (!featured) return null;
-
-    return (
-        <div className="relative h-[440px] sm:h-[540px] lg:h-[620px]" onPointerMove={onMove} onPointerLeave={() => { px.set(0); py.set(0); }}>
-            <div className="nd-halo absolute left-1/2 top-1/2 w-[300px] h-[300px] sm:w-[420px] sm:h-[420px] -translate-x-1/2 -translate-y-1/2" />
-            <div className="nd-rays absolute left-1/2 top-1/2 w-[900px] h-[900px] -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-
-            {/* floating type bubbles (far layer) */}
-            <motion.div className="absolute inset-0" style={{ x: farX, y: farY }}>
-                {BUBBLES.map((b) => {
-                    const bt = TYPES[b.type];
-                    return (
-                        <div key={b.type} className="nd-float absolute grid place-items-center rounded-2xl nd-glass"
-                            style={{ left: b.x, top: b.y, width: b.size, height: b.size, animationDelay: `${b.delay}s`, boxShadow: `0 10px 40px -8px ${bt.color}` }}>
-                            <bt.Icon className="w-1/2 h-1/2" style={{ color: bt.color, filter: 'brightness(1.4)' }} />
-                        </div>
-                    );
-                })}
-            </motion.div>
-
-            <div className="absolute inset-0 grid place-items-center" style={{ perspective: 1300 }}>
-                <motion.div className="relative w-[190px] sm:w-[250px] lg:w-[270px]" style={{ rotateX, rotateY }}>
-                    {/* side cards */}
-                    {show.sides.map((c, k) => (
-                        <motion.div key={c.id} className="absolute inset-x-0 top-6"
-                            initial={{ opacity: 0, x: 0, rotate: 0, scale: 0.82 }}
-                            animate={{ opacity: 0.9, x: k ? '58%' : '-58%', rotate: k ? 14 : -14, scale: 0.82 }}
-                            transition={{ delay: 0.6, type: 'spring', stiffness: 60, damping: 14 }}>
-                            <div className="nd-epic-glow"><Card card={c} /></div>
-                        </motion.div>
-                    ))}
-                    {/* featured legendary, flips to the next one */}
-                    <motion.div className="relative z-10" style={{ x: nearX, y: nearY }}>
-                        <AnimatePresence mode="wait" initial={false}>
-                            <motion.div key={featured.id} className="nd-legend-glow"
-                                initial={{ rotateY: -90, scale: 0.92 }} animate={{ rotateY: 0, scale: 1 }} exit={{ rotateY: 90, scale: 0.92 }}
-                                transition={{ duration: 0.35, ease: 'easeOut' }}>
-                                <Card card={featured} />
-                            </motion.div>
-                        </AnimatePresence>
-                    </motion.div>
-                </motion.div>
-            </div>
-
-            {/* live caption */}
-            <div className="absolute left-1/2 bottom-0 -translate-x-1/2 z-20">
-                <AnimatePresence mode="wait">
-                    <motion.div key={featured.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                        className="flex items-center gap-2.5 whitespace-nowrap rounded-full nd-glass pl-1.5 pr-4 py-1.5 text-sm">
-                        <TypeBadge type={featured.type} className="!w-7 !h-7 [&_svg]:!w-4 [&_svg]:!h-4" />
-                        <span className="font-semibold text-white">{featured.name}</span>
-                        <span className="text-amber-300 font-bold">★★★</span>
-                        <span className="text-white/50 hidden sm:inline">· {formatViews(Number(featured.views))} lectures/an</span>
-                    </motion.div>
-                </AnimatePresence>
-            </div>
-        </div>
-    );
-}
-
-function Hero({ show, total }) {
-    return (
-        <section className="relative isolate overflow-hidden">
-            <Aurora />
-            <div className="nd-dots" />
-            <div className="relative max-w-7xl mx-auto px-5 pt-12 sm:pt-16 pb-16 grid lg:grid-cols-[1.05fr_1fr] gap-4 items-center min-h-[calc(100svh-4rem)]">
-                <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: EASE }} className="relative z-10">
-                    <Pill>
-                        <span className="relative flex w-2 h-2"><span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping" /><span className="relative w-2 h-2 rounded-full bg-emerald-400" /></span>
-                        Saison 1 · {total ? total.toLocaleString('fr-FR') : '…'} espèces réelles
-                    </Pill>
-                    <h1 className="mt-6 font-display font-extrabold leading-[1.02] tracking-[-0.035em] text-white text-[clamp(2.5rem,4.8vw,4.75rem)]">
-                        Collectionne
-                        <RotatingWord />
-                        <span className="text-white/90">du monde réel.</span>
-                    </h1>
-                    <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-soft">
-                        Un jeu de cartes façon Pokémon avec de vraies espèces : animaux, arbres, algues, champignons, bactéries, virus et fossiles.
-                        <span className="text-white font-semibold"> Plus une espèce est célèbre sur Wikipédia, plus sa carte est rare.</span>
-                    </p>
-                    <div className="mt-8 flex flex-wrap items-center gap-3">
-                        <Link to="/connexion?mode=register" className="nd-btn group inline-flex items-center gap-2.5 px-7 py-4 rounded-2xl font-bold text-lg">
-                            <PackageOpen className="w-5 h-5" />Ouvrir mes 3 boosters gratuits
-                            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                        </Link>
-                        <a href="#demo" className="inline-flex items-center gap-2 px-6 py-4 rounded-2xl nd-glass text-white font-semibold hover:bg-white/10 transition-colors">
-                            <Dices className="w-5 h-5 text-fuchsia-300" />Essayer un booster
-                        </a>
-                    </div>
-                    <div className="mt-10 flex flex-wrap gap-3">
-                        {[
-                            [<CountUp key="n" to={total} />, 'espèces', 'from-emerald-400 to-cyan-400'],
-                            ['14', 'types', 'from-cyan-400 to-violet-400'],
-                            ['5', 'raretés', 'from-fuchsia-400 to-amber-300'],
-                        ].map(([value, label, grad]) => (
-                            <div key={label} className="rounded-2xl nd-glass px-5 py-3">
-                                <div className={`font-display text-3xl font-extrabold bg-gradient-to-r ${grad} bg-clip-text text-transparent`}>{value}</div>
-                                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{label}</div>
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
-
-                {show ? <HeroStage show={show} /> : <div className="h-[440px] sm:h-[540px] lg:h-[620px]" />}
-            </div>
-        </section>
-    );
-}
-
-/* ---------- sections ---------- */
-
-function TypeTicker() {
-    const items = Object.values(TYPES);
-    return (
-        <div className="relative border-y border-white/[0.07] bg-white/[0.02] py-5 -rotate-1 scale-[1.02]">
-            <div className="nd-marquee">
-                <div className="nd-marquee-track items-center !gap-8" style={{ animationDuration: '45s' }}>
-                    {[...items, ...items].map((t, i) => (
-                        <span key={i} className="flex items-center gap-8 font-display text-3xl sm:text-5xl font-extrabold tracking-tight whitespace-nowrap">
-                            <span className={i % 2 ? 'nd-outline-text' : ''} style={i % 2 ? {} : { color: t.color, filter: 'brightness(1.35) saturate(1.2)' }}>{t.label}</span>
-                            <Sparkles className="w-6 h-6 text-white/30" />
-                        </span>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function Marquee({ cards, reverse, duration }) {
-    return (
-        <div className="nd-marquee py-6">
-            <div className={`nd-marquee-track ${reverse ? 'nd-reverse' : ''}`} style={{ animationDuration: `${duration}s` }}>
-                {[...cards, ...cards].map((c, i) => (
-                    <div key={i} className={`w-[160px] sm:w-[200px] shrink-0 transition-transform duration-300 hover:-translate-y-3 hover:scale-105 ${c.rarity === 'legendary' ? 'nd-legend-glow' : c.rarity === 'epic' ? 'nd-epic-glow' : ''}`}
-                        style={{ rotate: `${(i % 3) - 1}deg` }}>
-                        <Card card={c} />
-                    </div>
-                ))}
-            </div>
+            <i style={{ width: '45vw', height: '45vw', left: '-10%', top: '-15%', background: '#1f8a4f', opacity: 0.4 }} />
+            <i style={{ width: '40vw', height: '40vw', right: '-8%', top: '-10%', background: '#e9c46a', opacity: 0.18, animationDelay: '-6s' }} />
+            <i style={{ width: '30vw', height: '30vw', right: '20%', bottom: '-10%', background: '#4fd18b', opacity: 0.25, animationDelay: '-3s' }} />
         </div>
     );
 }
@@ -337,23 +119,154 @@ function SectionTitle({ kicker, children, sub, center }) {
     return (
         <Reveal className={center ? 'text-center flex flex-col items-center' : ''}>
             <Pill><Zap className="w-3.5 h-3.5 text-amber-300" />{kicker}</Pill>
-            <h2 className="mt-5 font-display text-4xl sm:text-6xl font-extrabold tracking-[-0.035em] text-white leading-[1]">{children}</h2>
+            <h2 className="mt-5 font-display text-4xl sm:text-6xl font-semibold tracking-[-0.01em] text-white leading-[1]">{children}</h2>
             {sub && <p className={`mt-5 text-lg text-ink-soft leading-relaxed max-w-2xl ${center ? 'mx-auto' : ''}`}>{sub}</p>}
         </Reveal>
     );
 }
 
-function Showcase({ show }) {
+/* ---------- hero (mockup) ---------- */
+
+function Hero() {
+    const { user } = useGame();
+    const fade = (delay) => ({ initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.9, delay, ease: EASE } });
     return (
-        <section id="vitrine" className="pt-24 pb-8 overflow-hidden">
-            <div className="max-w-7xl mx-auto px-5">
-                <SectionTitle kicker="La vitrine" sub="Photos, résumés et chiffres viennent de Wikipédia et Wikidata. Survole une carte holographique : le reflet suit ta souris.">
-                    De l'axolotl à <span className="nd-grad-text">E. coli</span>.
-                </SectionTitle>
+        <section className="relative isolate overflow-hidden">
+            <motion.div className="nd-hero-bg" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 2.4, ease: EASE }} />
+            <div className="max-w-6xl mx-auto px-5 sm:px-6 pt-36 sm:pt-44 pb-14 sm:pb-24 min-h-[640px] sm:min-h-[760px] md:min-h-[min(88vh,860px)] flex flex-col justify-end">
+                <motion.h1 {...fade(0.1)} className="font-display font-medium leading-[0.98] text-[clamp(3.1rem,11vw,6.6rem)] text-white drop-shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+                    Collectionne<br /><span className="text-[#a8f0c6] italic">la Nature</span>
+                </motion.h1>
+                <motion.p {...fade(0.25)} className="mt-5 max-w-md text-[15px] sm:text-lg leading-relaxed text-white/75">
+                    Des créatures extraordinaires, des paysages majestueux, un monde à protéger.
+                </motion.p>
+                <motion.div {...fade(0.4)} className="mt-8 flex items-end justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <Link to={user ? '/booster' : '/connexion?mode=register'} className="nd-cta-gold group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-bold text-sm sm:text-base whitespace-nowrap">
+                            <GalleryVerticalEnd className="w-5 h-5" />Ouvrir un Booster<ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                        </Link>
+                        <a href={user ? '/collection' : '#vedette'} onClick={user ? undefined : (e) => { e.preventDefault(); document.getElementById('vedette')?.scrollIntoView({ behavior: 'smooth' }); }}
+                            className="nd-cta-glass group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-semibold text-sm sm:text-base text-white whitespace-nowrap">
+                            <Compass className="w-5 h-5 text-[#a8f0c6]" />Explorer les Cartes<ChevronRight className="w-4 h-4 text-white/60 transition-transform group-hover:translate-x-0.5" />
+                        </a>
+                    </div>
+                    <p className="shrink-0 text-right text-[8px] min-[400px]:text-[9px] sm:text-[11px] font-semibold uppercase tracking-[0.22em] sm:tracking-[0.28em] leading-[2] text-white/70 pb-1">
+                        Plus qu'un jeu<br />une nature<br />à préserver
+                        <span className="block ml-auto mt-2 w-12 h-px bg-gradient-to-l from-[#e9c46a] to-transparent" />
+                    </p>
+                </motion.div>
             </div>
-            <div className="mt-8">
-                <Marquee cards={show.rowA} duration={60} />
-                <Marquee cards={show.rowB} duration={70} reverse />
+        </section>
+    );
+}
+
+/* ---------- featured cards ---------- */
+
+const KINGDOM = { plant: 'Flore', tree: 'Flore', alga: 'Flore', fungus: 'Fonge', mold: 'Fonge', bacteria: 'Microbe', virus: 'Microbe', fossil: 'Fossile' };
+
+function FeatCard({ card }) {
+    const t = TYPES[card.type];
+    const r = RARITIES[card.rarity];
+    const shield = attacksFor(card).at(-1).dmg;
+    return (
+        <article className="nd-feat" style={{ '--r': r.color }}>
+            <img src={card.thumb_url} alt={card.name} loading="lazy" draggable="false" />
+            <div className="absolute top-3 left-3"><span className="nd-chip"><Gem className="w-3 h-3" />{r.label}</span></div>
+            <div className="absolute inset-x-0 bottom-0 p-3.5 sm:p-4">
+                <h3 className="font-display text-[1.25rem] sm:text-[1.4rem] font-semibold text-white leading-[1.05] line-clamp-2">{card.name}</h3>
+                <p className="mt-1 text-[11px] sm:text-xs text-white/60">{KINGDOM[card.type] || 'Créature'} · {t.label}</p>
+                <p className="mt-2 text-[11px] sm:text-xs italic text-white/80 leading-snug line-clamp-2">
+                    {card.sci_name && card.sci_name !== card.name && <>{card.sci_name}<br /></>}
+                    {RARITY_TIERS[card.rarity].replace(' de son type', '')} · {formatViews(card.views)} vues/an
+                </p>
+                <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center gap-3 text-xs font-bold text-white/85">
+                    <span className="flex items-center gap-1" title="Points de vie"><Leaf className="w-3.5 h-3.5 text-[#4fd18b]" />{card.hp ?? '—'}</span>
+                    <span className="flex items-center gap-1" title="Défense"><Shield className="w-3.5 h-3.5 text-[#a3b5a9]" />{shield}</span>
+                    <span className="ml-auto grid place-items-center w-6 h-6 rounded-full" style={{ background: `${t.color}33`, color: t.color }} title={t.label}><t.Icon className="w-3.5 h-3.5" /></span>
+                </div>
+            </div>
+        </article>
+    );
+}
+
+function SectionHead({ title, to, link }) {
+    return (
+        <div className="flex items-end justify-between gap-4">
+            <h2 className="font-display text-[1.7rem] sm:text-4xl font-medium text-white">{title}</h2>
+            <Link to={to} className="flex items-center gap-0.5 text-sm font-semibold text-[#4fd18b] hover:text-[#a8f0c6] transition-colors whitespace-nowrap pb-1">
+                {link}<ChevronRight className="w-4 h-4" />
+            </Link>
+        </div>
+    );
+}
+
+function Featured({ cards }) {
+    const { user } = useGame();
+    const track = useRef(null);
+    const [page, setPage] = useState(0);
+    const [pages, setPages] = useState(1);
+
+    function measure() {
+        const el = track.current;
+        if (!el) return;
+        const count = Math.max(1, Math.ceil(el.scrollWidth / el.clientWidth - 0.05));
+        setPages(count);
+        setPage(Math.round((el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth)) * (count - 1)));
+    }
+    useEffect(() => {
+        measure();
+        window.addEventListener('resize', measure);
+        return () => window.removeEventListener('resize', measure);
+    }, [cards.length]);
+    const goTo = (i) => {
+        const el = track.current;
+        el.scrollTo({ left: (i / Math.max(1, pages - 1)) * (el.scrollWidth - el.clientWidth), behavior: 'smooth' });
+    };
+
+    return (
+        <section id="vedette" className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-4 pb-10 scroll-mt-24">
+            <SectionHead title="Cartes en vedette" to={user ? '/collection' : '/connexion?mode=register'} link="Voir tout" />
+            <div ref={track} onScroll={measure} className="nd-carousel mt-5 -mx-5 px-5 sm:-mx-6 sm:px-6 flex gap-3.5 sm:gap-5 overflow-x-auto pt-2 pb-6">
+                {cards.map((c, i) => (
+                    <motion.div key={c.id} className="shrink-0 w-[44vw] max-w-[230px] sm:w-[220px]"
+                        initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7, delay: Math.min(i, 5) * 0.08, ease: EASE }}>
+                        <FeatCard card={c} />
+                    </motion.div>
+                ))}
+            </div>
+            {pages > 1 && (
+                <div className="flex justify-center gap-2">
+                    {Array.from({ length: pages }, (_, i) => (
+                        <button key={i} onClick={() => goTo(i)} aria-label={`Page ${i + 1}`}
+                            className={`h-1.5 rounded-full transition-all ${i === page ? 'w-6 bg-[#4fd18b]' : 'w-1.5 bg-white/25 hover:bg-white/45'}`} />
+                    ))}
+                </div>
+            )}
+        </section>
+    );
+}
+
+/* ---------- daily challenges ---------- */
+
+function DailyChallenges() {
+    const { user } = useGame();
+    const [list, setList] = useState(null);
+    useEffect(() => {
+        if (!user) { setList(SAMPLE_CHALLENGES); return; }
+        api('challenges').then((r) => setList(r.challenges)).catch(() => setList(SAMPLE_CHALLENGES));
+    }, [user]);
+    if (!list) return null;
+    return (
+        <section className="max-w-6xl mx-auto px-5 sm:px-6 pt-6 pb-16">
+            <SectionHead title="Défis du jour" to={user ? '/defis' : '/connexion?mode=register'} link="Voir tous" />
+            <div className="mt-5 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                {list.map((c, i) => (
+                    <Reveal key={c.key} delay={i * 0.08} className={i >= 2 ? 'hidden lg:block' : ''}>
+                        <Link to={user ? '/defis' : '/connexion?mode=register'} className="block h-full transition-transform hover:-translate-y-1">
+                            <ChallengeCard challenge={c} />
+                        </Link>
+                    </Reveal>
+                ))}
             </div>
         </section>
     );
@@ -374,8 +287,8 @@ function Demo({ show }) {
                 <div className="relative isolate overflow-hidden max-w-7xl mx-auto rounded-[2.5rem] nd-glass nd-ring px-6 sm:px-14 py-14 grid md:grid-cols-[1.2fr_1fr] gap-10 items-center">
                     <Aurora className="-z-10 opacity-60" />
                     <div>
-                        <Pill><Dices className="w-3.5 h-3.5 text-fuchsia-300" />Sans compte</Pill>
-                        <h2 className="mt-5 font-display text-4xl sm:text-6xl font-extrabold tracking-[-0.035em] text-white leading-[1]">
+                        <Pill><Dices className="w-3.5 h-3.5 text-[#a8f0c6]" />Sans compte</Pill>
+                        <h2 className="mt-5 font-display text-4xl sm:text-6xl font-semibold tracking-[-0.01em] text-white leading-[1]">
                             Essaie un booster<br /><span className="nd-grad-text">tout de suite.</span>
                         </h2>
                         <p className="mt-5 text-lg text-ink-soft max-w-md">Les mêmes chances que dans le vrai jeu. Touche le paquet, retourne les cartes… et croise les doigts pour une Légendaire.</p>
@@ -413,68 +326,12 @@ function Demo({ show }) {
     );
 }
 
-function Steps({ show }) {
-    const sample = show.ladder.at(-2);
-    const thumbs = show.rowB.slice(0, 6);
-    const steps = [
-        {
-            n: '01', title: 'Déchire un booster', grad: 'from-emerald-400 to-cyan-400',
-            text: '6 cartes par paquet, dont au moins une Rare. 3 boosters offerts à l\'inscription, puis des pièces chaque jour.',
-            visual: (
-                <div className="w-[112px] h-[179px] rotate-[-8deg] transition-transform duration-500 group-hover:rotate-[4deg] group-hover:-translate-y-3 group-hover:scale-105 drop-shadow-[0_20px_25px_rgba(0,0,0,0.5)]">
-                    <div className="w-[200px] origin-top-left scale-[0.56]"><Pack /></div>
-                </div>
-            ),
-        },
-        {
-            n: '02', title: 'Retourne les cartes', grad: 'from-violet-400 to-fuchsia-400',
-            text: 'Une à une, avec une explosion de lumière pour les Rares et un reflet holographique pour les Épiques et Légendaires.',
-            visual: (
-                <div className="relative w-[190px] h-[170px]">
-                    <div className="absolute left-0 top-3 w-[108px] rotate-[-10deg] transition-transform duration-500 group-hover:rotate-[-18deg] group-hover:-translate-x-2"><CardBack /></div>
-                    {sample && <div className="absolute right-0 top-0 w-[112px] rotate-[8deg] transition-transform duration-500 group-hover:rotate-[2deg] group-hover:-translate-y-3 nd-epic-glow"><Card card={sample} /></div>}
-                </div>
-            ),
-        },
-        {
-            n: '03', title: 'Complète ton NaturDex', grad: 'from-amber-300 to-pink-400',
-            text: 'Chaque espèce trouvée sort de l\'ombre. Recycle tes doublons en pièces pour viser les cartes qui te manquent.',
-            visual: (
-                <div className="grid grid-cols-3 gap-1.5 w-[150px]">
-                    {thumbs.map((c, i) => (i % 3 === 1
-                        ? <div key={c.id} className="aspect-[5/7] rounded-md border-2 border-dashed border-white/20 bg-white/5 grid place-items-center text-white/40 font-display font-bold">?</div>
-                        : <img key={c.id} src={c.thumb_url} alt="" className="aspect-[5/7] w-full object-cover rounded-md ring-2 ring-white/30 transition-transform duration-300 group-hover:scale-105" />
-                    ))}
-                </div>
-            ),
-        },
-    ];
-
-    return (
-        <section className="max-w-7xl mx-auto px-5 py-16">
-            <SectionTitle kicker="Comment on joue" center>Trois gestes, des milliers d'espèces</SectionTitle>
-            <div className="mt-14 grid md:grid-cols-3 gap-5">
-                {steps.map((s, i) => (
-                    <Reveal key={s.n} delay={i * 0.12}>
-                        <div className="group relative h-full rounded-[2rem] nd-glass p-8 pt-6 overflow-hidden transition-transform duration-300 hover:-translate-y-1.5">
-                            <div className={`absolute -top-24 -right-24 w-56 h-56 rounded-full bg-gradient-to-br ${s.grad} opacity-20 blur-3xl transition-opacity duration-500 group-hover:opacity-40`} />
-                            <div className="relative h-[190px] grid place-items-center">{s.visual}</div>
-                            <p className={`relative mt-4 font-display text-5xl font-extrabold bg-gradient-to-r ${s.grad} bg-clip-text text-transparent`}>{s.n}</p>
-                            <h3 className="relative mt-1 font-display text-2xl font-bold text-white">{s.title}</h3>
-                            <p className="relative mt-2 text-ink-soft leading-relaxed">{s.text}</p>
-                        </div>
-                    </Reveal>
-                ))}
-            </div>
-        </section>
-    );
-}
-
 function Rarity({ show }) {
+    const { user } = useGame();
     const max = show.top[0]?.views || 1;
     return (
         <section className="relative isolate overflow-hidden py-24">
-            <div className="absolute inset-0 -z-10 bg-[radial-gradient(50%_45%_at_80%_30%,rgb(255_197_61/0.16),transparent),radial-gradient(45%_50%_at_10%_80%,rgb(168_85_247/0.18),transparent)]" />
+            <div className="absolute inset-0 -z-10 bg-[radial-gradient(50%_45%_at_80%_30%,rgb(233_196_106/0.14),transparent),radial-gradient(45%_50%_at_10%_80%,rgb(79_209_139/0.14),transparent)]" />
             <div className="max-w-7xl mx-auto px-5">
                 <SectionTitle kicker="Les raretés" sub="On compte les lectures de chaque article Wikipédia, puis on classe chaque espèce parmi celles de son type. Le lion, le koala ou l'amanite tue-mouches sont Légendaires, et même les bactéries ont leurs stars.">
                     La célébrité fait <span className="nd-gold-text">la rareté</span>.
@@ -502,14 +359,14 @@ function Rarity({ show }) {
 
                 <div className="mt-16 grid lg:grid-cols-[1fr_1.3fr] gap-12 items-center">
                     <Reveal>
-                        <h3 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-white">Le panthéon du NaturDex</h3>
+                        <h3 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-white">Le panthéon du NatureDex</h3>
                         <p className="mt-4 text-ink-soft leading-relaxed">
                             Les espèces les plus lues de toute la collection, en lectures estimées par an. Une Légendaire apparaît dans environ
                             <b className="text-amber-300"> 1 booster sur 12</b>.
                         </p>
-                        <a href="#demo" className="mt-8 inline-flex items-center gap-2 font-semibold text-amber-300 hover:text-white transition-colors">
+                        <Link to={user ? '/booster' : '/connexion?mode=register'} className="mt-8 inline-flex items-center gap-2 font-semibold text-[#f4d88f] hover:text-white transition-colors">
                             Tenter ma chance <ArrowRight className="w-4 h-4" />
-                        </a>
+                        </Link>
                     </Reveal>
                     <ol className="space-y-3">
                         {show.top.map((c, i) => (
@@ -523,7 +380,7 @@ function Rarity({ show }) {
                                             <span className="text-[11px] text-white/45 truncate hidden sm:inline">{TYPES[c.type].label}</span>
                                         </div>
                                         <div className="mt-1.5 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                            <motion.div className="h-full rounded-full bg-gradient-to-r from-amber-300 via-pink-400 to-violet-500"
+                                            <motion.div className="h-full rounded-full bg-gradient-to-r from-[#4fd18b] via-[#a8f0c6] to-[#e9c46a]"
                                                 initial={{ width: 0 }} whileInView={{ width: `${(c.views / max) * 100}%` }} viewport={{ once: true }}
                                                 transition={{ duration: 1.2, delay: 0.2 + i * 0.08, ease: EASE }} />
                                         </div>
@@ -574,12 +431,12 @@ function FinalCta() {
     return (
         <section className="px-5 pb-24">
             <Reveal>
-                <div className="relative isolate overflow-hidden max-w-7xl mx-auto rounded-[2.5rem] px-8 sm:px-16 py-16 grid md:grid-cols-[1.4fr_1fr] gap-10 items-center bg-[linear-gradient(135deg,#0f2a4a,#2a1460_50%,#4a0f3a)]">
+                <div className="relative isolate overflow-hidden max-w-7xl mx-auto rounded-[2.5rem] px-8 sm:px-16 py-16 grid md:grid-cols-[1.4fr_1fr] gap-10 items-center bg-[linear-gradient(135deg,#0d3321,#0a2418_50%,#3a2c0c)]">
                     <Aurora className="-z-10" />
                     <div className="nd-rays absolute -right-40 top-1/2 w-[700px] h-[700px] -translate-y-1/2 -z-10" />
                     <div>
                         <Sparkles className="w-8 h-8 text-amber-300" />
-                        <h2 className="mt-4 font-display text-4xl sm:text-6xl font-extrabold tracking-[-0.035em] text-white leading-[1]">Ton premier booster<br /><span className="nd-grad-text">t'attend.</span></h2>
+                        <h2 className="mt-4 font-display text-4xl sm:text-6xl font-semibold tracking-[-0.01em] text-white leading-[1]">Ton premier booster<br /><span className="nd-grad-text">t'attend.</span></h2>
                         <p className="mt-5 text-white/70 text-lg max-w-md">Crée ton compte en 10 secondes, avec un pseudo et un mot de passe. 3 boosters sont offerts.</p>
                         <div className="mt-8 flex flex-wrap gap-3">
                             <Link to="/connexion?mode=register" className="nd-btn inline-flex items-center gap-2.5 px-7 py-4 rounded-2xl font-bold text-lg">
@@ -602,23 +459,22 @@ function FinalCta() {
 }
 
 export default function Landing() {
-    const { catalog } = useGame();
+    const { user, catalog } = useGame();
     const show = useShowcase(catalog);
 
     return (
         <div className="overflow-x-clip">
-            <Hero show={show} total={catalog?.total} />
-            <TypeTicker />
+            <Hero />
+            {show ? <Featured cards={show.featured} /> : <div className="h-[420px]" />}
+            <DailyChallenges />
             {show && (
                 <>
-                    <Showcase show={show} />
-                    <Demo show={show} />
-                    <Steps show={show} />
+                    {!user && <Demo show={show} />}
                     <Rarity show={show} />
                     <Types show={show} />
                 </>
             )}
-            <FinalCta />
+            {!user && <FinalCta />}
         </div>
     );
 }

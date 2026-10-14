@@ -148,8 +148,8 @@ function drawBooster(pools) {
 // Progress counts what the player pulled from boosters today. Types roughly match their
 // share of the catalogue, so goals stay reachable with the daily coins.
 const CHALLENGES = [
-    { key: 'forest', icon: 'leaf', title: 'Gardiens de la Forêt', text: 'Obtiens 3 cartes Forêt (plante, arbre, champignon)', goal: 3, reward: 100, types: ['plant', 'tree', 'fungus', 'mold'] },
-    { key: 'water', icon: 'drop', title: 'Sources de Vie', text: 'Obtiens 2 cartes Eau (poisson, créature marine, algue)', goal: 2, reward: 100, types: ['fish', 'marine', 'alga'] },
+    { key: 'forest', icon: 'leaf', title: 'Gardiens de la Forêt', text: 'Obtiens 3 cartes Forêt : plante, arbre ou champignon', goal: 3, reward: 100, types: ['plant', 'tree', 'fungus', 'mold'] },
+    { key: 'water', icon: 'drop', title: 'Sources de Vie', text: 'Obtiens 2 cartes Eau : poisson, créature marine ou algue', goal: 2, reward: 100, types: ['fish', 'marine', 'alga'] },
     { key: 'sky', icon: 'bird', title: 'Maîtres du Ciel', text: 'Obtiens 2 cartes Oiseau', goal: 2, reward: 80, types: ['bird'] },
     { key: 'scales', icon: 'sun', title: 'Sang-froid', text: 'Obtiens 2 cartes Reptile ou amphibien', goal: 2, reward: 80, types: ['reptile'] },
     { key: 'bugs', icon: 'bug', title: 'Petites Bêtes', text: 'Obtiens 2 cartes Insecte ou arachnide', goal: 2, reward: 80, types: ['arthropod'] },

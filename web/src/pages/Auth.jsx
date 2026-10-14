@@ -20,7 +20,7 @@ export default function Auth() {
         setError('');
         try {
             await authenticate(mode, username, password);
-            navigate('/');
+            navigate('/booster');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -37,7 +37,7 @@ export default function Auth() {
 
     return (
         <div className="max-w-md mx-auto px-4 py-16">
-            <h1 className="font-display text-4xl font-black text-white text-center">
+            <h1 className="font-display text-4xl font-semibold text-white text-center">
                 {mode === 'register' ? <>Ton carnet de<br /><span className="nd-grad-text">naturaliste</span></> : <>Bon retour,<br /><span className="nd-grad-text">explorateur</span></>}
             </h1>
             <form onSubmit={submit} className="mt-10 p-6 rounded-3xl bg-white/[0.04] backdrop-blur border border-white/10 shadow-xl shadow-black/30 space-y-4">

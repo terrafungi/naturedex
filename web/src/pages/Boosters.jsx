@@ -57,19 +57,19 @@ export default function Boosters() {
             <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Carnet de {user.username}</p>
-                    <h1 className="font-display text-4xl sm:text-5xl font-black text-white mt-1">
+                    <h1 className="font-display text-4xl sm:text-5xl font-semibold text-white mt-1">
                         {discovered} <span className="text-ink-soft font-medium text-2xl sm:text-3xl">/ {total.toLocaleString('fr-FR')} espèces découvertes</span>
                     </h1>
                 </div>
             </div>
             <div className="mt-4 h-2.5 rounded-full bg-white/10 overflow-hidden">
-                <motion.div className="h-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-500" initial={{ width: 0 }} animate={{ width: `${(discovered / Math.max(total, 1)) * 100}%` }} transition={{ duration: 1 }} />
+                <motion.div className="h-full bg-gradient-to-r from-[#2fa866] via-[#4fd18b] to-[#e9c46a]" initial={{ width: 0 }} animate={{ width: `${(discovered / Math.max(total, 1)) * 100}%` }} transition={{ duration: 1 }} />
             </div>
 
             <div className="mt-10 grid lg:grid-cols-[1fr_1.2fr] gap-8 items-start">
                 {/* the pack */}
                 <div className="relative flex flex-col items-center p-8 rounded-[2rem] nd-glass nd-ring text-paper overflow-hidden">
-                    <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(circle at 50% 30%, #7c5cff, transparent 55%), radial-gradient(circle at 30% 90%, #22e58b, transparent 50%)' }} />
+                    <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(circle at 50% 30%, #e9c46a, transparent 55%), radial-gradient(circle at 30% 90%, #2fa866, transparent 50%)' }} />
                     <motion.button
                         disabled={busy || user.boosters < 1}
                         onClick={open}

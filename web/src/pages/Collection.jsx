@@ -80,7 +80,7 @@ export default function Collection() {
             <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Collection</p>
-                    <h1 className="font-display text-4xl font-black text-white mt-1">
+                    <h1 className="font-display text-4xl font-semibold text-white mt-1">
                         {Object.keys(owned).length} <span className="text-ink-soft font-medium text-2xl">/ {catalog.total.toLocaleString('fr-FR')}</span>
                     </h1>
                 </div>

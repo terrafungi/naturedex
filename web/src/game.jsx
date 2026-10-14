@@ -52,7 +52,7 @@ export const TYPES = {
 export const RARITIES = {
     common:    { label: 'Commune', symbol: '●', order: 0, color: '#9ca3af' },
     uncommon:  { label: 'Peu commune', symbol: '◆', order: 1, color: '#10b981' },
-    rare:      { label: 'Rare', symbol: '★', order: 2, color: '#e09b00' },
+    rare:      { label: 'Rare', symbol: '★', order: 2, color: '#4ea8ff' },
     epic:      { label: 'Épique', symbol: '★★', order: 3, color: '#a855f7' },
     legendary: { label: 'Légendaire', symbol: '★★★', order: 4, color: '#ffc53d' },
 };
