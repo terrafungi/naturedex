@@ -58,7 +58,7 @@ export default function Boosters() {
                 <div>
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Carnet de {user.username}</p>
                     <h1 className="font-display text-4xl sm:text-5xl font-black text-white mt-1">
-                        {discovered} <span className="text-ink-soft font-medium text-2xl sm:text-3xl">/ {total} espèces découvertes</span>
+                        {discovered} <span className="text-ink-soft font-medium text-2xl sm:text-3xl">/ {total.toLocaleString('fr-FR')} espèces découvertes</span>
                     </h1>
                 </div>
             </div>
@@ -130,7 +130,7 @@ export default function Boosters() {
                                         <span className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
                                             <span className="block h-full rounded-full" style={{ width: `${(have / Math.max(total, 1)) * 100}%`, background: t.color }} />
                                         </span>
-                                        <span className="w-14 text-right tabular-nums text-ink-soft">{have}/{total}</span>
+                                        <span className="w-20 text-right tabular-nums text-ink-soft">{have}/{total.toLocaleString('fr-FR')}</span>
                                     </li>
                                 );
                             })}

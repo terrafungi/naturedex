@@ -87,7 +87,7 @@ export default function CardPage() {
                         ))}
                     </dl>
                     <p className="mt-4 text-sm text-ink-soft">
-                        Sa rareté vient de sa popularité : {formatViews(Number(card.views))} lectures par an (estimées sur les 60 derniers jours), comparées aux autres espèces de type {t.label.toLowerCase()}.
+                        Sa rareté vient de sa popularité : {formatViews(Number(card.views))} lectures par an (moyenne des 3 derniers mois), comparées aux autres espèces de type {t.label.toLowerCase()}.
                     </p>
 
                     <div className="mt-8 flex flex-wrap items-center gap-3">
