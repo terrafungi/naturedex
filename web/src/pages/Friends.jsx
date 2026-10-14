@@ -31,7 +31,7 @@ function Badge({ n }) {
 function MiniCard({ item, warn }) {
     const r = RARITIES[item.card.rarity] || RARITIES.common;
     return (
-        <Link to={`/carte/${item.card.id}`} className="relative w-[4.5rem] shrink-0 group" title={item.card.name}>
+        <Link to={`/carte/${item.card.id}`} className="relative block w-[4.5rem] shrink-0 group" title={item.card.name}>
             <div className="aspect-[3/4] rounded-xl overflow-hidden ring-2 bg-black/30" style={{ '--tw-ring-color': r.color }}>
                 {item.card.thumb_url && <img src={item.card.thumb_url} alt="" className="w-full h-full object-cover" loading="lazy" />}
             </div>
@@ -142,7 +142,7 @@ function Picker({ username, selected, onToggle, onQty, total }) {
                                     <button type="button" onClick={() => onToggle(c)} className={`block w-full text-left rounded-2xl transition ${qty ? 'ring-[3px] ring-[#e9c46a] scale-[0.97]' : 'hover:-translate-y-0.5'}`}>
                                         <Card card={c} number={c.num} total={total} />
                                     </button>
-                                    {username && !c.have && <span className="absolute top-1 left-1/2 -translate-x-1/2 whitespace-nowrap px-1.5 py-0.5 rounded-full bg-[#4fd18b] text-[#05130d] text-[9px] font-bold flex items-center gap-0.5 pointer-events-none"><Sparkles className="w-2.5 h-2.5" />Nouvelle</span>}
+                                    {username && !c.have && <span className="absolute -top-2 left-2 z-10 whitespace-nowrap px-1.5 py-0.5 rounded-full bg-[#4fd18b] shadow text-[#05130d] text-[9px] font-bold flex items-center gap-0.5 pointer-events-none"><Sparkles className="w-2.5 h-2.5" />Nouvelle</span>}
                                     {c.count > 1 && !qty && <span className="absolute -top-1.5 -right-1.5 px-1.5 rounded-full bg-white/90 text-[#05130d] text-[11px] font-black pointer-events-none">×{c.count}</span>}
                                     {qty > 0 && (
                                         <span className="absolute -top-2 -right-2 grid place-items-center w-7 h-7 rounded-full bg-[#e9c46a] text-[#05130d] shadow-lg pointer-events-none"><Check className="w-4 h-4" strokeWidth={3} /></span>
