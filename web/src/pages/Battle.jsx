@@ -95,7 +95,7 @@ function Bench({ team, active, foe, side, onPick, options, disabled }) {
                             {f.hp > 0 ? (
                                 <span className="flex items-center gap-1">
                                     <span className="w-14"><HpBar hp={f.hp} max={f.maxHp} height={4} /></span>
-                                    {m && side === 0 && <><MultTag mult={m.dealt} /><MultTag mult={m.taken > 1 ? 0.75 : null} /></>}
+                                    {m && side === 0 && <><MultTag mult={m.dealt} prefix="inflige " /><MultTag mult={m.taken} prefix="subit " invert /></>}
                                 </span>
                             ) : <span className="text-[10px] text-[#ffb4a2] font-bold">K.O.</span>}
                         </span>
@@ -141,7 +141,7 @@ function EndModal({ battle, onClose }) {
     const won = battle.status === 'won';
     const st = battle.state;
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-50 grid place-items-center bg-black/70 backdrop-blur p-4">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[100] grid place-items-center bg-black/70 backdrop-blur p-4">
             <motion.div initial={{ scale: 0.85, y: 20 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-sm p-6 rounded-[2rem] nd-glass nd-ring text-center">
                 {won ? <Crown className="w-14 h-14 mx-auto text-[#f4d88f]" /> : <Skull className="w-14 h-14 mx-auto text-[#ffb4a2]" />}
                 <h2 className="mt-2 font-display text-4xl font-bold">{won ? 'Victoire !' : 'Défaite'}</h2>
@@ -283,8 +283,8 @@ export default function Battle() {
                     </p>
                     <p className="font-display text-xl font-semibold truncate">{battle.stageName || `Contre ${foeName}`}</p>
                 </div>
-                <span className="px-3 py-1.5 rounded-full bg-white/[0.06] text-sm font-bold tabular-nums">Manche {Math.max(1, st.round)}/{st.maxRounds}</span>
-                {!over && <button onClick={forfeit} disabled={busy} className="px-3 py-1.5 rounded-full bg-rust/20 text-[#ffb4a2] text-sm font-semibold flex items-center gap-1.5 disabled:opacity-40"><Flag className="w-4 h-4" />Abandonner</button>}
+                <span className="px-3 py-1.5 rounded-full bg-white/[0.06] text-sm font-bold tabular-nums"><span className="hidden sm:inline">Manche </span>{Math.max(1, st.round)}/{st.maxRounds}</span>
+                {!over && <button onClick={forfeit} disabled={busy} title="Abandonner" className="px-3 py-1.5 rounded-full bg-rust/20 text-[#ffb4a2] text-sm font-semibold flex items-center gap-1.5 disabled:opacity-40"><Flag className="w-4 h-4" /><span className="hidden sm:inline">Abandonner</span></button>}
             </div>
 
             <div className="mt-4 p-3 sm:p-5 rounded-[2rem] nd-glass space-y-3">
@@ -318,7 +318,7 @@ export default function Battle() {
                 ) : replacing ? (
                     <div className="p-4 rounded-3xl border border-rust/40 bg-rust/10">
                         <p className="font-bold">Ta carte est K.O. — choisis celle qui entre en jeu</p>
-                        <p className="text-xs text-white/70 mb-3">Regarde les types : ×1,5 = elle frappe fort {foe.name}, ×0,75 en rouge = elle craint ses coups.</p>
+                        <p className="text-xs text-white/70 mb-3">Vert = avantage, rouge = désavantage face à {foe.name} (inflige / subit ×1,5 ou ×0,75).</p>
                         <Bench team={shown.teams[0]} active={shown.active[0]} foe={foe} side={0} options={opts} onPick={act} disabled={busy} />
                     </div>
                 ) : (
@@ -340,7 +340,7 @@ export default function Battle() {
                                 <div className="grid sm:grid-cols-2 gap-2">
                                     {shown.teams[0].map((f, i) => i === shown.active[0] || f.hp <= 0 ? null : (
                                         <ActionBtn key={f.id} action={{ kind: 'switch', to: i }} Icon={RefreshCw}
-                                            title={<span className="flex items-center gap-2 min-w-0"><Avatar card={f} size={26} /><span className="truncate">{f.name}</span><MultTag mult={matchup(f, foe).dealt} /><MultTag mult={matchup(f, foe).taken > 1 ? 0.75 : null} /></span>}
+                                            title={<span className="flex items-center gap-2 min-w-0"><Avatar card={f} size={26} /><span className="truncate">{f.name}</span><MultTag mult={matchup(f, foe).dealt} prefix="inflige " /><MultTag mult={matchup(f, foe).taken} prefix="subit " invert /></span>}
                                             sub={`${f.hp}/${f.maxHp} PV · ${TYPES[f.type].label}`} tone="border-white/10 bg-white/[0.03] hover:bg-white/[0.08]" />
                                     ))}
                                 </div>

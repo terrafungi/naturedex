@@ -35,9 +35,9 @@ function TeamVs({ team, mine }) {
                     <div key={c.id} className="flex flex-col items-center gap-1 w-14">
                         <Avatar card={c} size={44} />
                         <span className="text-[10px] leading-tight text-center text-white/70 line-clamp-1 w-full">{c.name}</span>
-                        <span className="flex gap-0.5">
+                        <span className="flex gap-0.5" title="Ton meilleur multiplicateur contre elle / le pire qu'elle t'inflige">
                             <MultTag mult={best > 1 ? best : null} />
-                            {worst > 1 && <MultTag mult={0.75} />}
+                            {worst > 1 && <MultTag mult={worst} prefix="⚠" invert />}
                         </span>
                     </div>
                 );

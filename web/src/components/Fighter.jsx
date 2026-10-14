@@ -73,9 +73,9 @@ export function HpBar({ hp, max, shield = 0, height = 10 }) {
 }
 
 // ×1.5 / ×0.75 label for a matchup, or nothing when neutral.
-export function MultTag({ mult, prefix = '' }) {
+export function MultTag({ mult, prefix = '', invert = false }) {
     if (!mult || mult === 1) return null;
-    const good = mult > 1;
+    const good = (mult > 1) !== invert;
     return (
         <span className={`inline-block rounded px-1 text-[10px] font-black tabular-nums ${good ? 'bg-[#4fd18b]/20 text-[#8ee6a8]' : 'bg-[#e76f51]/20 text-[#ffb4a2]'}`}>
             {prefix}×{String(mult).replace('.', ',')}
