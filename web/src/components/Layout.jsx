@@ -54,7 +54,7 @@ function Brand() {
             <LeafLogo className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 drop-shadow-[0_0_12px_rgba(79,209,139,0.45)] transition-transform group-hover:-rotate-12" />
             <span className="leading-none min-w-0">
                 <span className="block font-display text-[1.6rem] sm:text-[1.8rem] font-semibold text-white">NatureDex</span>
-                <span className="block mt-1 text-[8.5px] sm:text-[9.5px] font-semibold uppercase tracking-[0.2em] text-white/55 truncate">Des cartes pour un monde plus vivant</span>
+                <span className="block lg:hidden xl:block mt-1 text-[8.5px] sm:text-[9.5px] font-semibold uppercase tracking-[0.2em] text-white/55 truncate">Des cartes pour un monde plus vivant</span>
             </span>
         </Link>
     );
@@ -83,26 +83,33 @@ function MenuSheet({ onClose }) {
     return (
         <motion.div className="fixed inset-0 z-50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <motion.nav className="absolute right-0 top-0 h-full w-[min(320px,85vw)] bg-[#081a11] border-l border-white/10 p-6 flex flex-col gap-1"
+            <motion.nav className="absolute right-0 top-0 h-full w-[min(320px,85vw)] bg-[#081a11] border-l border-white/10 px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex flex-col gap-0.5 overflow-y-auto overscroll-contain"
                 initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-4 shrink-0">
                     <LeafLogo className="w-9 h-9" />
                     <button onClick={onClose} className="grid place-items-center w-10 h-10 rounded-full nd-cta-glass" aria-label="Fermer le menu"><X className="w-5 h-5" /></button>
                 </div>
                 {user && (
-                    <div className="mb-4 rounded-2xl nd-glass p-4">
-                        <div className="font-display text-xl text-white">{user.username}</div>
-                        <div className="mt-1 flex items-center gap-1.5 text-sm text-[#8ee6a8]"><Seed />{fmt(user.coins)} graines</div>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-sm text-[#f4c25b]"><Nugget />{fmt(user.nuggets)} pépites</div>
+                    <div className="mb-3 shrink-0 rounded-2xl nd-glass px-4 py-3 flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="font-display text-lg text-white truncate">{user.username}</div>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-sm font-semibold tabular-nums">
+                                <span className="flex items-center gap-1 text-[#8ee6a8]"><Seed />{fmt(user.coins)}</span>
+                                <span className="flex items-center gap-1 text-[#f4c25b]"><Nugget />{fmt(user.nuggets)}</span>
+                            </div>
+                        </div>
+                        <Link to="/boutique" onClick={onClose} className="grid place-items-center w-9 h-9 rounded-full bg-[#e9c46a] text-[#2a1c00] shrink-0" title="Boutique solidaire" aria-label="Boutique solidaire">
+                            <Plus className="w-5 h-5" strokeWidth={3} />
+                        </Link>
                     </div>
                 )}
                 {NAV.map(({ to, label, Icon, end }) => (
                     <NavLink key={to} to={to} end={end} onClick={onClose}
-                        className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6]' : 'text-white/80 hover:bg-white/5'}`}>
+                        className={({ isActive }) => `shrink-0 flex items-center gap-3 px-4 py-2.5 rounded-xl font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6]' : 'text-white/80 hover:bg-white/5'}`}>
                         <Icon className="w-5 h-5" />{label}<NavBadge to={to} className="ml-auto" />
                     </NavLink>
                 ))}
-                <div className="mt-auto">
+                <div className="mt-auto pt-3 shrink-0">
                     {user ? (
                         <button onClick={() => { logout(); onClose(); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/70 hover:bg-white/5">
                             <LogOut className="w-5 h-5" />Se déconnecter
