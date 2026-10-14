@@ -152,7 +152,8 @@ async function socialCounts(db, userId) {
     const { rows: [c] } = await db.query(
         `SELECT (SELECT COUNT(*)::int FROM friendships WHERE addressee_id = $1 AND status = 'pending') AS "friendRequests",
                 (SELECT COUNT(*)::int FROM trades WHERE to_id = $1 AND status = 'pending') AS "tradeOffers",
-                (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND day = (now() AT TIME ZONE 'Europe/Paris')::date) AS "quizPlayed"`,
+                (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND day = (now() AT TIME ZONE 'Europe/Paris')::date) AS "quizPlayed",
+                (SELECT COUNT(*)::int FROM messages WHERE to_id = $1 AND read_at IS NULL) AS "unreadMessages"`,
         [userId]
     );
     return c;
@@ -394,6 +395,35 @@ async function trophyList(db, userId) {
     const claimed = new Set(claims.map((r) => r.key));
     return TROPHIES.map(({ metric, ...t }) => ({ ...t, progress: Math.min(m[metric] || 0, t.goal), claimed: claimed.has(t.key) }));
 }
+
+// What is waiting for the player, per page (red counters on the navigation icons).
+async function badgeCounts(db, user, pub) {
+    const [trophies, { challenges }, { rows: [inv] }] = await Promise.all([
+        trophyList(db, user.id),
+        dailyChallenges(db, user.id),
+        db.query(`SELECT COUNT(*) FILTER (WHERE invite_rewarded_at IS NOT NULL)::int AS rewarded,
+                         COUNT(*) FILTER (WHERE invite_rewarded_at IS NULL AND (SELECT COUNT(DISTINCT d) FROM (
+                             SELECT (at AT TIME ZONE 'Europe/Paris')::date AS d FROM openings WHERE user_id = u.id
+                             UNION SELECT day FROM quizzes WHERE user_id = u.id AND status = 'done') x) >= $2)::int AS ready
+                  FROM users u WHERE invited_by = $1`, [user.id, INVITE_DAYS]),
+    ]);
+    const s = pub.social;
+    return {
+        '/booster': (pub.nextDailyAt ? 0 : 1) + (pub.charges >= pub.maxCharges ? 1 : 0),
+        '/quiz': Math.max(0, QUIZ_PER_DAY - s.quizPlayed),
+        '/defis': challenges.filter((c) => !c.claimed && c.progress >= c.goal).length,
+        '/trophees': trophies.filter((t) => !t.claimed && t.progress >= t.goal).length,
+        '/inviter': Math.min(inv.ready, Math.max(0, INVITE_CAP - inv.rewarded)),
+        '/amis': s.friendRequests + s.tradeOffers,
+        '/messages': s.unreadMessages,
+    };
+}
+
+// ---------- private messages ----------
+
+const MESSAGE_MAX = 1000;
+const MESSAGES_PER_MINUTE = 20;
+const THREAD_LIMIT = 100;
 
 // ---------- auction house ----------
 
@@ -1207,6 +1237,70 @@ const actions = {
             [user.id, other.id]
         );
         return { ok: true };
+    },
+
+    // ---- Badges & messages ----
+    async badges(db, body, event) {
+        const user = await requireUser(db, event);
+        const pub = await publicUser(db, user);
+        return { user: pub, badges: await badgeCounts(db, user, pub) };
+    },
+
+    // One row per correspondent (last message, unread count), plus friends not written to yet.
+    async conversations(db, body, event) {
+        const user = await requireUser(db, event);
+        const [{ rows: conversations }, { rows: friends }] = await Promise.all([
+            db.query(
+                `SELECT u.username, m.body, m.created_at, m.from_id = $1 AS mine,
+                        (SELECT COUNT(*)::int FROM messages WHERE from_id = u.id AND to_id = $1 AND read_at IS NULL) AS unread,
+                        EXISTS (SELECT 1 FROM friendships f WHERE f.status = 'accepted'
+                                AND ((f.requester_id = $1 AND f.addressee_id = u.id) OR (f.requester_id = u.id AND f.addressee_id = $1))) AS friend
+                 FROM (SELECT DISTINCT ON (other) * FROM (
+                          SELECT *, CASE WHEN from_id = $1 THEN to_id ELSE from_id END AS other FROM messages WHERE $1 IN (from_id, to_id)
+                       ) x ORDER BY other, id DESC) m
+                 JOIN users u ON u.id = m.other
+                 ORDER BY m.id DESC LIMIT 100`, [user.id]),
+            db.query(
+                `SELECT u.username FROM friendships f
+                 JOIN users u ON u.id = CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END
+                 WHERE f.status = 'accepted' AND $1 IN (f.requester_id, f.addressee_id) ORDER BY lower(u.username)`, [user.id]),
+        ]);
+        const talked = new Set(conversations.map((c) => c.username));
+        return { conversations, friends: friends.map((f) => f.username).filter((u) => !talked.has(u)) };
+    },
+
+    // The last messages with one player (or those after `after`), marking theirs as read.
+    async thread(db, body, event) {
+        const user = await requireUser(db, event);
+        const other = await findUser(db, body.username);
+        const after = Number(body.after) || 0;
+        const { rows } = await db.query(
+            `SELECT * FROM (
+                SELECT id, body, created_at, read_at, from_id = $1 AS mine FROM messages
+                WHERE ((from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1)) AND id > $3
+                ORDER BY id DESC LIMIT ${THREAD_LIMIT}) t ORDER BY id`,
+            [user.id, other.id, after]
+        );
+        const { rowCount: read } = await db.query(
+            `UPDATE messages SET read_at = now() WHERE from_id = $2 AND to_id = $1 AND read_at IS NULL`, [user.id, other.id]);
+        const f = await relation(db, user.id, other.id);
+        return { username: other.username, friend: f?.status === 'accepted', messages: rows, read };
+    },
+
+    async sendMessage(db, body, event) {
+        const user = await requireUser(db, event);
+        const text = String(body.body || '').replace(/\r\n/g, '\n').trim();
+        if (!text) throw new HttpError(400, 'Message vide');
+        if (text.length > MESSAGE_MAX) throw new HttpError(400, `Message trop long (${MESSAGE_MAX} caractères maximum)`);
+        const other = await requireFriend(db, user.id, body.username);
+        const { rows: [{ n }] } = await db.query(
+            `SELECT COUNT(*)::int AS n FROM messages WHERE from_id = $1 AND created_at > now() - interval '1 minute'`, [user.id]);
+        if (n >= MESSAGES_PER_MINUTE) throw new HttpError(429, 'Doucement ! Attends un peu avant d\'envoyer d\'autres messages');
+        const { rows: [message] } = await db.query(
+            `INSERT INTO messages (from_id, to_id, body) VALUES ($1, $2, $3) RETURNING id, body, created_at, read_at, true AS mine`,
+            [user.id, other.id, text]
+        );
+        return { message };
     },
 
     // ---- Trades ----

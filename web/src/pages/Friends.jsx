@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeftRight, Check, Clock, Minus, Plus, Search, Send, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowLeftRight, Check, Clock, MessageCircle, Minus, Plus, Search, Send, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react';
 import InviteBanner from '../components/InviteBanner.jsx';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
@@ -381,6 +381,7 @@ export default function Friends() {
                                     <div className="font-display text-lg text-white truncate">{f.username}</div>
                                     <div className="text-xs text-white/55">{f.discovered.toLocaleString('fr-FR')} espèces découvertes</div>
                                 </div>
+                                <Link to={`/messages/${encodeURIComponent(f.username)}`} className="grid place-items-center w-9 h-9 rounded-full ring-1 ring-white/15 text-white/80 hover:bg-white/10" aria-label={`Écrire à ${f.username}`} title="Message"><MessageCircle className="w-4 h-4" /></Link>
                                 <button onClick={() => setTrading(f.username)} className="nd-cta-gold px-3.5 py-2 rounded-full text-sm font-bold flex items-center gap-1.5"><ArrowLeftRight className="w-4 h-4" /><span className="hidden min-[400px]:inline">Échanger</span></button>
                                 <button disabled={busy} onClick={() => window.confirm(`Retirer ${f.username} de tes amis ?`) && act('removeFriend', { username: f.username }, `${f.username} a été retiré de tes amis.`)}
                                     className="grid place-items-center w-9 h-9 rounded-full text-white/50 hover:text-[#ff8a80] hover:bg-white/5" aria-label={`Retirer ${f.username}`}><Trash2 className="w-4 h-4" /></button>

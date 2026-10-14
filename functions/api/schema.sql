@@ -192,3 +192,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_by INT REFERENCES users(id) O
 ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_rewarded_at TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_share DATE;
 CREATE INDEX IF NOT EXISTS users_invited_by ON users (invited_by);
+
+-- Private messages between friends. read_at is set when the recipient opens the thread.
+CREATE TABLE IF NOT EXISTS messages (
+    id BIGSERIAL PRIMARY KEY,
+    from_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    read_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS messages_pair ON messages (LEAST(from_id, to_id), GREATEST(from_id, to_id), id);
+CREATE INDEX IF NOT EXISTS messages_unread ON messages (to_id) WHERE read_at IS NULL;
+CREATE INDEX IF NOT EXISTS messages_from ON messages (from_id, created_at);

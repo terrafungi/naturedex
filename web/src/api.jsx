@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 // Direct Lambda URL (faster than going through CloudFront /api).
 const API_BASE = 'https://6473i3zbep7lhvii3vg7pzg3ny0aicsj.lambda-url.eu-central-1.on.aws/';
@@ -23,7 +23,7 @@ export async function api(action, params = {}) {
 const GameContext = createContext(null);
 
 export function GameProvider({ children }) {
-    const [user, setUser] = useState(null);
+    const [user, setUserRaw] = useState(null);
     const [ready, setReady] = useState(false);
     const [catalog, setCatalog] = useState(null);
     const [owned, setOwned] = useState({}); // { cardId: count }
@@ -40,33 +40,47 @@ export function GameProvider({ children }) {
         api('catalog').then(setCatalog).catch(() => setCatalog({ total: 0, types: {}, cards: [] }));
         if (!localStorage.getItem(TOKEN_KEY)) { setReady(true); return; }
         api('me')
-            .then(({ user }) => { setUser(user); return refreshCollection(); })
+            .then(({ user }) => { setUserRaw(user); return refreshCollection(); })
             .catch(() => localStorage.removeItem(TOKEN_KEY))
             .finally(() => setReady(true));
     }, [refreshCollection]);
 
-    // Keep wallet and social badges (friend requests, trade offers) fresh.
+    // Counters per page (`/defis`: 2…) for the navigation badges, refreshed every 30 s,
+    // on page change and shortly after any action that returns a new user.
+    const [badges, setBadges] = useState({});
+    const refreshBadges = useCallback(() => {
+        if (!localStorage.getItem(TOKEN_KEY)) return;
+        api('badges').then(({ user, badges }) => { setUserRaw(user); setBadges(badges); }).catch(() => {});
+    }, []);
     const loggedIn = !!user;
     useEffect(() => {
         if (!loggedIn) return;
-        const t = setInterval(() => {
-            if (document.visibilityState === 'visible') api('me').then(({ user }) => setUser(user)).catch(() => {});
-        }, 45_000);
-        return () => clearInterval(t);
-    }, [loggedIn]);
+        refreshBadges();
+        const t = setInterval(() => document.visibilityState === 'visible' && refreshBadges(), 30_000);
+        const onShow = () => document.visibilityState === 'visible' && refreshBadges();
+        document.addEventListener('visibilitychange', onShow);
+        return () => { clearInterval(t); document.removeEventListener('visibilitychange', onShow); };
+    }, [loggedIn, refreshBadges]);
+    const pending = useRef(0);
+    const setUser = useCallback((u) => {
+        setUserRaw(u);
+        clearTimeout(pending.current);
+        if (u) pending.current = setTimeout(refreshBadges, 400);
+    }, [refreshBadges]);
 
     const authenticate = useCallback(async (mode, username, password, extra = {}) => {
         const { token, user } = await api(mode, { username, password, ...extra });
         localStorage.setItem(TOKEN_KEY, token);
         setUser(user);
         await refreshCollection();
-    }, [refreshCollection]);
+    }, [refreshCollection, setUser]);
 
     const logout = useCallback(async () => {
         await api('logout').catch(() => {});
         localStorage.removeItem(TOKEN_KEY);
         localStorage.setItem('naturdex.returning', '1'); // next visit shows log-in, not sign-up
-        setUser(null);
+        setUserRaw(null);
+        setBadges({});
         setOwned({});
         setOwnedInfo({});
     }, []);
@@ -86,7 +100,7 @@ export function GameProvider({ children }) {
     }, []);
 
     return (
-        <GameContext.Provider value={{ user, setUser, ready, catalog, owned, ownedInfo, setOwned, refreshCollection, authenticate, logout, addCards }}>
+        <GameContext.Provider value={{ user, setUser, ready, badges, refreshBadges, catalog, owned, ownedInfo, setOwned, refreshCollection, authenticate, logout, addCards }}>
             {children}
         </GameContext.Provider>
     );

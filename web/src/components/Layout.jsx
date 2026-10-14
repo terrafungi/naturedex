@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, Brain, Gavel, Gift, Home, Layers, LayoutGrid, Medal, Package, Plus, ShoppingBag, Trophy, User, Users, X } from 'lucide-react';
+import { Award, Brain, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
@@ -13,6 +13,7 @@ export const NAV = [
     { to: '/classement', label: 'Classement', Icon: Medal },
     { to: '/encheres', label: 'Enchères', Icon: Gavel },
     { to: '/amis', label: 'Amis', Icon: Users },
+    { to: '/messages', label: 'Messages', Icon: MessageCircle },
     { to: '/defis', label: 'Défis', Icon: Trophy },
     { to: '/trophees', label: 'Trophées', Icon: Award },
     { to: '/boutique', label: 'Boutique solidaire', short: 'Boutique', Icon: ShoppingBag },
@@ -20,15 +21,18 @@ export const NAV = [
     { to: '/profil', label: 'Profil', Icon: User },
 ];
 
-// Pending friend requests + trade offers, shown as a red dot count on the Amis link.
-function useSocialCount() {
-    const { user } = useGame();
-    return (user?.social?.friendRequests || 0) + (user?.social?.tradeOffers || 0);
+// Red counter on a navigation icon: what is waiting on that page (rewards to collect,
+// unread messages, friend requests…), from the server's `badges` map.
+function useBadge(to) {
+    const { badges } = useGame();
+    return badges[to] || 0;
 }
-function NavBadge({ to, className = '' }) {
-    const n = useSocialCount();
-    if (to !== '/amis' || !n) return null;
-    return <span className={`min-w-[1.1rem] h-[1.1rem] px-1 inline-grid place-items-center rounded-full bg-[#ff6b6b] text-white text-[10px] font-bold leading-none ${className}`}>{n > 9 ? '9+' : n}</span>;
+function Counter({ n, className = '' }) {
+    if (!n) return null;
+    return <span className={`min-w-[1.1rem] h-[1.1rem] px-1 inline-grid place-items-center rounded-full bg-[#ff6b6b] text-white text-[10px] font-bold leading-none ring-2 ring-[#0b1f16] ${className}`}>{n > 9 ? '9+' : n}</span>;
+}
+function NavBadge({ to, className }) {
+    return <Counter n={useBadge(to)} className={className} />;
 }
 
 export function LeafLogo({ className = 'w-9 h-9' }) {
@@ -98,13 +102,14 @@ function TabItem({ to, label, short, Icon, end, className = '' }) {
 function TabBar() {
     const { pathname } = useLocation();
     const [open, setOpen] = useState(false);
-    const social = useSocialCount();
+    const { badges, refreshBadges } = useGame();
     const primary = NAV.slice(0, PRIMARY);
     const more = NAV.slice(PRIMARY);
     const activeMore = more.find(({ to }) => pathname === to || pathname.startsWith(`${to}/`));
-    const moreBadge = more.some(({ to }) => to === '/amis') ? social : 0;
+    const moreBadge = more.reduce((sum, { to }) => sum + (badges[to] || 0), 0);
 
     useEffect(() => { setOpen(false); }, [pathname]);
+    useEffect(() => { refreshBadges(); }, [pathname, refreshBadges]);
     useEffect(() => {
         if (!open) return;
         const onKey = (e) => e.key === 'Escape' && setOpen(false);
@@ -131,14 +136,14 @@ function TabBar() {
                     )}
                 </AnimatePresence>
                 <div className="nd-tabbar pointer-events-auto mx-auto w-full max-w-md lg:w-fit lg:max-w-none flex gap-1 p-1.5 rounded-[1.6rem]">
-                    {primary.map((item) => <TabItem key={item.to} {...item} className="flex-1 min-w-0 lg:flex-none lg:w-[4.9rem]" />)}
-                    {more.map((item) => <TabItem key={item.to} {...item} className="hidden lg:flex lg:w-[4.9rem]" />)}
+                    {primary.map((item) => <TabItem key={item.to} {...item} className="flex-1 min-w-0 lg:flex-none lg:w-[4.55rem]" />)}
+                    {more.map((item) => <TabItem key={item.to} {...item} className="hidden lg:flex lg:w-[4.55rem]" />)}
                     <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="nd-more"
                         className={`lg:hidden relative flex-1 min-w-0 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors ${open || activeMore ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/80 hover:text-white'}`}>
                         <MoreIcon className="w-5 h-5" strokeWidth={1.8} />
                         <span className="max-w-full truncate px-0.5">{open ? 'Fermer' : activeMore ? (activeMore.short || activeMore.label) : 'Plus'}</span>
-                        {!open && !activeMore && <Plus className="absolute top-1.5 right-[calc(50%-1.3rem)] w-3 h-3 p-px rounded-full bg-[#e9c46a] text-[#2a1c00]" strokeWidth={3.5} />}
-                        {!open && moreBadge > 0 && <span className="absolute top-1 right-[calc(50%-1.4rem)] min-w-[1.1rem] h-[1.1rem] px-1 inline-grid place-items-center rounded-full bg-[#ff6b6b] text-white text-[10px] font-bold leading-none">{moreBadge > 9 ? '9+' : moreBadge}</span>}
+                        {!open && !activeMore && !moreBadge && <Plus className="absolute top-1.5 right-[calc(50%-1.3rem)] w-3 h-3 p-px rounded-full bg-[#e9c46a] text-[#2a1c00]" strokeWidth={3.5} />}
+                        {!open && <Counter n={moreBadge} className="absolute top-1 right-[calc(50%-1.4rem)]" />}
                     </button>
                 </div>
             </nav>

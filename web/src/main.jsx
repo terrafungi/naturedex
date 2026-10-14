@@ -14,6 +14,7 @@ import Profile from './pages/Profile.jsx';
 import Trophies from './pages/Trophies.jsx';
 import Leaderboard from './pages/Leaderboard.jsx';
 import Invite from './pages/Invite.jsx';
+import Messages from './pages/Messages.jsx';
 import Auctions from './pages/Auctions.jsx';
 import Friends from './pages/Friends.jsx';
 import Quiz from './pages/Quiz.jsx';
@@ -42,6 +43,8 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/trophees" element={<Private><Trophies /></Private>} />
                         <Route path="/classement" element={<Private><Leaderboard /></Private>} />
                         <Route path="/inviter" element={<Private><Invite /></Private>} />
+                        <Route path="/messages" element={<Private><Messages /></Private>} />
+                        <Route path="/messages/:username" element={<Private><Messages /></Private>} />
                         <Route path="/encheres" element={<Private><Auctions /></Private>} />
                         <Route path="/quiz" element={<Private><Quiz /></Private>} />
                         <Route path="/boutique" element={<Private><Shop /></Private>} />
