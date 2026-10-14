@@ -43,7 +43,7 @@ const INVITE_REWARD = { coins: 1000, nuggets: 150 };
 const INVITEE_BONUS = { coins: 300, nuggets: 50 };
 const INVITE_DAYS = 2;
 const INVITE_CAP = 30;
-const SHARE_COINS = 100; // once a day, for sharing the game link
+const SHARE_COINS = 100; // once per account, for sharing the game link
 // pépites per recycled duplicate
 const RECYCLE_VALUE = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, secret: 1000 };
 
@@ -350,13 +350,13 @@ async function inviteState(db, user) {
                     SELECT (at AT TIME ZONE 'Europe/Paris')::date AS d FROM openings WHERE user_id = u.id
                     UNION SELECT day FROM quizzes WHERE user_id = u.id AND status = 'done') x) AS days
          FROM users u WHERE u.invited_by = $1 ORDER BY u.created_at DESC LIMIT 200`, [user.id]);
-    const { rows: [me] } = await db.query(`SELECT last_share IS NOT NULL AND last_share >= ${PARIS_DAY} AS shared FROM users WHERE id = $1`, [user.id]);
+    const { rows: [me] } = await db.query(`SELECT last_share IS NOT NULL AS shared FROM users WHERE id = $1`, [user.id]);
     const rewarded = invitees.filter((i) => i.rewarded).length;
     return {
         code,
         reward: INVITE_REWARD, inviteeBonus: INVITEE_BONUS, days: INVITE_DAYS, cap: INVITE_CAP, shareCoins: SHARE_COINS,
         rewarded,
-        sharedToday: me.shared,
+        shared: me.shared,
         invitees: invitees.map((i) => ({ ...i, ready: !i.rewarded && i.days >= INVITE_DAYS && rewarded < INVITE_CAP })),
     };
 }
@@ -947,13 +947,13 @@ const actions = {
         return { paid, coins: paid * INVITE_REWARD.coins, nuggets: paid * INVITE_REWARD.nuggets, user: await publicUser(db, updated), invites: await inviteState(db, updated) };
     },
 
-    // Sharing can't be verified, so it pays little and once a day.
+    // Sharing can't be verified, so it pays little and only once per account.
     async shareReward(db, body, event) {
         const user = await requireUser(db, event);
         const { rows: [updated] } = await db.query(
             `UPDATE users SET coins = coins + $2, last_share = ${PARIS_DAY}
-             WHERE id = $1 AND (last_share IS NULL OR last_share < ${PARIS_DAY}) RETURNING *`, [user.id, SHARE_COINS]);
-        if (!updated) throw new HttpError(409, 'Bonus de partage déjà reçu aujourd\'hui');
+             WHERE id = $1 AND last_share IS NULL RETURNING *`, [user.id, SHARE_COINS]);
+        if (!updated) throw new HttpError(409, 'Bonus de partage déjà reçu');
         return { coins: SHARE_COINS, user: await publicUser(db, updated), invites: await inviteState(db, updated) };
     },
 

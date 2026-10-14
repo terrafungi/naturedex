@@ -50,15 +50,15 @@ export default function Invite() {
         { key: 'mail', label: 'E-mail', Icon: Mail, color: '#f4d88f', url: `mailto:?subject=${enc('Rejoins-moi sur NatureDex')}&body=${enc(`${text}\n\n${link}`)}` },
     ];
 
-    // Any share action pays the daily bonus (once a day, server-side).
+    // The first share action pays the bonus (once per account, server-side).
     async function rewardShare() {
-        if (!data || data.sharedToday) return;
+        if (!data || data.shared) return;
         try {
             const res = await api('shareReward');
             setUser(res.user);
             setData(res.invites);
             setMessage(`Merci pour le partage : +${res.coins} graines !`);
-        } catch { /* already paid today */ }
+        } catch { /* already paid */ }
     }
     async function copy() {
         await navigator.clipboard?.writeText(link).catch(() => {});
@@ -106,9 +106,9 @@ export default function Invite() {
                         <span className="flex flex-wrap gap-x-3"><Amount seeds={data.inviteeBonus.coins} sign /><Amount nuggets={data.inviteeBonus.nuggets} sign /></span>
                         <span className="block mt-1">à l'inscription avec ton lien</span>
                     </Reward>
-                    <Reward Icon={Share2} title="Partage du jour">
+                    <Reward Icon={Share2} title="Premier partage">
                         <Amount seeds={data.shareCoins} sign />
-                        <span className="block mt-1">{data.sharedToday ? 'Reçu aujourd\'hui, reviens demain' : 'chaque jour où tu partages ton lien'}</span>
+                        <span className="block mt-1">{data.shared ? 'Bonus déjà reçu' : 'une seule fois, en partageant ton lien'}</span>
                     </Reward>
                 </div>
             )}
