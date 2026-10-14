@@ -570,7 +570,7 @@ async function loadTrades(db, userId, where) {
 
 // ---------- shop (real money, Stripe) ----------
 
-const SITE_ORIGINS = ['https://diuqx6knr7is6.cloudfront.net', 'http://localhost:6100', 'http://localhost:5173'];
+const SITE_ORIGINS = ['https://diuqx6knr7is6.cloudfront.net', 'https://naturedex.fr', 'https://www.naturedex.fr', 'http://localhost:6100', 'http://localhost:5173'];
 
 // Credit a purchase once Stripe says it is paid. Idempotent: the webhook and the
 // return page may both call this, only the first one flips pending → paid.
