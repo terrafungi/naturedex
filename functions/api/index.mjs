@@ -150,6 +150,19 @@ const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views
 const RARITY_ORDER = `CASE c.rarity WHEN 'legendary' THEN 4 WHEN 'epic' THEN 3 WHEN 'rare' THEN 2 WHEN 'uncommon' THEN 1 ELSE 0 END`;
 let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
+// The catalogue builder skips article intros (too many pages to fetch in bulk):
+// fetch one the first time somebody opens the card, and keep it.
+async function fillExtract(db, card) {
+    const title = card.wiki_url.split('/wiki/').pop();
+    const res = await fetch(`https://fr.wikipedia.org/api/rest_v1/page/summary/${title}`, {
+        headers: { 'User-Agent': 'NaturDex/0.1 (OpenKBS card game; contact via openkbs.com)' },
+        signal: AbortSignal.timeout(4_000),
+    }).catch(() => null);
+    const extract = res?.ok ? (await res.json()).extract : null;
+    if (extract) await db.query(`UPDATE cards SET extract = $2 WHERE id = $1`, [card.id, extract]);
+    return extract;
+}
+
 // ---------- actions ----------
 
 const actions = {
@@ -318,6 +331,7 @@ const actions = {
         if (!card) throw new HttpError(404, 'Carte introuvable');
         // Undiscovered cards stay a mystery.
         if (!card.count) return { card: { id: card.id, num: card.num, type: card.type, rarity: card.rarity, count: 0 } };
+        if (!card.extract) card.extract = await fillExtract(db, card);
         return { card };
     },
 

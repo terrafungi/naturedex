@@ -12,6 +12,12 @@ export function TypeBadge({ type, className = '' }) {
     );
 }
 
+// Commons serves no 500px thumbnail for images narrower than that: show the original file.
+function fallbackToOriginal(e) {
+    const original = e.currentTarget.src.replace('/thumb/', '/').replace(/\/\d+px-[^/]+$/, '');
+    if (original !== e.currentTarget.src) e.currentTarget.src = original;
+}
+
 /** Full card. `card` comes from the catalog (light) or the API (full). */
 export function Card({ card, number, total, tilt = false, className = '' }) {
     const ref = useRef(null);
@@ -53,7 +59,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                     </div>
                 </div>
                 <div className="nd-window">
-                    <img src={card.thumb_url} alt={card.name} loading="lazy" draggable="false" />
+                    <img src={card.thumb_url} alt={card.name} loading="lazy" draggable="false" onError={fallbackToOriginal} />
                 </div>
                 <div className="nd-strip">
                     <span className="nd-sci">{card.sci_name || t.label}</span>

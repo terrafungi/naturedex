@@ -4,12 +4,21 @@
  *   cd scripts && npm install
  *   DATABASE_URL="$(openkbs postgres connection --libpq)" node build-catalog.mjs
  *
- * Rarity = popularity: page views of the fr.wikipedia article over the last 12 months,
- * ranked by percentile inside each card type (every type gets its own legendaries).
- * Network responses are cached in scripts/.cache so re-runs are cheap.
+ * Everything comes from bulk sources (the per-page Wikipedia API rate-limits 100k+ lookups):
+ * - taxa, fr.wikipedia titles and images (Wikidata P18) from QLever SPARQL;
+ * - popularity from the monthly Wikimedia pageview dump, pre-filtered to fr.wikipedia:
+ *     curl -s https://dumps.wikimedia.org/other/pageview_complete/monthly/YYYY/YYYY-MM/pageviews-YYYYMM-user.bz2 \
+ *       | bzip2 -dc | LC_ALL=C awk '$1=="fr.wikipedia"{print $2" "$5; s=1; next} s{exit}' > /tmp/fr-views.txt
+ *   then pass VIEWS_FILE=/tmp/fr-views-07.txt,/tmp/fr-views-08.txt,... (averaged, x12 = yearly estimate).
+ * Article intros are fetched lazily by the API the first time a card is looked at.
+ *
+ * Rarity = popularity, ranked by percentile inside each card type (every type gets its own legendaries).
+ * Wikidata responses are cached in scripts/.cache so re-runs are cheap.
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
+import readline from 'node:readline';
 import pg from 'pg';
 
 const UA = 'NaturDex/0.1 (OpenKBS card game; contact via openkbs.com)';
@@ -76,52 +85,34 @@ async function sparql(query, { timeoutMs = 65_000 } = {}) {
     }
 }
 
-async function getJson(url) {
-    for (let attempt = 1; attempt <= 6; attempt++) {
-        const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
-        if (res?.ok) return res.json();
-        if (res && res.status === 404) return null;
-        await sleep((res?.status === 429 ? 20_000 : 1_500) * attempt);
-    }
-    return undefined; // failed: not cached, retried on the next run
+// Commons file name -> direct upload.wikimedia.org URLs (original + 500px thumbnail).
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)$/i;
+function commonsImage(file) {
+    if (!file || !IMAGE_EXT.test(file)) return null;
+    const name = file.replace(/ /g, '_');
+    const hash = crypto.createHash('md5').update(name).digest('hex');
+    const enc = encodeURIComponent(name);
+    const dir = `${hash[0]}/${hash.slice(0, 2)}`;
+    return {
+        image: `https://upload.wikimedia.org/wikipedia/commons/${dir}/${enc}`,
+        thumb: `https://upload.wikimedia.org/wikipedia/commons/thumb/${dir}/${enc}/500px-${enc}${/\.svg$/i.test(name) ? '.png' : ''}`,
+    };
 }
 
-// Batched intro + image lookup via the MediaWiki action API (20 titles per call;
-// the REST summary endpoint rate-limits one-by-one lookups hard).
-async function fetchSummaries(titles, checkpoint) {
-    const out = {};
-    for (let i = 0; i < titles.length; i += 20) {
-        const batch = titles.slice(i, i + 20);
-        const params = new URLSearchParams({
-            action: 'query', format: 'json', formatversion: '2', redirects: '1',
-            prop: 'extracts|pageimages|pageprops|info', exintro: '1', explaintext: '1', exsentences: '3', exlimit: '20',
-            piprop: 'thumbnail|original', pithumbsize: '960', ppprop: 'disambiguation', inprop: 'url',
-            titles: batch.join('|'),
-        });
-        const res = await getJson(`https://fr.wikipedia.org/w/api.php?${params}`);
-        if (!res?.query) continue;
-        const alias = new Map();
-        for (const n of [...(res.query.normalized || []), ...(res.query.redirects || [])]) alias.set(n.from, n.to);
-        const pages = new Map((res.query.pages || []).map((p) => [p.title, p]));
-        for (const t of batch) {
-            let final = t;
-            for (let k = 0; k < 3 && alias.has(final); k++) final = alias.get(final);
-            const p = pages.get(final);
-            if (!p || p.missing) { out[t] = null; continue; }
-            const thumb = p.thumbnail?.source || p.original?.source;
-            out[t] = p.pageprops?.disambiguation !== undefined || !thumb || !p.extract ? null : {
-                title: p.title,
-                canonical: p.title.replace(/ /g, '_'),
-                extract: p.extract,
-                image: thumb,
-                thumb: thumb.includes('/960px-') ? thumb.replace('/960px-', '/500px-') : thumb,
-                url: p.fullurl,
-            };
+// fr.wikipedia title -> yearly views estimate, from pre-filtered monthly dumps (see header).
+// Several months smooth out one-off spikes (news, bots).
+async function loadViews(files) {
+    const views = new Map();
+    for (const file of files) {
+        const rl = readline.createInterface({ input: fs.createReadStream(file) });
+        for await (const line of rl) {
+            const sp = line.lastIndexOf(' ');
+            const title = line.slice(0, sp);
+            views.set(title, (views.get(title) || 0) + Number(line.slice(sp + 1)));
         }
-        if ((i / 20) % 100 === 0) { console.log(`  ${Math.min(i + 20, titles.length)}/${titles.length}`); checkpoint?.(out); }
-        await sleep(100);
     }
-    return out;
+    for (const [t, v] of views) views.set(t, Math.round((v * 12) / files.length));
+    return views;
 }
 
 const qidOf = (uri) => uri.split('/').pop();
@@ -149,18 +140,22 @@ async function fetchType(type, anchorIds) {
            ?item wdt:P171* ?anchor.
            VALUES ?rank { ${type.ranks.map((r) => RANK[r]).join(' ')} } ?item wdt:P105 ?rank.
            ${type.exclude ? `MINUS { VALUES ?ex { ${type.exclude.map((n) => `wd:${anchorIds[n]}`).join(' ')} } ?item wdt:P171* ?ex. }` : ''}`;
-    const rows = await sparql(`SELECT DISTINCT ?item ?title ?sl WHERE {
+    const rows = await sparql(`SELECT ?item (SAMPLE(?title0) AS ?title) (SAMPLE(?sl0) AS ?sl) (SAMPLE(?img0) AS ?img) WHERE {
         ${taxonClause}
-        ?item wikibase:sitelinks ?sl.
-        ?article schema:about ?item; schema:isPartOf <https://fr.wikipedia.org/>; schema:name ?title.
-    } LIMIT 400000`, { timeoutMs: 180_000 });
-    return rows.map((r) => ({ qid: qidOf(r.item.value), title: r.title.value, sitelinks: Number(r.sl.value) }));
+        ?item wikibase:sitelinks ?sl0.
+        ?article schema:about ?item; schema:isPartOf <https://fr.wikipedia.org/>; schema:name ?title0.
+        OPTIONAL { ?item wdt:P18 ?img0. }
+    } GROUP BY ?item LIMIT 400000`, { timeoutMs: 180_000 });
+    return rows.map((r) => ({
+        qid: qidOf(r.item.value), title: r.title.value, sitelinks: Number(r.sl.value),
+        image: r.img ? decodeURIComponent(r.img.value.split('/Special:FilePath/').pop()) : null,
+    }));
 }
 
-async function fetchDetails(qids) {
-    const out = {};
-    for (let i = 0; i < qids.length; i += 150) {
-        const values = qids.slice(i, i + 150).map((q) => `wd:${q}`).join(' ');
+async function fetchDetails(qids, out = {}) {
+    for (let i = 0; i < qids.length; i += 400) {
+        if (i % 8000 === 0) console.log(`  ${i}/${qids.length}`);
+        const values = qids.slice(i, i + 400).map((q) => `wd:${q}`).join(' ');
         const rows = await sparql(`SELECT ?item (SAMPLE(?sci0) AS ?sci) (SAMPLE(?iucn0) AS ?iucn)
                 (MAX(?mass0) AS ?mass) (MAX(?len0) AS ?len) (MAX(?height0) AS ?height) WHERE {
             VALUES ?item { ${values} }
@@ -179,35 +174,6 @@ async function fetchDetails(qids) {
                 height: r.height ? Number(r.height.value) : null,
             };
         }
-    }
-    return out;
-}
-
-// Popularity = fr.wikipedia page views over the last 60 days (the max the action API
-// serves), batched 50 titles per call and scaled to a yearly estimate. The per-article
-// REST pageviews endpoint rate-limits bulk lookups far too hard.
-const VIEW_DAYS = 60;
-async function fetchPageviews(titles, checkpoint) {
-    const out = {};
-    for (let i = 0; i < titles.length; i += 50) {
-        const batch = titles.slice(i, i + 50);
-        let cont = {};
-        do { // the API returns pageviews for part of the batch, then a `continue` token
-            const params = new URLSearchParams({
-                action: 'query', format: 'json', formatversion: '2',
-                prop: 'pageviews', pvipdays: String(VIEW_DAYS), titles: batch.join('|'), ...cont,
-            });
-            const res = await getJson(`https://fr.wikipedia.org/w/api.php?${params}`);
-            for (const p of res?.query?.pages || []) {
-                if (!p.pageviews) continue;
-                const sum = Object.values(p.pageviews).reduce((a, v) => a + (v || 0), 0);
-                out[p.title] = Math.round((sum * 365) / VIEW_DAYS);
-            }
-            cont = res?.continue || null;
-            if (cont) await sleep(1_000);
-        } while (cont);
-        if ((i / 50) % 20 === 0) { console.log(`  ${Math.min(i + 50, titles.length)}/${titles.length}`); checkpoint?.(out); }
-        await sleep(1_000);
     }
     return out;
 }
@@ -240,6 +206,7 @@ function assignRarity(cards) {
 
 async function main() {
     if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    if (!process.env.VIEWS_FILE) throw new Error('VIEWS_FILE is required (see header)');
 
     console.log('Resolving taxon anchors…');
     const anchorIds = await resolveAnchors(TYPES.flatMap((t) => [...(t.anchors || []), ...(t.exclude || [])]));
@@ -260,40 +227,31 @@ async function main() {
     const candidates = [...seen.values()];
 
     console.log(`Fetching Wikidata details for ${candidates.length} items…`);
-    const details = await fetchDetails(candidates.map((c) => c.qid));
+    const detailsCache = cache('details');
+    await fetchDetails(candidates.map((c) => c.qid).filter((q) => !(q in detailsCache.data)), detailsCache.data);
+    detailsCache.save();
+    const details = detailsCache.data;
 
-    console.log('Fetching Wikipedia summaries…');
-    const summaries = cache('summaries');
-    const missing = candidates.filter((c) => !(c.qid in summaries.data));
-    const keepSummaries = (byTitle) => {
-        for (const c of missing) if (c.title in byTitle) summaries.data[c.qid] = byTitle[c.title];
-        summaries.save();
-    };
-    keepSummaries(await fetchSummaries(missing.map((c) => c.title), keepSummaries));
+    console.log('Loading fr.wikipedia page views…');
+    const views = await loadViews(process.env.VIEWS_FILE.split(','));
+    console.log(`  ${views.size} titles`);
 
-    console.log(`Fetching page views (last ${VIEW_DAYS} days)…`);
-    const views = cache(`views-${new Date().toISOString().slice(0, 7)}`);
-    const withSummary = candidates.filter((c) => summaries.data[c.qid]);
-    const todo = withSummary.filter((c) => !(c.qid in views.data));
-    const keepViews = (byPage) => {
-        for (const c of todo) {
-            const v = byPage[summaries.data[c.qid].title];
-            if (v !== undefined) views.data[c.qid] = v;
-        }
-        views.save();
-    };
-    keepViews(await fetchPageviews(todo.map((c) => summaries.data[c.qid].title), keepViews));
-
-    const cards = withSummary.map((c) => {
-        const s = summaries.data[c.qid];
+    // Cards from earlier builds keep their fr.wikipedia lead image and intro (summaries cache).
+    const summaries = cache('summaries').data;
+    const cards = [];
+    for (const c of candidates) {
+        const s = summaries[c.qid];
+        const img = s ? { image: s.image, thumb: s.thumb } : commonsImage(c.image);
+        if (!img) continue; // no illustration, no card
         const d = details[c.qid] || {};
-        return {
-            qid: c.qid, type: c.type, name: s.title, sci_name: d.sci, iucn: d.iucn,
-            views: views.data[c.qid] || 0, image_url: s.image, thumb_url: s.thumb,
-            extract: s.extract, wiki_url: s.url,
+        const key = c.title.replace(/ /g, '_');
+        cards.push({
+            qid: c.qid, type: c.type, name: c.title.replace(/ \([^)]*\)$/, ''), sci_name: d.sci, iucn: d.iucn,
+            views: views.get(key) || 0, image_url: img.image, thumb_url: img.thumb,
+            extract: s?.extract || null, wiki_url: s?.url || `https://fr.wikipedia.org/wiki/${encodeURIComponent(key)}`,
             stats: { sitelinks: c.sitelinks, mass_kg: d.mass, length_m: d.length, height_m: d.height },
-        };
-    });
+        });
+    }
     assignRarity(cards);
     for (const c of cards) c.stats.hp = hpFor(c.views, c.rarity);
 
