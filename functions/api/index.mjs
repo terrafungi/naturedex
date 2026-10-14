@@ -10,6 +10,10 @@
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import pg from 'pg';
+import {
+    CARD_SCORE, IUCN_LABELS, KIND_LABELS, LEVEL_COINS, PERFECT_COINS, PERFECT_NUGGETS, QUIZ_PER_DAY, THEMES,
+    buildQuiz, intro, isLate, publicQuestion,
+} from './quiz.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -126,6 +130,7 @@ async function publicUser(db, user) {
         nextDailyAt: nextDaily > Date.now() ? new Date(nextDaily).toISOString() : null,
         recycleValue: RECYCLE_VALUE,
         social: await socialCounts(db, user.id),
+        quizPerDay: QUIZ_PER_DAY,
         ...rows[0],
     };
 }
@@ -134,7 +139,8 @@ async function publicUser(db, user) {
 async function socialCounts(db, userId) {
     const { rows: [c] } = await db.query(
         `SELECT (SELECT COUNT(*)::int FROM friendships WHERE addressee_id = $1 AND status = 'pending') AS "friendRequests",
-                (SELECT COUNT(*)::int FROM trades WHERE to_id = $1 AND status = 'pending') AS "tradeOffers"`,
+                (SELECT COUNT(*)::int FROM trades WHERE to_id = $1 AND status = 'pending') AS "tradeOffers",
+                (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND day = (now() AT TIME ZONE 'Europe/Paris')::date) AS "quizPlayed"`,
         [userId]
     );
     return c;
@@ -276,6 +282,13 @@ const TROPHIES = [
     ...series('Enchères', 'cart', 'bought', [[1, 'Premier achat'], [10, 'Acheteur avisé'], [50, 'Grand collectionneur']], (g) => `Remporte ${g} enchère${g > 1 ? 's' : ''}`),
     ...series('Amis', 'users', 'friends', [[1, 'Premier ami'], [5, 'Petite bande'], [20, 'Club des naturalistes']], (g) => `Aie ${g} ami${g > 1 ? 's' : ''}`),
     ...series('Amis', 'swap', 'trades', [[1, 'Premier échange'], [10, 'Troqueur'], [50, 'Roi du troc']], (g) => `Réussis ${g} échange${g > 1 ? 's' : ''} de cartes`),
+    ...series('Quiz', 'brain', 'quizzes', [[1, 'Premier quiz'], [10, 'Curieux de nature'], [50, 'Érudit'], [200, 'Puits de science'], [500, 'Encyclopédie vivante']],
+        (g) => `Termine ${n(g)} quiz`),
+    ...series('Quiz', 'lightbulb', 'quizCorrect', [[25, 'Bonne pioche'], [100, 'Esprit vif'], [500, 'Savant'], [2000, 'Professeur'], [5000, 'Sage de la forêt']],
+        (g) => `Donne ${n(g)} bonnes réponses au quiz`),
+    ...series('Quiz', 'target', 'quizPerfect', [[1, 'Sans faute'], [10, 'Infaillible'], [50, 'Oracle']], (g) => `Réussis ${g} quiz parfait${g > 1 ? 's' : ''} (10/10)`),
+    ...series('Quiz', 'flame', 'quizDays', [[7, 'Une semaine de savoir'], [30, 'Un mois d\'apprentissage'], [100, 'Cent jours'], [365, 'Une année de quiz']],
+        (g) => `Joue au quiz ${g} jours différents`),
     ...series('Enchères', 'recycle', 'recycled', [[10, 'Tri sélectif'], [100, 'Recycleur'], [1000, 'Compost géant']], (g) => `Recycle ${n(g)} doublons`),
 ];
 
@@ -291,6 +304,10 @@ async function trophyList(db, userId) {
                     (SELECT COUNT(*)::int FROM auctions WHERE bidder_id = $1 AND status = 'sold') AS bought,
                     (SELECT COUNT(*)::int FROM friendships WHERE status = 'accepted' AND $1 IN (requester_id, addressee_id)) AS friends,
                     (SELECT COUNT(*)::int FROM trades WHERE status = 'accepted' AND $1 IN (from_id, to_id)) AS trades,
+                    (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND status = 'done') AS quizzes,
+                    (SELECT COALESCE(SUM(score), 0)::int FROM quizzes WHERE user_id = $1 AND status = 'done') AS "quizCorrect",
+                    (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND status = 'done' AND score = jsonb_array_length(questions)) AS "quizPerfect",
+                    (SELECT COUNT(DISTINCT day)::int FROM quizzes WHERE user_id = $1 AND status = 'done') AS "quizDays",
                     recycled FROM users WHERE id = $1`, [userId]),
         db.query(`SELECT c.type, c.rarity, COUNT(*)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
                   WHERE uc.user_id = $1 GROUP BY 1, 2`, [userId]),
@@ -403,6 +420,79 @@ async function fillExtract(db, card) {
 }
 
 // ---------- actions ----------
+
+// ---- Daily quiz ----
+
+const parisDay = async (db) => (await db.query(`SELECT to_char((now() AT TIME ZONE 'Europe/Paris')::date, 'YYYY-MM-DD') AS day`)).rows[0].day;
+
+// Consecutive days with a finished quiz, ending today (or yesterday if today is not played yet).
+function quizStreak(days, today) {
+    const set = new Set(days);
+    const d = new Date(`${today}T12:00:00Z`);
+    if (!set.has(today)) d.setUTCDate(d.getUTCDate() - 1);
+    let streak = 0;
+    while (set.has(d.toISOString().slice(0, 10))) { streak++; d.setUTCDate(d.getUTCDate() - 1); }
+    return streak;
+}
+
+async function quizState(db, userId) {
+    const day = await parisDay(db);
+    const [{ rows: today }, { rows: active }, { rows: days }, { rows: kinds }, { rows: [totals] }] = await Promise.all([
+        db.query(`SELECT id, theme, score, coins, nuggets, status, jsonb_array_length(questions) AS total, finished_at
+                  FROM quizzes WHERE user_id = $1 AND day = $2 ORDER BY id`, [userId, day]),
+        db.query(`SELECT id, theme, current, score, jsonb_array_length(questions) AS total FROM quizzes
+                  WHERE user_id = $1 AND status = 'active' ORDER BY id DESC LIMIT 1`, [userId]),
+        db.query(`SELECT DISTINCT to_char(day, 'YYYY-MM-DD') AS day FROM quizzes WHERE user_id = $1 AND status = 'done'
+                  ORDER BY 1 DESC LIMIT 400`, [userId]),
+        db.query(`SELECT q.questions -> (a.i::int - 1) ->> 'kind' AS kind, COUNT(*)::int AS answered,
+                         COUNT(*) FILTER (WHERE (a.v ->> 'correct')::boolean)::int AS correct
+                  FROM quizzes q CROSS JOIN jsonb_array_elements(q.answers) WITH ORDINALITY AS a(v, i)
+                  WHERE q.user_id = $1 GROUP BY 1`, [userId]),
+        db.query(`SELECT COUNT(*) FILTER (WHERE status = 'done')::int AS quizzes,
+                         COALESCE(SUM(score) FILTER (WHERE status = 'done'), 0)::int AS correct,
+                         COALESCE(SUM(jsonb_array_length(questions)) FILTER (WHERE status = 'done'), 0)::int AS questions,
+                         COUNT(*) FILTER (WHERE status = 'done' AND score = jsonb_array_length(questions))::int AS perfect,
+                         (SELECT COUNT(*)::int FROM quiz_seen WHERE user_id = $1) AS species
+                  FROM quizzes WHERE user_id = $1`, [userId]),
+    ]);
+    return {
+        day,
+        perDay: QUIZ_PER_DAY,
+        left: Math.max(0, QUIZ_PER_DAY - today.length),
+        today,
+        active: active[0] || null,
+        streak: quizStreak(days.map((r) => r.day), day),
+        stats: totals,
+        kinds: Object.entries(KIND_LABELS).map(([kind, label]) => ({ kind, label, ...(kinds.find((k) => k.kind === kind) || { answered: 0, correct: 0 }) })),
+        themes: Object.entries(THEMES).map(([key, t]) => ({ key, label: t.label })),
+        rewards: { levelCoins: LEVEL_COINS, perfectCoins: PERFECT_COINS, perfectNuggets: PERFECT_NUGGETS, cardScore: CARD_SCORE },
+    };
+}
+
+// The species behind a question, shown after the answer so the player learns something.
+async function learnCard(db, cardId, userId) {
+    const { rows: [c] } = await db.query(
+        `SELECT c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.thumb_url, c.image_url, c.iucn, c.wiki_url, c.extract,
+                (c.stats->>'mass_kg')::float AS mass, COALESCE(uc.count, 0) AS count
+         FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $2 WHERE c.id = $1`,
+        [cardId, userId]
+    );
+    if (!c) return null;
+    if (!c.extract) c.extract = await fillExtract(db, c);
+    const { extract, ...card } = c;
+    return { ...card, fact: intro(extract, 340), iucnLabel: IUCN_LABELS[c.iucn] || null };
+}
+
+async function lockQuiz(client, userId, id) {
+    const { rows: [q] } = await client.query(`SELECT * FROM quizzes WHERE id = $1 AND user_id = $2 FOR UPDATE`, [Number(id), userId]);
+    if (!q) throw new HttpError(404, 'Quiz introuvable');
+    return q;
+}
+
+const quizProgress = (q) => ({
+    id: q.id, theme: q.theme, themeLabel: THEMES[q.theme]?.label, current: q.current, total: q.questions.length,
+    score: q.score, coins: q.coins, nuggets: q.nuggets, results: q.answers.map((a) => a.correct),
+});
 
 // ---- Friends & trades ----
 const MAX_TRADE_ITEMS = 10;
@@ -1022,6 +1112,107 @@ const actions = {
         );
         if (!rowCount) throw new HttpError(404, 'Proposition introuvable ou déjà traitée');
         return { ok: true };
+    },
+
+    async quiz(db, body, event) {
+        const user = await requireUser(db, event);
+        return quizState(db, user.id);
+    },
+
+    async quizStart(db, body, event) {
+        const user = await requireUser(db, event);
+        const theme = THEMES[body.theme] ? body.theme : 'all';
+        const id = await inTransaction(db, async (client) => {
+            await client.query(`SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+            const { rows: [active] } = await client.query(`SELECT id FROM quizzes WHERE user_id = $1 AND status = 'active' LIMIT 1`, [user.id]);
+            if (active) return active.id; // finish the running quiz first
+            const day = await parisDay(client);
+            const { rows: [{ played }] } = await client.query(`SELECT COUNT(*)::int AS played FROM quizzes WHERE user_id = $1 AND day = $2`, [user.id, day]);
+            if (played >= QUIZ_PER_DAY) throw new HttpError(429, `Tu as joué tes ${QUIZ_PER_DAY} quiz du jour. Reviens demain pour de nouvelles questions !`);
+            const { rows: seenRows } = await client.query(`SELECT card_id, at FROM quiz_seen WHERE user_id = $1`, [user.id]);
+            const seen = new Map(seenRows.map((r) => [r.card_id, new Date(r.at).getTime()]));
+            const questions = await buildQuiz(db, theme, seen);
+            if (questions.length < 5) throw new HttpError(503, 'Impossible de préparer un quiz pour ce thème, essaie un autre thème');
+            const { rows: [q] } = await client.query(
+                `INSERT INTO quizzes (user_id, day, theme, questions) VALUES ($1, $2, $3, $4) RETURNING id`,
+                [user.id, day, theme, JSON.stringify(questions)]
+            );
+            await client.query(
+                `INSERT INTO quiz_seen (user_id, card_id) SELECT $1, unnest($2::int[])
+                 ON CONFLICT (user_id, card_id) DO UPDATE SET at = now()`,
+                [user.id, [...new Set(questions.map((x) => x.about))]]
+            );
+            return q.id;
+        });
+        return { id };
+    },
+
+    // Shows the current question and starts its timer (a reload keeps the same deadline).
+    async quizNext(db, body, event) {
+        const user = await requireUser(db, event);
+        return inTransaction(db, async (client) => {
+            const q = await lockQuiz(client, user.id, body.id);
+            if (q.status === 'done') return { quiz: quizProgress(q), done: true };
+            let askedAt = q.asked_at;
+            if (!askedAt) {
+                ({ rows: [{ asked_at: askedAt }] } = await client.query(`UPDATE quizzes SET asked_at = now() WHERE id = $1 RETURNING asked_at`, [q.id]));
+            }
+            return { quiz: quizProgress(q), question: publicQuestion(q.questions[q.current], q.current, askedAt), serverNow: new Date().toISOString() };
+        });
+    },
+
+    async quizAnswer(db, body, event) {
+        const user = await requireUser(db, event);
+        const result = await inTransaction(db, async (client) => {
+            const q = await lockQuiz(client, user.id, body.id);
+            if (q.status === 'done') throw new HttpError(409, 'Ce quiz est déjà terminé');
+            if (Number(body.index) !== q.current || !q.asked_at) throw new HttpError(409, 'Cette question a déjà reçu une réponse');
+            const question = q.questions[q.current];
+            const late = isLate(question, q.asked_at);
+            const choice = Number.isInteger(body.choice) ? body.choice : -1;
+            const correct = !late && choice === question.answer;
+            const gained = correct ? LEVEL_COINS[question.level] : 0;
+            const answers = [...q.answers, { choice, correct, late, ms: Date.now() - new Date(q.asked_at).getTime() }];
+            const done = answers.length >= q.questions.length;
+            const score = q.score + (correct ? 1 : 0);
+            let coins = q.coins + gained;
+            let nuggets = 0, rewardCard = null;
+            if (done) {
+                const perfect = score === q.questions.length;
+                if (perfect) { coins += PERFECT_COINS; nuggets = PERFECT_NUGGETS; }
+                if (score >= CARD_SCORE) {
+                    // A card of a species the player recognised, new to the collection if possible (Rare at most).
+                    const known = q.questions.filter((_, i) => answers[i].correct).map((x) => x.about);
+                    const { rows: [c] } = await client.query(
+                        `SELECT c.id FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1
+                         WHERE c.id = ANY($2::int[]) AND c.rarity IN ('common', 'uncommon', 'rare')
+                         ORDER BY (uc.card_id IS NULL) DESC, random() LIMIT 1`, [user.id, known]);
+                    const fallback = c || (await client.query(
+                        `SELECT id FROM cards WHERE rarity = 'uncommon' AND views >= 800 ORDER BY random() LIMIT 1`)).rows[0];
+                    rewardCard = fallback?.id || null;
+                    if (rewardCard) await giveCard(client, user.id, rewardCard);
+                }
+                await client.query(`UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1`, [user.id, coins, nuggets]);
+            }
+            const { rows: [updated] } = await client.query(
+                `UPDATE quizzes SET answers = $2, current = current + 1, asked_at = NULL, score = $3, coins = $4, nuggets = $5,
+                        reward_card = $6, status = $7, finished_at = CASE WHEN $7 = 'done' THEN now() END
+                 WHERE id = $1 RETURNING *`,
+                [q.id, JSON.stringify(answers), score, coins, nuggets, rewardCard, done ? 'done' : 'active']
+            );
+            return {
+                correct, late, gained, answer: question.answer, facts: question.facts || null,
+                reveal: question.hideLabels ? question.options.map((o) => o.label) : null,
+                about: question.about, done, quiz: quizProgress(updated), rewardCard, perfect: done && score === q.questions.length,
+            };
+        });
+        const { about, rewardCard, ...res } = result;
+        res.learn = await learnCard(db, about, user.id);
+        if (res.done) {
+            res.rewardCard = rewardCard ? await learnCard(db, rewardCard, user.id) : null;
+            res.user = await publicUser(db, await requireUser(db, event));
+        }
+        return res;
     },
 
     async recycle(db, body, event) {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Award, Gavel, Home, Layers, LogIn, LogOut, Menu, Package, Trophy, User, Users, X } from 'lucide-react';
+import { Award, Brain, Gavel, Home, Layers, LogIn, LogOut, Menu, Package, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
@@ -9,14 +9,15 @@ export const NAV = [
     { to: '/', label: 'Accueil', Icon: Home, end: true },
     { to: '/collection', label: 'Collection', Icon: Layers },
     { to: '/booster', label: 'Booster', Icon: Package },
+    { to: '/quiz', label: 'Quiz', Icon: Brain },
     { to: '/encheres', label: 'Enchères', Icon: Gavel },
     { to: '/amis', label: 'Amis', Icon: Users },
     { to: '/defis', label: 'Défis', Icon: Trophy },
     { to: '/trophees', label: 'Trophées', Icon: Award },
     { to: '/profil', label: 'Profil', Icon: User },
 ];
-// The mobile tab bar has room for five: home and profile stay in the menu.
-const TABS = NAV.filter(({ to }) => !['/', '/profil', '/trophees'].includes(to));
+// The mobile tab bar has room for five: the rest stays in the menu.
+const TABS = NAV.filter(({ to }) => !['/', '/profil', '/trophees', '/defis'].includes(to));
 
 // Pending friend requests + trade offers, shown as a red dot count on the Amis link.
 function useSocialCount() {
@@ -141,9 +142,9 @@ export default function Layout() {
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-3">
                     <Brand />
                     <nav className="hidden lg:flex items-center gap-0.5">
-                        {NAV.map(({ to, label, end }) => (
+                        {NAV.filter(({ to }) => to !== '/').map(({ to, label, end }) => (
                             <NavLink key={to} to={to} end={end}
-                                className={({ isActive }) => `flex items-center gap-1 px-3 py-2 rounded-full text-sm font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6] ring-1 ring-[#4fd18b]/25' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
+                                className={({ isActive }) => `flex items-center gap-1 px-2.5 py-2 rounded-full text-sm font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6] ring-1 ring-[#4fd18b]/25' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
                                 {label}<NavBadge to={to} />
                             </NavLink>
                         ))}

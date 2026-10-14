@@ -135,3 +135,30 @@ CREATE TABLE IF NOT EXISTS trade_items (
     qty INT NOT NULL DEFAULT 1 CHECK (qty > 0),
     PRIMARY KEY (trade_id, owner_id, card_id)
 );
+
+-- Daily quiz: questions (with answers) stay on the server; the browser gets one at a time.
+CREATE TABLE IF NOT EXISTS quizzes (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day DATE NOT NULL,
+    theme TEXT NOT NULL,
+    questions JSONB NOT NULL,
+    answers JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{ choice, correct, late, ms }]
+    current INT NOT NULL DEFAULT 0,
+    asked_at TIMESTAMPTZ, -- when the current question was shown (timer start)
+    score INT NOT NULL DEFAULT 0,
+    coins INT NOT NULL DEFAULT 0,
+    nuggets INT NOT NULL DEFAULT 0,
+    reward_card INT REFERENCES cards(id) ON DELETE SET NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'done')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS quizzes_user_day ON quizzes (user_id, day);
+-- species a player already met in a quiz, so new quizzes favour unseen ones
+CREATE TABLE IF NOT EXISTS quiz_seen (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    card_id INT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, card_id)
+);
