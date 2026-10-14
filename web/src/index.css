@@ -135,6 +135,9 @@ body {
 .nd-card .nd-attack { display: flex; align-items: baseline; gap: 2cqi; padding: 1.6cqi 0; border-bottom: 0.3cqi solid rgb(31 42 34 / 0.15); font-size: 4.2cqi; }
 .nd-card .nd-attack b { font-family: var(--font-display); font-weight: 700; }
 .nd-card .nd-attack span:last-child { margin-left: auto; font-family: var(--font-display); font-weight: 800; font-size: 5.4cqi; }
+.nd-card .nd-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4cqi; margin-top: 1.6cqi; }
+.nd-card .nd-stats span { display: flex; align-items: baseline; justify-content: center; gap: 1cqi; padding: 0.8cqi 0; border-radius: 1.6cqi; background: color-mix(in oklab, var(--type) 14%, transparent); font-family: var(--font-display); font-weight: 800; font-size: 4.6cqi; }
+.nd-card .nd-stats small { font-family: var(--font-sans, inherit); font-weight: 700; font-size: 2.8cqi; opacity: 0.65; letter-spacing: 0.04em; }
 .nd-card .nd-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; font-size: 3.2cqi; color: #5d6762; }
 
 .nd-type-icon {

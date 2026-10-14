@@ -205,3 +205,34 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS messages_pair ON messages (LEAST(from_id, to_id), GREATEST(from_id, to_id), id);
 CREATE INDEX IF NOT EXISTS messages_unread ON messages (to_id) WHERE read_at IS NULL;
 CREATE INDEX IF NOT EXISTS messages_from ON messages (from_id, created_at);
+
+-- Battles. `arena` holds the player's team (also their defence in ranked fights), their
+-- rating and their campaign progress; `battles` the full deterministic state of each fight.
+CREATE TABLE IF NOT EXISTS arena (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    team        INTEGER[] NOT NULL DEFAULT '{}',
+    rating      INTEGER NOT NULL DEFAULT 1000,
+    wins        INTEGER NOT NULL DEFAULT 0,
+    losses      INTEGER NOT NULL DEFAULT 0,
+    campaign    INTEGER NOT NULL DEFAULT 0,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS arena_rating ON arena (rating);
+
+CREATE TABLE IF NOT EXISTS battles (
+    id            BIGSERIAL PRIMARY KEY,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    mode          TEXT NOT NULL,
+    stage         INTEGER,
+    opponent_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    opponent_name TEXT NOT NULL,
+    opponent_rating INTEGER,
+    state         JSONB NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'active',
+    reward        JSONB,
+    rating_delta  INTEGER,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ended_at      TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS battles_one_active ON battles (user_id) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS battles_user_ended ON battles (user_id, ended_at DESC);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Award, Brain, Crown, Gem, Layers, Medal, Users, Globe2 } from 'lucide-react';
+import { Award, Brain, Crown, Gem, Layers, Medal, Users, Globe2, Swords } from 'lucide-react';
 import { api } from '../api.jsx';
 
 const n = (v) => Number(v).toLocaleString('fr-FR');
@@ -12,6 +12,7 @@ const BOARDS = [
     { key: 'species', label: 'Espèces', Icon: Layers, unit: 'espèces', text: 'Nombre d\'espèces différentes découvertes dans le carnet.', extra: (v) => plural(v, 'carte') },
     { key: 'cards', label: 'Cartes', Icon: Gem, unit: 'cartes', text: 'Nombre total de cartes possédées, doublons compris.', extra: (v) => plural(v, 'espèce') },
     { key: 'prestige', label: 'Prestige', Icon: Crown, unit: 'points', text: 'Chaque espèce découverte rapporte des points selon sa rareté : Peu commune 1, Rare 3, Épique 8, Légendaire 25, Secrète 100.', extra: (v) => v ? plural(v, 'légendaire') : null },
+    { key: 'arena', label: 'Arène', Icon: Swords, unit: 'points', text: 'Cote de l\'arène classée : +/− selon la force de l\'adversaire battu ou perdu (départ à 1000).', extra: (v) => plural(v, 'victoire') },
     { key: 'trophies', label: 'Trophées', Icon: Award, unit: 'trophées', text: 'Nombre de trophées récupérés.', extra: () => null },
 ];
 const PODIUM = ['#e9c46a', '#c3ccd8', '#cd8a4a'];

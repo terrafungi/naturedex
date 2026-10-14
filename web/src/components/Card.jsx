@@ -1,6 +1,7 @@
 import { useRef } from 'react';
-import { Eye, HelpCircle, Sparkles } from 'lucide-react';
-import { RARITIES, TYPES, attacksFor, formatViews } from '../game.jsx';
+import { Eye, HelpCircle, Sparkles, Zap } from 'lucide-react';
+import { RARITIES, TYPES, formatViews } from '../game.jsx';
+import { ABILITIES, battleStats } from '../battle.js';
 
 export function TypeBadge({ type, className = '' }) {
     const t = TYPES[type];
@@ -24,6 +25,8 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
     const t = TYPES[card.type] || TYPES.plant;
     const r = RARITIES[card.rarity] || RARITIES.common;
     const hp = card.hp ?? card.stats?.hp;
+    const st = card.atk != null ? card : card.stats?.atk != null ? card.stats : battleStats(card);
+    const ab = ABILITIES[card.type];
     const foil = ['epic', 'legendary', 'secret'].includes(card.rarity);
     const ink = card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
 
@@ -66,15 +69,18 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                     <span className="nd-sci">{card.sci_name || t.label}</span>
                     <span className="shrink-0 font-semibold" style={{ color: ink }}>{t.label}</span>
                 </div>
-                <div className="mt-[1.5cqi]">
-                    {attacksFor(card).map((a) => (
-                        <div key={a.name} className="nd-attack">
-                            <span className="nd-type-icon !w-[5cqi] !h-[5cqi]" style={{ '--type': t.color }} />
-                            <b>{a.name}</b>
-                            <span>{a.dmg}</span>
-                        </div>
-                    ))}
+                <div className="nd-stats">
+                    <span title="Attaque"><small>ATQ</small>{st.atk}</span>
+                    <span title="Défense"><small>DÉF</small>{st.def}</span>
+                    <span title="Vitesse : la plus rapide agit en premier"><small>VIT</small>{st.spd}</span>
                 </div>
+                {ab && (
+                    <div className="nd-attack" title={ab.text}>
+                        <span className="nd-type-icon !w-[5cqi] !h-[5cqi]" style={{ '--type': t.color }} />
+                        <b>{ab.name}</b>
+                        <span className="flex items-center">{ab.cost}<Zap className="w-[4.2cqi] h-[4.2cqi] fill-current" /></span>
+                    </div>
+                )}
                 <div className="nd-foot">
                     <span className="flex items-center gap-[1cqi]" title="Lectures Wikipédia par an (estimation)">
                         {card.views != null && <><Eye className="w-[3.6cqi] h-[3.6cqi]" />{formatViews(Number(card.views))}</>}

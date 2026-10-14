@@ -7,7 +7,7 @@ import { Card, MysteryCard, TypeBadge } from '../components/Card.jsx';
 import { ChallengeCard, SAMPLE_CHALLENGES } from '../components/Challenge.jsx';
 import { Pack } from '../components/Pack.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
-import { RARITIES, TYPES, attacksFor, formatViews } from '../game.jsx';
+import { RARITIES, TYPES, formatViews } from '../game.jsx';
 
 const RARITY_TIERS = {
     common: 'Le reste des espèces',
@@ -168,7 +168,7 @@ const KINGDOM = { plant: 'Flore', tree: 'Flore', alga: 'Flore', fungus: 'Fonge',
 function FeatCard({ card }) {
     const t = TYPES[card.type];
     const r = RARITIES[card.rarity];
-    const shield = attacksFor(card).at(-1).dmg;
+    const shield = card.def ?? card.stats?.def ?? '—';
     return (
         <article className="nd-feat" style={{ '--r': r.color }}>
             <img src={card.thumb_url} alt={card.name} loading="lazy" draggable="false" />

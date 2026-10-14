@@ -19,6 +19,8 @@ import Auctions from './pages/Auctions.jsx';
 import Friends from './pages/Friends.jsx';
 import Quiz from './pages/Quiz.jsx';
 import Shop from './pages/Shop.jsx';
+import Combat from './pages/Combat.jsx';
+import Battle from './pages/Battle.jsx';
 
 // Sign-up is mandatory: every page (home included) needs an account, so a first
 // visit lands on the sign-up form (Auth switches to log-in for returning players).
@@ -46,6 +48,8 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/messages" element={<Private><Messages /></Private>} />
                         <Route path="/messages/:username" element={<Private><Messages /></Private>} />
                         <Route path="/encheres" element={<Private><Auctions /></Private>} />
+                        <Route path="/combat" element={<Private><Combat /></Private>} />
+                        <Route path="/combat/:id" element={<Private><Battle /></Private>} />
                         <Route path="/quiz" element={<Private><Quiz /></Private>} />
                         <Route path="/boutique" element={<Private><Shop /></Private>} />
                         <Route path="/amis" element={<Private><Friends /></Private>} />

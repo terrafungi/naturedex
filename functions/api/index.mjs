@@ -19,6 +19,7 @@ import {
 import {
     ASSOCIATIONS, DONATION_SHARE, PACKS, createCheckout, donationOf, getCheckout, stripeReady, stripeTestMode, verifyWebhook,
 } from './shop.mjs';
+import { DAILY_REWARDS, arenaActions } from './arena.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -304,6 +305,9 @@ const TROPHIES = [
         (g) => `Joue au quiz ${g} jours différents`),
     ...series('Boutique', 'heart', 'patron', [[1, 'Mécène de la nature'], [5, 'Ami des associations']],
         (g) => g > 1 ? `Soutiens ${g} fois une association nature via la boutique` : 'Soutiens une association nature via la boutique'),
+    ...series('Combat', 'swords', 'battleWins', [[1, 'Premier combat'], [10, 'Combattant'], [50, 'Gladiateur'], [200, 'Champion de l\'arène'], [500, 'Légende de l\'arène']],
+        (g) => `Gagne ${n(g)} combat${g > 1 ? 's' : ''}`),
+    ...series('Combat', 'map', 'campaign', [[5, 'Explorateur'], [10, 'Aventurier'], [15, 'Maître de la campagne']], (g) => `Termine l'étape ${g} de la campagne`),
     ...series('Enchères', 'recycle', 'recycled', [[10, 'Tri sélectif'], [100, 'Recycleur'], [1000, 'Compost géant']], (g) => `Recycle ${n(g)} doublons`),
 ];
 
@@ -319,6 +323,7 @@ const BOARDS = {
                             COUNT(*) FILTER (WHERE c.rarity IN ('legendary', 'secret'))::int AS extra
                      FROM user_cards uc JOIN cards c ON c.id = uc.card_id GROUP BY 1`,
     trophies: () => `SELECT user_id, COUNT(*)::int AS score, 0 AS extra FROM trophy_claims GROUP BY 1`,
+    arena: () => `SELECT user_id, rating AS score, wins AS extra FROM arena WHERE wins + losses > 0`,
 };
 
 async function findSponsor(db, code) {
@@ -379,6 +384,8 @@ async function trophyList(db, userId) {
                     (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND status = 'done' AND score = jsonb_array_length(questions)) AS "quizPerfect",
                     (SELECT COUNT(DISTINCT day)::int FROM quizzes WHERE user_id = $1 AND status = 'done') AS "quizDays",
                     (SELECT COUNT(*)::int FROM purchases WHERE user_id = $1 AND status = 'paid') AS patron,
+                    (SELECT COUNT(*)::int FROM battles WHERE user_id = $1 AND status = 'won') AS "battleWins",
+                    (SELECT COALESCE(MAX(campaign), 0)::int FROM arena WHERE user_id = $1) AS campaign,
                     recycled FROM users WHERE id = $1`, [userId]),
         db.query(`SELECT c.type, c.rarity, COUNT(*)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
                   WHERE uc.user_id = $1 GROUP BY 1, 2`, [userId]),
@@ -398,7 +405,7 @@ async function trophyList(db, userId) {
 
 // What is waiting for the player, per page (red counters on the navigation icons).
 async function badgeCounts(db, user, pub) {
-    const [trophies, { challenges }, { rows: [inv] }] = await Promise.all([
+    const [trophies, { challenges }, { rows: [inv] }, { rows: [fight] }] = await Promise.all([
         trophyList(db, user.id),
         dailyChallenges(db, user.id),
         db.query(`SELECT COUNT(*) FILTER (WHERE invite_rewarded_at IS NOT NULL)::int AS rewarded,
@@ -406,6 +413,9 @@ async function badgeCounts(db, user, pub) {
                              SELECT (at AT TIME ZONE 'Europe/Paris')::date AS d FROM openings WHERE user_id = u.id
                              UNION SELECT day FROM quizzes WHERE user_id = u.id AND status = 'done') x) >= $2)::int AS ready
                   FROM users u WHERE invited_by = $1`, [user.id, INVITE_DAYS]),
+        db.query(`SELECT EXISTS (SELECT 1 FROM battles WHERE user_id = $1 AND status = 'active') AS active,
+                         (SELECT COUNT(*)::int FROM battles WHERE user_id = $1 AND (reward->>'daily')::boolean
+                            AND (ended_at AT TIME ZONE 'Europe/Paris')::date = ${PARIS_DAY}) AS rewarded`, [user.id]),
     ]);
     const s = pub.social;
     return {
@@ -416,6 +426,7 @@ async function badgeCounts(db, user, pub) {
         '/inviter': Math.min(inv.ready, Math.max(0, INVITE_CAP - inv.rewarded)),
         '/amis': s.friendRequests + s.tradeOffers,
         '/messages': s.unreadMessages,
+        '/combat': fight.active ? 1 : Math.max(0, DAILY_REWARDS - fight.rewarded),
     };
 }
 
@@ -503,7 +514,8 @@ const shapeAuction = ({ bid, start_price, ...a }) => ({ ...a, bid, start_price, 
 const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.image_url, c.thumb_url,
                      c.extract, c.wiki_url, c.iucn, c.stats`;
 
-const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp`;
+const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp,
+    (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd`;
 let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
 // The catalogue builder skips article intros (too many pages to fetch in bulk):
@@ -1620,6 +1632,8 @@ const actions = {
         }
     },
 };
+
+Object.assign(actions, arenaActions({ requireUser, inTransaction, HttpError, publicUser, parisDay }));
 
 const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo']);
 
