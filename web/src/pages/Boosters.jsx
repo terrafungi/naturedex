@@ -20,7 +20,7 @@ function useCountdown(iso) {
 }
 
 export default function Boosters() {
-    const { user, setUser, catalog, owned, addCards } = useGame();
+    const { user, setUser, catalog, owned, ownedInfo, addCards } = useGame();
     const [opening, setOpening] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -44,12 +44,13 @@ export default function Boosters() {
     const buy = () => run('buyBooster');
     const daily = () => run('claimDaily');
 
-    const total = catalog?.length || user.total;
+    const total = catalog?.total || user.total;
     const discovered = Object.keys(owned).length;
-    const byType = Object.keys(TYPES).map((key) => {
-        const all = catalog?.filter((c) => c.type === key) || [];
-        return { key, total: all.length, have: all.filter((c) => owned[c.id]).length };
-    });
+    const byType = Object.keys(TYPES).map((key) => ({
+        key,
+        total: Object.values(catalog?.types[key] || {}).reduce((a, n) => a + n, 0),
+        have: Object.values(ownedInfo).filter(([type]) => type === key).length,
+    }));
 
     return (
         <div className="max-w-6xl mx-auto px-4 py-10">

@@ -143,8 +143,12 @@ function drawBooster(pools) {
     });
 }
 
-const CARD_FIELDS = `c.id, c.name, c.sci_name, c.type, c.rarity, c.views, c.image_url, c.thumb_url,
+const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.image_url, c.thumb_url,
                      c.extract, c.wiki_url, c.iucn, c.stats`;
+
+const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp`;
+const RARITY_ORDER = `CASE c.rarity WHEN 'legendary' THEN 4 WHEN 'epic' THEN 3 WHEN 'rare' THEN 2 WHEN 'uncommon' THEN 1 ELSE 0 END`;
+let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
 // ---------- actions ----------
 
@@ -251,18 +255,57 @@ const actions = {
         }
     },
 
+    // Catalogue overview (tens of thousands of cards: never sent whole): counts per type
+    // and rarity, plus a sample of cards for the landing page and the demo booster.
     async catalog(db) {
+        if (!catalogCache || Date.now() - catalogAt > 600_000) {
+            const { rows: counts } = await db.query(`SELECT type, rarity, COUNT(*)::int AS n FROM cards GROUP BY 1, 2`);
+            const { rows: cards } = await db.query(
+                `(SELECT * FROM (SELECT ${LIGHT_FIELDS}, row_number() OVER (PARTITION BY c.type, c.rarity ORDER BY c.views DESC) AS k
+                    FROM cards c WHERE c.rarity IN ('legendary', 'epic')) t WHERE k <= 4)
+                 UNION ALL
+                 (SELECT ${LIGHT_FIELDS}, 0 FROM cards c WHERE c.rarity IN ('rare', 'uncommon', 'common') ORDER BY random() LIMIT 300)`
+            );
+            const types = {};
+            for (const { type, rarity, n } of counts) (types[type] ||= {})[rarity] = n;
+            catalogCache = { total: counts.reduce((sum, r) => sum + r.n, 0), types, cards: cards.map(({ k, ...c }) => c) };
+            catalogAt = Date.now();
+        }
+        return catalogCache;
+    },
+
+    // One page of the collection grid. Undiscovered cards only reveal their type and rarity.
+    async browse(db, body, event) {
+        const user = await requireUser(db, event);
+        const limit = Math.min(Number(body.limit) || 60, 120);
+        const offset = Math.max(Number(body.offset) || 0, 0);
+        const q = String(body.query || '').trim();
         const { rows } = await db.query(
-            `SELECT id, name, sci_name, type, rarity, views, thumb_url, (stats->>'hp')::int AS hp
-             FROM cards ORDER BY type, views DESC`
+            `SELECT ${LIGHT_FIELDS}, uc.count, COUNT(*) OVER()::int AS matches
+             FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1
+             WHERE ($2::text IS NULL OR c.type = $2) AND ($3::text IS NULL OR c.rarity = $3)
+               AND (NOT $4 OR uc.count IS NOT NULL)
+               AND ($5 = '' OR (uc.count IS NOT NULL AND (c.name ILIKE '%' || $5 || '%' OR c.sci_name ILIKE '%' || $5 || '%')))
+             ORDER BY uc.count IS NULL, ${RARITY_ORDER} DESC, c.num
+             LIMIT $6 OFFSET $7`,
+            [user.id, body.type || null, body.rarity || null, Boolean(body.onlyOwned || q), q, limit, offset]
         );
-        return { cards: rows };
+        return {
+            matches: rows[0]?.matches || 0,
+            cards: rows.map(({ matches, ...c }) => (c.count ? c : { id: c.id, num: c.num, type: c.type, rarity: c.rarity })),
+        };
     },
 
     async collection(db, body, event) {
         const user = await requireUser(db, event);
-        const { rows } = await db.query(`SELECT card_id, count FROM user_cards WHERE user_id = $1`, [user.id]);
-        return { owned: Object.fromEntries(rows.map((r) => [r.card_id, r.count])) };
+        const { rows } = await db.query(
+            `SELECT uc.card_id, uc.count, c.type, c.rarity FROM user_cards uc JOIN cards c ON c.id = uc.card_id WHERE uc.user_id = $1`,
+            [user.id]
+        );
+        return {
+            owned: Object.fromEntries(rows.map((r) => [r.card_id, r.count])),
+            info: Object.fromEntries(rows.map((r) => [r.card_id, [r.type, r.rarity]])),
+        };
     },
 
     async card(db, body, event) {
@@ -274,7 +317,7 @@ const actions = {
         );
         if (!card) throw new HttpError(404, 'Carte introuvable');
         // Undiscovered cards stay a mystery.
-        if (!card.count) return { card: { id: card.id, type: card.type, rarity: card.rarity, count: 0 } };
+        if (!card.count) return { card: { id: card.id, num: card.num, type: card.type, rarity: card.rarity, count: 0 } };
         return { card };
     },
 

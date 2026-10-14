@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS cards (
     iucn        TEXT,
     stats       JSONB NOT NULL DEFAULT '{}'::jsonb
 );
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS num INTEGER;
+CREATE INDEX IF NOT EXISTS cards_num_idx ON cards (num);
 CREATE INDEX IF NOT EXISTS cards_rarity_idx ON cards (rarity);
 CREATE INDEX IF NOT EXISTS cards_type_idx ON cards (type);
 

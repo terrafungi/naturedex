@@ -24,22 +24,22 @@ fs.mkdirSync(CACHE_DIR, { recursive: true });
 const RANK = { species: 'wd:Q7432', genus: 'wd:Q34740', strain: 'wd:Q855769' };
 
 // Order = priority: an item matching several types keeps the first one.
-// `limit` = number of cards kept per type (the best-known taxa by sitelinks).
+// No quota: every taxon with a fr.wikipedia article (and, later, a lead image) becomes a card.
 const TYPES = [
-    { key: 'fossil', fossilTaxon: true, limit: 240 },
-    { key: 'virus', anchors: ['Riboviria', 'Duplodnaviria', 'Monodnaviria', 'Varidnaviria'], ranks: ['species', 'genus', 'strain'], limit: 150 },
-    { key: 'bacteria', anchors: ['Bacteria', 'Archaea'], ranks: ['species', 'genus'], limit: 180 },
-    { key: 'mold', anchors: ['Penicillium', 'Aspergillus', 'Mucor', 'Rhizopus', 'Botrytis', 'Fusarium', 'Alternaria', 'Cladosporium', 'Stachybotrys', 'Trichoderma', 'Neurospora', 'Erysiphe', 'Plasmopara', 'Phytophthora', 'Saccharomyces', 'Candida', 'Claviceps', 'Physarum'], ranks: ['species', 'genus'], limit: 120 },
-    { key: 'fungus', anchors: ['Agaricomycetes', 'Pezizomycotina'], ranks: ['species', 'genus'], limit: 200 },
-    { key: 'alga', anchors: ['Rhodophyta', 'Chlorophyta', 'Phaeophyceae', 'Bacillariophyta', 'Charophyceae'], ranks: ['species', 'genus'], limit: 140 },
-    { key: 'tree', anchors: ['Pinophyta', 'Ginkgo', 'Arecaceae', 'Quercus', 'Acer', 'Fagus', 'Betula', 'Fraxinus', 'Tilia', 'Ulmus', 'Populus', 'Castanea', 'Juglans', 'Eucalyptus', 'Adansonia', 'Magnolia', 'Platanus', 'Carpinus', 'Alnus', 'Sorbus', 'Olea', 'Ceiba', 'Tectona', 'Swietenia', 'Ficus', 'Salix', 'Aesculus', 'Robinia', 'Prunus', 'Malus', 'Citrus', 'Mangifera', 'Cinnamomum', 'Theobroma', 'Coffea', 'Hevea', 'Liriodendron', 'Dracaena', 'Ceratonia'], ranks: ['species'], limit: 200 },
-    { key: 'plant', anchors: ['Angiospermae', 'Magnoliophyta', 'Polypodiopsida', 'Bryophyta', 'Lycopodiopsida'], ranks: ['species'], limit: 260 },
-    { key: 'mammal', anchors: ['Mammalia'], ranks: ['species'], limit: 260 },
-    { key: 'bird', anchors: ['Aves'], ranks: ['species'], limit: 240 },
-    { key: 'reptile', anchors: ['Reptilia', 'Squamata', 'Testudines', 'Crocodilia', 'Amphibia'], exclude: ['Aves', 'Mammalia'], ranks: ['species'], limit: 200 },
-    { key: 'fish', anchors: ['Actinopterygii', 'Chondrichthyes', 'Coelacanthiformes'], ranks: ['species'], limit: 200 },
-    { key: 'arthropod', anchors: ['Insecta', 'Arachnida', 'Myriapoda'], ranks: ['species'], limit: 240 },
-    { key: 'marine', anchors: ['Cephalopoda', 'Bivalvia', 'Cnidaria', 'Echinodermata', 'Porifera', 'Decapoda'], ranks: ['species', 'genus'], limit: 180 },
+    { key: 'fossil', fossilTaxon: true },
+    { key: 'virus', anchors: ['Riboviria', 'Duplodnaviria', 'Monodnaviria', 'Varidnaviria', 'Adnaviria', 'Ribozyviria'], ranks: ['species', 'genus', 'strain'] },
+    { key: 'bacteria', anchors: ['Bacteria', 'Archaea'], ranks: ['species', 'genus'] },
+    { key: 'mold', anchors: ['Penicillium', 'Aspergillus', 'Mucor', 'Rhizopus', 'Botrytis', 'Fusarium', 'Alternaria', 'Cladosporium', 'Stachybotrys', 'Trichoderma', 'Neurospora', 'Erysiphe', 'Plasmopara', 'Phytophthora', 'Saccharomyces', 'Candida', 'Claviceps', 'Physarum', 'Saccharomycetes', 'Myxogastria', 'Mucorales', 'Erysiphales', 'Peronosporales'], ranks: ['species', 'genus'] },
+    { key: 'fungus', anchors: ['Fungi'], ranks: ['species', 'genus'] },
+    { key: 'alga', anchors: ['Rhodophyta', 'Chlorophyta', 'Phaeophyceae', 'Bacillariophyta', 'Charophyceae', 'Dinoflagellata', 'Ulvophyceae', 'Zygnematophyceae'], ranks: ['species', 'genus'] },
+    { key: 'tree', anchors: ['Pinophyta', 'Ginkgo', 'Arecaceae', 'Quercus', 'Acer', 'Fagus', 'Betula', 'Fraxinus', 'Tilia', 'Ulmus', 'Populus', 'Castanea', 'Juglans', 'Eucalyptus', 'Adansonia', 'Magnolia', 'Platanus', 'Carpinus', 'Alnus', 'Sorbus', 'Olea', 'Ceiba', 'Tectona', 'Swietenia', 'Ficus', 'Salix', 'Aesculus', 'Robinia', 'Prunus', 'Malus', 'Pyrus', 'Citrus', 'Mangifera', 'Cinnamomum', 'Theobroma', 'Coffea', 'Hevea', 'Liriodendron', 'Dracaena', 'Ceratonia', 'Acacia', 'Shorea', 'Dipterocarpus', 'Terminalia', 'Diospyros', 'Corymbia', 'Cecropia', 'Bombax', 'Cycadopsida'], ranks: ['species'] },
+    { key: 'plant', anchors: ['Plantae'], ranks: ['species'] },
+    { key: 'mammal', anchors: ['Mammalia'], ranks: ['species'] },
+    { key: 'bird', anchors: ['Aves'], ranks: ['species'] },
+    { key: 'reptile', anchors: ['Reptilia', 'Squamata', 'Testudines', 'Crocodilia', 'Amphibia'], ranks: ['species'] },
+    { key: 'fish', anchors: ['Actinopterygii', 'Chondrichthyes', 'Coelacanthiformes', 'Dipnoi', 'Petromyzontiformes', 'Myxini'], ranks: ['species'] },
+    { key: 'arthropod', anchors: ['Insecta', 'Arachnida', 'Myriapoda', 'Entognatha', 'Merostomata'], ranks: ['species'] },
+    { key: 'marine', anchors: ['Mollusca', 'Cnidaria', 'Echinodermata', 'Porifera', 'Crustacea', 'Annelida', 'Ctenophora', 'Tunicata', 'Bryozoa', 'Brachiopoda'], ranks: ['species', 'genus'] },
 ];
 
 const IUCN = {
@@ -88,7 +88,7 @@ async function getJson(url) {
 
 // Batched intro + image lookup via the MediaWiki action API (20 titles per call;
 // the REST summary endpoint rate-limits one-by-one lookups hard).
-async function fetchSummaries(titles) {
+async function fetchSummaries(titles, checkpoint) {
     const out = {};
     for (let i = 0; i < titles.length; i += 20) {
         const batch = titles.slice(i, i + 20);
@@ -118,8 +118,8 @@ async function fetchSummaries(titles) {
                 url: p.fullurl,
             };
         }
-        if ((i / 20) % 20 === 0) console.log(`  ${Math.min(i + 20, titles.length)}/${titles.length}`);
-        await sleep(200);
+        if ((i / 20) % 100 === 0) { console.log(`  ${Math.min(i + 20, titles.length)}/${titles.length}`); checkpoint?.(out); }
+        await sleep(100);
     }
     return out;
 }
@@ -142,7 +142,6 @@ async function resolveAnchors(names) {
     return Object.fromEntries(Object.entries(best).map(([n, v]) => [n, v.q]));
 }
 
-// Over-fetch so a type still fills its quota after higher-priority types claimed some items.
 async function fetchType(type, anchorIds) {
     const taxonClause = type.fossilTaxon
         ? '?item wdt:P31 wd:Q23038290.'
@@ -154,7 +153,7 @@ async function fetchType(type, anchorIds) {
         ${taxonClause}
         ?item wikibase:sitelinks ?sl.
         ?article schema:about ?item; schema:isPartOf <https://fr.wikipedia.org/>; schema:name ?title.
-    } ORDER BY DESC(?sl) LIMIT ${type.limit * 3}`);
+    } LIMIT 400000`, { timeoutMs: 180_000 });
     return rows.map((r) => ({ qid: qidOf(r.item.value), title: r.title.value, sitelinks: Number(r.sl.value) }));
 }
 
@@ -188,7 +187,7 @@ async function fetchDetails(qids) {
 // serves), batched 50 titles per call and scaled to a yearly estimate. The per-article
 // REST pageviews endpoint rate-limits bulk lookups far too hard.
 const VIEW_DAYS = 60;
-async function fetchPageviews(titles) {
+async function fetchPageviews(titles, checkpoint) {
     const out = {};
     for (let i = 0; i < titles.length; i += 50) {
         const batch = titles.slice(i, i + 50);
@@ -207,8 +206,8 @@ async function fetchPageviews(titles) {
             cont = res?.continue || null;
             if (cont) await sleep(1_000);
         } while (cont);
-        if ((i / 50) % 10 === 0) console.log(`  ${Math.min(i + 50, titles.length)}/${titles.length}`);
-        await sleep(3_000);
+        if ((i / 50) % 20 === 0) { console.log(`  ${Math.min(i + 50, titles.length)}/${titles.length}`); checkpoint?.(out); }
+        await sleep(1_000);
     }
     return out;
 }
@@ -252,7 +251,6 @@ async function main() {
         let added = 0;
         for (const it of items) {
             if (seen.has(it.qid)) continue;
-            if (added >= type.limit) break;
             seen.set(it.qid, { ...it, type: type.key });
             added++;
         }
@@ -267,20 +265,24 @@ async function main() {
     console.log('Fetching Wikipedia summaries…');
     const summaries = cache('summaries');
     const missing = candidates.filter((c) => !(c.qid in summaries.data));
-    const byTitle = await fetchSummaries(missing.map((c) => c.title));
-    for (const c of missing) if (c.title in byTitle) summaries.data[c.qid] = byTitle[c.title];
-    summaries.save();
+    const keepSummaries = (byTitle) => {
+        for (const c of missing) if (c.title in byTitle) summaries.data[c.qid] = byTitle[c.title];
+        summaries.save();
+    };
+    keepSummaries(await fetchSummaries(missing.map((c) => c.title), keepSummaries));
 
     console.log(`Fetching page views (last ${VIEW_DAYS} days)…`);
     const views = cache(`views-${new Date().toISOString().slice(0, 7)}`);
     const withSummary = candidates.filter((c) => summaries.data[c.qid]);
     const todo = withSummary.filter((c) => !(c.qid in views.data));
-    const byPage = await fetchPageviews(todo.map((c) => summaries.data[c.qid].title));
-    for (const c of todo) {
-        const v = byPage[summaries.data[c.qid].title];
-        if (v !== undefined) views.data[c.qid] = v;
-    }
-    views.save();
+    const keepViews = (byPage) => {
+        for (const c of todo) {
+            const v = byPage[summaries.data[c.qid].title];
+            if (v !== undefined) views.data[c.qid] = v;
+        }
+        views.save();
+    };
+    keepViews(await fetchPageviews(todo.map((c) => summaries.data[c.qid].title), keepViews));
 
     const cards = withSummary.map((c) => {
         const s = summaries.data[c.qid];
@@ -299,14 +301,20 @@ async function main() {
     const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
     await db.connect();
     await db.query(fs.readFileSync(path.join(import.meta.dirname, '../functions/api/schema.sql'), 'utf8'));
-    for (const c of cards) {
+    for (let i = 0; i < cards.length; i += 500) {
+        const batch = cards.slice(i, i + 500);
+        const col = (k) => batch.map((c) => c[k]);
         await db.query(
             `INSERT INTO cards (qid, name, sci_name, type, rarity, views, image_url, thumb_url, extract, wiki_url, iucn, stats)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-             ON CONFLICT (qid) DO UPDATE SET name=$2, sci_name=$3, type=$4, rarity=$5, views=$6, image_url=$7,
-                thumb_url=$8, extract=$9, wiki_url=$10, iucn=$11, stats=$12`,
-            [c.qid, c.name, c.sci_name, c.type, c.rarity, c.views, c.image_url, c.thumb_url, c.extract, c.wiki_url, c.iucn, c.stats],
+             SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::bigint[], $7::text[],
+                                  $8::text[], $9::text[], $10::text[], $11::text[], $12::jsonb[])
+             ON CONFLICT (qid) DO UPDATE SET name=EXCLUDED.name, sci_name=EXCLUDED.sci_name, type=EXCLUDED.type,
+                rarity=EXCLUDED.rarity, views=EXCLUDED.views, image_url=EXCLUDED.image_url, thumb_url=EXCLUDED.thumb_url,
+                extract=EXCLUDED.extract, wiki_url=EXCLUDED.wiki_url, iucn=EXCLUDED.iucn, stats=EXCLUDED.stats`,
+            [col('qid'), col('name'), col('sci_name'), col('type'), col('rarity'), col('views'), col('image_url'),
+             col('thumb_url'), col('extract'), col('wiki_url'), col('iucn'), batch.map((c) => JSON.stringify(c.stats))],
         );
+        if ((i / 500) % 20 === 0) console.log(`  ${Math.min(i + 500, cards.length)}/${cards.length}`);
     }
     // Drop cards that left the catalog, unless a player already owns them.
     const gone = await db.query(
@@ -314,6 +322,9 @@ async function main() {
         [cards.map((c) => c.qid)],
     );
     console.log(`Removed ${gone.rowCount} stale cards`);
+    // Stable card numbers for the collection: by type, then popularity.
+    await db.query(`UPDATE cards c SET num = n.num FROM (
+        SELECT id, row_number() OVER (ORDER BY type, views DESC, id) AS num FROM cards) n WHERE n.id = c.id`);
     const { rows } = await db.query(`SELECT type, rarity, COUNT(*)::int AS n FROM cards GROUP BY 1, 2 ORDER BY 1, 2`);
     console.table(rows);
     await db.end();

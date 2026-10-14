@@ -34,7 +34,7 @@ export default function CardPage() {
 
     const t = TYPES[card.type];
     const r = RARITIES[card.rarity];
-    const number = catalog ? catalog.findIndex((c) => c.id === card.id) + 1 : null;
+    const number = card.num;
 
     if (!card.count) {
         return (
@@ -61,7 +61,7 @@ export default function CardPage() {
         <div className="max-w-6xl mx-auto px-4 py-10">
             <Link to="/collection" className="inline-flex items-center gap-2 text-sm font-semibold text-white"><ArrowLeft className="w-4 h-4" />Collection</Link>
             <div className="mt-6 grid md:grid-cols-[minmax(0,380px)_1fr] gap-10 lg:gap-16 items-start">
-                <div className="w-full max-w-[380px] mx-auto"><Card card={card} number={number} total={catalog?.length} tilt /></div>
+                <div className="w-full max-w-[380px] mx-auto"><Card card={card} number={number} total={catalog?.total} tilt /></div>
                 <div>
                     <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider">
                         <span className="px-2.5 py-1 rounded-full text-paper" style={{ background: t.color }}>{t.label}</span>

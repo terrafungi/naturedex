@@ -44,7 +44,7 @@ function distinctTypes(list, count) {
 
 function useShowcase(catalog) {
     return useMemo(() => {
-        const cards = (catalog || []).filter((c) => c.thumb_url);
+        const cards = (catalog?.cards || []).filter((c) => c.thumb_url).map((c) => ({ ...c, views: Number(c.views) }));
         if (!cards.length) return null;
         const byViews = [...cards].sort((a, b) => b.views - a.views);
         const of = (...rarities) => byViews.filter((c) => rarities.includes(c.rarity));
@@ -59,7 +59,7 @@ function useShowcase(catalog) {
         }).filter(Boolean);
         const types = Object.keys(TYPES).map((key) => {
             const all = byViews.filter((c) => c.type === key);
-            return { key, star: all[0], count: (catalog || []).filter((c) => c.type === key).length };
+            return { key, star: all[0], count: Object.values(catalog.types[key] || {}).reduce((a, n) => a + n, 0) };
         }).sort((a, b) => (b.star?.views || 0) - (a.star?.views || 0));
         const pools = Object.fromEntries(Object.keys(RARITIES).map((r) => [r, cards.filter((c) => c.rarity === r)]));
 
@@ -607,7 +607,7 @@ export default function Landing() {
 
     return (
         <div className="overflow-x-clip">
-            <Hero show={show} total={catalog?.length} />
+            <Hero show={show} total={catalog?.total} />
             <TypeTicker />
             {show && (
                 <>

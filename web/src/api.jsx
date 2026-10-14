@@ -26,15 +26,18 @@ export function GameProvider({ children }) {
     const [user, setUser] = useState(null);
     const [ready, setReady] = useState(false);
     const [catalog, setCatalog] = useState(null);
-    const [owned, setOwned] = useState({});
+    const [owned, setOwned] = useState({}); // { cardId: count }
+    const [ownedInfo, setOwnedInfo] = useState({}); // { cardId: [type, rarity] }
 
     const refreshCollection = useCallback(async () => {
-        const { owned } = await api('collection');
+        const { owned, info } = await api('collection');
         setOwned(owned);
+        setOwnedInfo(info);
     }, []);
 
     useEffect(() => {
-        api('catalog').then(({ cards }) => setCatalog(cards)).catch(() => setCatalog([]));
+        // { total, types: { type: { rarity: count } }, cards: sample for the landing page }
+        api('catalog').then(setCatalog).catch(() => setCatalog({ total: 0, types: {}, cards: [] }));
         if (!localStorage.getItem(TOKEN_KEY)) { setReady(true); return; }
         api('me')
             .then(({ user }) => { setUser(user); return refreshCollection(); })
@@ -54,6 +57,7 @@ export function GameProvider({ children }) {
         localStorage.removeItem(TOKEN_KEY);
         setUser(null);
         setOwned({});
+        setOwnedInfo({});
     }, []);
 
     // Merge newly opened cards into the local collection without a refetch.
@@ -63,10 +67,15 @@ export function GameProvider({ children }) {
             for (const c of cards) next[c.id] = (next[c.id] || 0) + 1;
             return next;
         });
+        setOwnedInfo((prev) => {
+            const next = { ...prev };
+            for (const c of cards) next[c.id] = [c.type, c.rarity];
+            return next;
+        });
     }, []);
 
     return (
-        <GameContext.Provider value={{ user, setUser, ready, catalog, owned, setOwned, refreshCollection, authenticate, logout, addCards }}>
+        <GameContext.Provider value={{ user, setUser, ready, catalog, owned, ownedInfo, setOwned, refreshCollection, authenticate, logout, addCards }}>
             {children}
         </GameContext.Provider>
     );

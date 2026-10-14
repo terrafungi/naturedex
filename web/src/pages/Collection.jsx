@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Recycle, Search } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
@@ -20,33 +20,51 @@ function Chip({ active, onClick, children, color }) {
 }
 
 export default function Collection() {
-    const { catalog, owned, user, setUser, refreshCollection } = useGame();
+    const { catalog, owned, ownedInfo, user, setUser, refreshCollection } = useGame();
     const [type, setType] = useState(null);
     const [rarity, setRarity] = useState(null);
     const [onlyOwned, setOnlyOwned] = useState(false);
     const [query, setQuery] = useState('');
-    const [limit, setLimit] = useState(PAGE);
+    const [debounced, setDebounced] = useState('');
+    const [page, setPage] = useState(null); // { cards, matches } for the current filters
+    const [loadingMore, setLoadingMore] = useState(false);
     const [message, setMessage] = useState('');
 
-    // Stable card numbers: catalog order (type, then popularity).
-    const numbered = useMemo(() => (catalog || []).map((c, i) => ({ ...c, number: i + 1 })), [catalog]);
+    useEffect(() => {
+        const t = setTimeout(() => setDebounced(query.trim()), 300);
+        return () => clearTimeout(t);
+    }, [query]);
 
-    const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        return numbered
-            .filter((c) => (!type || c.type === type) && (!rarity || c.rarity === rarity) && (!onlyOwned || owned[c.id]))
-            .filter((c) => !q || (owned[c.id] && (c.name.toLowerCase().includes(q) || c.sci_name?.toLowerCase().includes(q))))
-            .sort((a, b) => !owned[a.id] - !owned[b.id] || RARITIES[b.rarity].order - RARITIES[a.rarity].order || a.number - b.number);
-    }, [numbered, type, rarity, onlyOwned, query, owned]);
+    // The catalogue is far too big for the browser: the server sorts and filters, we fetch pages.
+    const filters = useMemo(() => ({ type, rarity, onlyOwned, query: debounced }), [type, rarity, onlyOwned, debounced]);
+    useEffect(() => {
+        let alive = true;
+        setPage(null);
+        api('browse', { ...filters, offset: 0, limit: PAGE })
+            .then((res) => alive && setPage(res))
+            .catch(() => alive && setPage({ cards: [], matches: 0 }));
+        return () => { alive = false; };
+    }, [filters, owned]);
+
+    async function loadMore() {
+        setLoadingMore(true);
+        try {
+            const res = await api('browse', { ...filters, offset: page.cards.length, limit: PAGE });
+            setPage({ matches: res.matches, cards: [...page.cards, ...res.cards] });
+        } finally {
+            setLoadingMore(false);
+        }
+    }
 
     const duplicates = useMemo(() => {
         let count = 0, coins = 0;
-        for (const c of numbered) {
-            const extra = (owned[c.id] || 0) - 1;
-            if (extra > 0) { count += extra; coins += extra * (user.recycleValue?.[c.rarity] || 0); }
+        for (const [id, n] of Object.entries(owned)) {
+            const extra = n - 1;
+            const rarity = ownedInfo[id]?.[1];
+            if (extra > 0) { count += extra; coins += extra * (user.recycleValue?.[rarity] || 0); }
         }
         return { count, coins };
-    }, [numbered, owned, user.recycleValue]);
+    }, [owned, ownedInfo, user.recycleValue]);
 
     async function recycleAll() {
         const res = await api('recycle');
@@ -63,7 +81,7 @@ export default function Collection() {
                 <div>
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Collection</p>
                     <h1 className="font-display text-4xl font-black text-white mt-1">
-                        {Object.keys(owned).length} <span className="text-ink-soft font-medium text-2xl">/ {catalog.length}</span>
+                        {Object.keys(owned).length} <span className="text-ink-soft font-medium text-2xl">/ {catalog.total.toLocaleString('fr-FR')}</span>
                     </h1>
                 </div>
                 {duplicates.count > 0 && (
@@ -102,21 +120,24 @@ export default function Collection() {
                 </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
-                {filtered.slice(0, limit).map((c) => (
-                    <Link key={c.id} to={`/carte/${c.id}`} className="relative block transition-transform hover:-translate-y-1">
-                        {owned[c.id] ? <Card card={c} number={c.number} total={catalog.length} /> : <MysteryCard card={c} number={c.number} />}
-                        {owned[c.id] > 1 && (
-                            <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#04150d] text-xs font-bold shadow-lg shadow-emerald-500/30">×{owned[c.id]}</span>
-                        )}
-                    </Link>
-                ))}
-            </div>
-            {filtered.length === 0 && <p className="py-20 text-center text-ink-soft">Aucune carte ne correspond à ces filtres.</p>}
-            {filtered.length > limit && (
+            {!page && <div className="py-20 text-center font-display text-lg text-ink-soft">Chargement…</div>}
+            {page && (
+                <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
+                    {page.cards.map((c) => (
+                        <Link key={c.id} to={`/carte/${c.id}`} className="relative block transition-transform hover:-translate-y-1">
+                            {c.count ? <Card card={c} number={c.num} total={catalog.total} /> : <MysteryCard card={c} number={c.num} />}
+                            {c.count > 1 && (
+                                <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#04150d] text-xs font-bold shadow-lg shadow-emerald-500/30">×{c.count}</span>
+                            )}
+                        </Link>
+                    ))}
+                </div>
+            )}
+            {page?.matches === 0 && <p className="py-20 text-center text-ink-soft">Aucune carte ne correspond à ces filtres.</p>}
+            {page && page.matches > page.cards.length && (
                 <div className="mt-10 text-center">
-                    <button onClick={() => setLimit(limit + PAGE)} className="px-6 py-3 rounded-full border border-white/10 text-white font-semibold hover:bg-white/10">
-                        Afficher plus ({filtered.length - limit} restantes)
+                    <button onClick={loadMore} disabled={loadingMore} className="px-6 py-3 rounded-full border border-white/10 text-white font-semibold hover:bg-white/10 disabled:opacity-60">
+                        {loadingMore ? 'Chargement…' : `Afficher plus (${(page.matches - page.cards.length).toLocaleString('fr-FR')} restantes)`}
                     </button>
                 </div>
             )}
