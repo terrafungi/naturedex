@@ -1,22 +1,43 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Coins, Gift, Package } from 'lucide-react';
+import { Gift, Zap } from 'lucide-react';
+import { Amount, Seed } from '../components/Currency.jsx';
 import { api, useGame } from '../api.jsx';
 import { Pack } from '../components/Pack.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
 import { TYPES } from '../game.jsx';
 
-function useCountdown(iso) {
+export function useCountdown(iso, onDone) {
     const [now, setNow] = useState(Date.now());
     useEffect(() => {
         if (!iso) return;
         const t = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(t);
     }, [iso]);
-    if (!iso) return null;
-    const ms = Math.max(0, new Date(iso).getTime() - now);
+    const ms = iso ? Math.max(0, new Date(iso).getTime() - now) : 0;
+    useEffect(() => { if (iso && ms === 0) onDone?.(); }, [iso, ms === 0]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!iso || ms === 0) return null;
     const h = Math.floor(ms / 3.6e6), m = Math.floor((ms % 3.6e6) / 6e4), s = Math.floor((ms % 6e4) / 1000);
-    return ms === 0 ? null : `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+    return h ? `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s` : `${m}m ${String(s).padStart(2, '0')}s`;
+}
+
+// Ten free openings, refilled one by one every 30 minutes.
+function ChargeGauge({ user }) {
+    return (
+        <div className="relative w-full max-w-xs mt-6">
+            <div className="flex items-center justify-between text-sm font-semibold">
+                <span className="flex items-center gap-1.5 text-white"><Zap className="w-4 h-4 text-[#f4d88f] fill-[#f4d88f]/40" />Charges gratuites</span>
+                <span className="tabular-nums text-white">{user.charges}<span className="text-white/50">/{user.maxCharges}</span></span>
+            </div>
+            <div className="mt-2 grid gap-1" style={{ gridTemplateColumns: `repeat(${user.maxCharges}, 1fr)` }}>
+                {Array.from({ length: user.maxCharges }, (_, i) => (
+                    <motion.span key={i} className="h-2.5 rounded-full"
+                        initial={false}
+                        animate={{ background: i < user.charges ? '#f4d88f' : 'rgba(255,255,255,0.12)', boxShadow: i < user.charges ? '0 0 10px -2px #e9c46a' : '0 0 0 0 transparent' }} />
+                ))}
+            </div>
+        </div>
+    );
 }
 
 export default function Boosters() {
@@ -25,12 +46,17 @@ export default function Boosters() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const countdown = useCountdown(user.nextDailyAt);
+    const refresh = () => api('me').then((res) => setUser(res.user)).catch(() => {});
+    const nextCharge = useCountdown(user.nextChargeAt, refresh);
+    // What the next opening costs: a free charge, a bonus booster, or graines.
+    const payWith = user.charges > 0 ? 'charge' : user.boosters > 0 ? 'booster' : 'coins';
+    const canOpen = payWith !== 'coins' || user.coins >= user.boosterPrice;
 
-    async function run(action, after) {
+    async function run(action, after, params) {
         setBusy(true);
         setError('');
         try {
-            const res = await api(action);
+            const res = await api(action, params);
             setUser(res.user);
             after?.(res);
         } catch (err) {
@@ -40,8 +66,7 @@ export default function Boosters() {
         }
     }
 
-    const open = () => run('openBooster', (res) => { addCards(res.cards); setOpening(res.cards); });
-    const buy = () => run('buyBooster');
+    const open = () => run('openBooster', (res) => { addCards(res.cards); setOpening(res.cards); }, { pay: payWith === 'coins' });
     const daily = () => run('claimDaily');
 
     const total = catalog?.total || user.total;
@@ -71,26 +96,34 @@ export default function Boosters() {
                 <div className="relative flex flex-col items-center p-8 rounded-[2rem] nd-glass nd-ring text-paper overflow-hidden">
                     <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(circle at 50% 30%, #e9c46a, transparent 55%), radial-gradient(circle at 30% 90%, #2fa866, transparent 50%)' }} />
                     <motion.button
-                        disabled={busy || user.boosters < 1}
+                        disabled={busy || !canOpen}
                         onClick={open}
                         className="relative w-[200px] sm:w-[230px] disabled:grayscale disabled:opacity-60"
-                        whileHover={user.boosters > 0 ? { y: -8, rotate: -2 } : {}}
-                        whileTap={user.boosters > 0 ? { scale: 0.96 } : {}}
+                        whileHover={canOpen ? { y: -8, rotate: -2 } : {}}
+                        whileTap={canOpen ? { scale: 0.96 } : {}}
                     >
                         <Pack />
-                        {user.boosters > 0 && (
+                        {user.charges > 0 && (
                             <span className="absolute -top-3 -right-3 min-w-10 h-10 px-2 grid place-items-center rounded-full bg-rust text-paper font-display font-black text-lg shadow-lg">
-                                ×{user.boosters}
+                                ×{user.charges}
                             </span>
                         )}
                     </motion.button>
+                    <ChargeGauge user={user} />
+                    <p className="relative mt-2 w-full max-w-xs text-xs text-white/60 flex justify-between gap-2">
+                        <span>{nextCharge ? <>Prochaine charge dans <b className="text-white tabular-nums">{nextCharge}</b></> : 'Jauge pleine'}</span>
+                        <span>+1 toutes les {user.chargeMinutes} min</span>
+                    </p>
                     <button
-                        disabled={busy || user.boosters < 1}
+                        disabled={busy || !canOpen}
                         onClick={open}
-                        className="relative mt-8 w-full max-w-xs py-3.5 rounded-full nd-btn font-bold text-lg disabled:opacity-40"
+                        className="relative mt-6 w-full max-w-xs py-3.5 rounded-full nd-btn font-bold text-lg disabled:opacity-40 flex items-center justify-center gap-2"
                     >
-                        {user.boosters > 0 ? 'Ouvrir un booster' : 'Aucun booster'}
+                        {payWith === 'charge' ? 'Ouvrir un booster' : payWith === 'booster' ? `Ouvrir un booster bonus (${user.boosters})` : <>Ouvrir pour <Seed className="w-5 h-5" />{user.boosterPrice}</>}
                     </button>
+                    {payWith === 'coins' && !canOpen && (
+                        <p className="relative mt-3 text-sm text-white/70 text-center max-w-xs">Plus de charge ni de graines : attends la prochaine charge, ou gagne des graines avec les défis et les trophées.</p>
+                    )}
                     {error && <p className="relative mt-3 text-sm font-semibold text-[#ffb4a2]">{error}</p>}
                 </div>
 
@@ -100,20 +133,19 @@ export default function Boosters() {
                         <div className="p-5 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur">
                             <Gift className="w-6 h-6 text-rust" />
                             <h2 className="mt-2 font-display text-xl font-bold">Bonus du jour</h2>
-                            <p className="text-sm text-ink-soft">+{user.dailyCoins} pièces toutes les 20 heures.</p>
+                            <p className="text-sm text-ink-soft"><Amount seeds={user.dailyCoins} sign /> graines toutes les 20 heures.</p>
                             <button disabled={busy || !!countdown} onClick={daily}
                                 className="mt-4 w-full py-2.5 rounded-full nd-btn font-semibold disabled:opacity-40 disabled:grayscale">
                                 {countdown ? `Revient dans ${countdown}` : 'Récupérer'}
                             </button>
                         </div>
                         <div className="p-5 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur">
-                            <Package className="w-6 h-6 text-white" />
-                            <h2 className="mt-2 font-display text-xl font-bold">Boutique</h2>
-                            <p className="text-sm text-ink-soft">Tu as <b className="text-brass-deep">{user.coins} pièces</b>. Recycle tes doublons pour en gagner.</p>
-                            <button disabled={busy || user.coins < user.boosterPrice} onClick={buy}
-                                className="mt-4 w-full py-2.5 rounded-full border-2 border-brass text-brass-deep font-bold hover:bg-brass/15 disabled:opacity-40 flex items-center justify-center gap-2">
-                                Acheter un booster · <Coins className="w-4 h-4" />{user.boosterPrice}
-                            </button>
+                            <Seed className="w-6 h-6" />
+                            <h2 className="mt-2 font-display text-xl font-bold">Graines</h2>
+                            <p className="text-sm text-ink-soft">
+                                Tu as <Amount seeds={user.coins} />. Elles servent uniquement à ouvrir des boosters
+                                ({user.boosterPrice} l'ouverture) une fois tes charges épuisées. Gagne-en avec le bonus du jour, les défis et les trophées.
+                            </p>
                         </div>
                     </div>
 
@@ -145,7 +177,7 @@ export default function Boosters() {
                         key={opening.map((c) => c.id).join('-')}
                         cards={opening}
                         onClose={() => setOpening(null)}
-                        canOpenAgain={user.boosters > 0}
+                        canOpenAgain={canOpen}
                         onAgain={open}
                     />
                 )}

@@ -20,10 +20,15 @@ const headers = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization'
 };
 
-const BOOSTER_PRICE = 100;
+// Two currencies: « graines » (users.coins) only open boosters, « pépites » (users.nuggets)
+// are the auction-house money.
+const BOOSTER_PRICE = 100; // graines for one opening once the free charges are spent
 const DAILY_COINS = 100;
+const MAX_CHARGES = 10;
+const CHARGE_MS = 30 * 60 * 1000;
 const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
 const SESSION_DAYS = 60;
+// pépites per recycled duplicate
 const RECYCLE_VALUE = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, secret: 1000 };
 
 // One booster = 6 slots, each a weighted rarity table. The last slot hides the 50 secret
@@ -90,6 +95,14 @@ async function requireUser(db, event) {
     return rows[0];
 }
 
+// Free openings: `charges` as of `charges_at`, plus one every 30 minutes up to the cap.
+function chargeState(user, now = Date.now()) {
+    const from = new Date(user.charges_at).getTime();
+    const ticks = Math.max(0, Math.floor((now - from) / CHARGE_MS));
+    const charges = Math.min(MAX_CHARGES, user.charges + ticks);
+    return { charges, ticks, from, nextAt: charges >= MAX_CHARGES ? null : from + (ticks + 1) * CHARGE_MS };
+}
+
 async function publicUser(db, user) {
     const { rows } = await db.query(
         `SELECT COUNT(*)::int AS discovered, COALESCE(SUM(count), 0)::int AS owned,
@@ -97,11 +110,17 @@ async function publicUser(db, user) {
          FROM user_cards WHERE user_id = $1`,
         [user.id]
     );
+    const charge = chargeState(user);
     const nextDaily = user.last_daily ? new Date(user.last_daily).getTime() + DAILY_COOLDOWN_MS : 0;
     return {
         username: user.username,
         coins: user.coins,
+        nuggets: user.nuggets,
         boosters: user.boosters,
+        charges: charge.charges,
+        maxCharges: MAX_CHARGES,
+        chargeMinutes: CHARGE_MS / 60000,
+        nextChargeAt: charge.nextAt && new Date(charge.nextAt).toISOString(),
         boosterPrice: BOOSTER_PRICE,
         dailyCoins: DAILY_COINS,
         nextDailyAt: nextDaily > Date.now() ? new Date(nextDaily).toISOString() : null,
@@ -198,11 +217,155 @@ async function dailyChallenges(db, userId) {
     };
 }
 
+const RARITY_ORDER = `CASE c.rarity WHEN 'secret' THEN 5 WHEN 'legendary' THEN 4 WHEN 'epic' THEN 3 WHEN 'rare' THEN 2 WHEN 'uncommon' THEN 1 ELSE 0 END`;
+
+// ---------- trophies ----------
+
+// Permanent achievements, in series of growing goals. Each tier pays graines and pépites.
+const TYPE_NAMES = {
+    mammal: 'Mammifères', bird: 'Oiseaux', reptile: 'Reptiles & amphibiens', fish: 'Poissons',
+    arthropod: 'Insectes & arachnides', marine: 'Créatures marines', plant: 'Plantes', tree: 'Arbres',
+    alga: 'Algues', fungus: 'Champignons', mold: 'Moisissures & levures', bacteria: 'Bactéries', virus: 'Virus', fossil: 'Fossiles',
+};
+const TIER_COINS = [50, 100, 200, 300, 500, 800, 1200, 2000, 3000];
+const TIER_NUGGETS = [20, 50, 100, 150, 250, 400, 600, 1000, 1500];
+
+function series(group, icon, metric, steps, text) {
+    return steps.map(([goal, title], i) => ({
+        key: `${metric}-${goal}`, group, icon, metric, goal, title, text: text(goal), tier: i,
+        coins: TIER_COINS[i], nuggets: TIER_NUGGETS[i],
+    }));
+}
+const n = (v) => v.toLocaleString('fr-FR');
+
+const TROPHIES = [
+    ...series('Collection', 'book', 'discovered', [
+        [10, 'Premiers pas'], [50, 'Herbier de poche'], [100, 'Carnet bien rempli'], [250, 'Naturaliste en herbe'],
+        [500, 'Explorateur du vivant'], [1000, 'Biologiste'], [2500, 'Encyclopédiste'], [5000, 'Gardien de l\'Arche'], [10000, 'Linné des temps modernes'],
+    ], (g) => `Découvre ${n(g)} espèces différentes`),
+    ...series('Collection', 'layers', 'owned', [[100, 'Petit tas'], [500, 'Classeur plein'], [2000, 'Malle aux trésors'], [5000, 'Cabinet de curiosités']],
+        (g) => `Possède ${n(g)} cartes au total, doublons compris`),
+    ...series('Collection', 'globe', 'types', [[14, 'Arche de Noé']], () => 'Possède au moins une carte de chaque type'),
+    ...series('Collection', 'globe', 'types10', [[14, 'Tour du monde vivant']], () => 'Découvre 10 espèces de chaque type'),
+    ...series('Collection', 'copy', 'maxCount', [[5, 'Coup de cœur'], [10, 'Obsession']], (g) => `Possède ${g} exemplaires d'une même carte`),
+    ...series('Boosters', 'package', 'opened', [
+        [1, 'Premier booster'], [10, 'Déchireur d\'emballages'], [50, 'Accro aux boosters'], [100, 'Centurion'],
+        [250, 'Collectionneur compulsif'], [500, 'Montagne de papier'], [1000, 'Légende des boosters'],
+    ], (g) => `Ouvre ${n(g)} booster${g > 1 ? 's' : ''}`),
+    ...series('Raretés', 'star', 'rarity:rare', [[1, 'Œil vif'], [25, 'Chasseur de raretés'], [100, 'Trésor de Rares']], (g) => `Découvre ${g} espèce${g > 1 ? 's' : ''} Rare${g > 1 ? 's' : ''}`),
+    ...series('Raretés', 'gem', 'rarity:epic', [[1, 'Reflet holographique'], [10, 'Galerie Épique'], [50, 'Collection Épique']], (g) => `Découvre ${g} espèce${g > 1 ? 's' : ''} Épique${g > 1 ? 's' : ''}`),
+    ...series('Raretés', 'crown', 'rarity:legendary', [[1, 'Rencontre légendaire'], [5, 'Panthéon personnel'], [25, 'Mythologie vivante']], (g) => `Découvre ${g} espèce${g > 1 ? 's' : ''} Légendaire${g > 1 ? 's' : ''}`),
+    ...series('Raretés', 'sparkles', 'rarity:secret', [[1, 'Le Secret'], [3, 'Initié'], [10, 'Gardien des Secrets']], (g) => `Découvre ${g} carte${g > 1 ? 's' : ''} Secrète${g > 1 ? 's' : ''}`),
+    ...Object.entries(TYPE_NAMES).flatMap(([type, name]) => series('Types', `type:${type}`, `type:${type}`,
+        [[5, `Curieux des ${name}`], [25, `Spécialiste des ${name}`], [100, `Maître des ${name}`]],
+        (g) => `Découvre ${g} espèces de type ${name}`)),
+    ...series('Défis', 'trophy', 'challenges', [[1, 'Premier défi'], [10, 'Régulier'], [50, 'Infatigable'], [150, 'Champion des défis'], [365, 'Une année de nature']],
+        (g) => `Termine ${g} défi${g > 1 ? 's' : ''} du jour`),
+    ...series('Enchères', 'gavel', 'sold', [[1, 'Première vente'], [10, 'Marchand'], [50, 'Négociant']], (g) => `Vends ${g} carte${g > 1 ? 's' : ''} aux enchères`),
+    ...series('Enchères', 'cart', 'bought', [[1, 'Premier achat'], [10, 'Acheteur avisé'], [50, 'Grand collectionneur']], (g) => `Remporte ${g} enchère${g > 1 ? 's' : ''}`),
+    ...series('Enchères', 'recycle', 'recycled', [[10, 'Tri sélectif'], [100, 'Recycleur'], [1000, 'Compost géant']], (g) => `Recycle ${n(g)} doublons`),
+];
+
+async function trophyList(db, userId) {
+    const [{ rows: [m] }, { rows: groups }, { rows: claims }] = await Promise.all([
+        db.query(`SELECT
+                    (SELECT COUNT(*)::int FROM user_cards WHERE user_id = $1) AS discovered,
+                    (SELECT COALESCE(SUM(count), 0)::int FROM user_cards WHERE user_id = $1) AS owned,
+                    (SELECT COALESCE(MAX(count), 0)::int FROM user_cards WHERE user_id = $1) AS "maxCount",
+                    (SELECT COUNT(*)::int FROM openings WHERE user_id = $1) AS opened,
+                    (SELECT COUNT(*)::int FROM challenge_claims WHERE user_id = $1) AS challenges,
+                    (SELECT COUNT(*)::int FROM auctions WHERE seller_id = $1 AND status = 'sold') AS sold,
+                    (SELECT COUNT(*)::int FROM auctions WHERE bidder_id = $1 AND status = 'sold') AS bought,
+                    recycled FROM users WHERE id = $1`, [userId]),
+        db.query(`SELECT c.type, c.rarity, COUNT(*)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
+                  WHERE uc.user_id = $1 GROUP BY 1, 2`, [userId]),
+        db.query(`SELECT key FROM trophy_claims WHERE user_id = $1`, [userId]),
+    ]);
+    const perType = {};
+    for (const { type, rarity, n } of groups) {
+        perType[type] = (perType[type] || 0) + n;
+        m[`rarity:${rarity}`] = (m[`rarity:${rarity}`] || 0) + n;
+    }
+    for (const [type, count] of Object.entries(perType)) m[`type:${type}`] = count;
+    m.types = Object.keys(perType).length;
+    m.types10 = Object.values(perType).filter((count) => count >= 10).length;
+    const claimed = new Set(claims.map((r) => r.key));
+    return TROPHIES.map(({ metric, ...t }) => ({ ...t, progress: Math.min(m[metric] || 0, t.goal), claimed: claimed.has(t.key) }));
+}
+
+// ---------- auction house ----------
+
+const AUCTION_HOURS = [1, 6, 12, 24, 48];
+const AUCTION_FEE = 0.05; // taken from the seller's earnings
+const MAX_LISTINGS = 10;
+const MAX_PRICE = 1_000_000;
+
+const minBid = (a) => (a.bid == null ? a.start_price : a.bid + Math.max(1, Math.ceil(a.bid * 0.05)));
+
+async function giveCard(client, userId, cardId) {
+    await client.query(
+        `INSERT INTO user_cards (user_id, card_id) VALUES ($1, $2)
+         ON CONFLICT (user_id, card_id) DO UPDATE SET count = user_cards.count + 1`,
+        [userId, cardId]
+    );
+}
+
+// Sold: card to the high bidder, bid minus the fee to the seller. Unsold: card back to the seller.
+async function closeAuction(client, a) {
+    if (a.bidder_id) {
+        await giveCard(client, a.bidder_id, a.card_id);
+        await client.query(`UPDATE users SET nuggets = nuggets + $2 WHERE id = $1`, [a.seller_id, a.bid - Math.floor(a.bid * AUCTION_FEE)]);
+    } else {
+        await giveCard(client, a.seller_id, a.card_id);
+    }
+    await client.query(`UPDATE auctions SET status = $2, settled_at = now() WHERE id = $1`, [a.id, a.bidder_id ? 'sold' : 'expired']);
+}
+
+// Auctions are settled lazily, by whichever request comes first after they end.
+async function settleAuctions(db) {
+    const { rows: due } = await db.query(`SELECT 1 FROM auctions WHERE status = 'open' AND ends_at <= now() LIMIT 1`);
+    if (!due.length) return;
+    await inTransaction(db, async (client) => {
+        const { rows } = await client.query(
+            `SELECT * FROM auctions WHERE status = 'open' AND ends_at <= now() ORDER BY id LIMIT 50 FOR UPDATE SKIP LOCKED`
+        );
+        for (const a of rows) await closeAuction(client, a);
+    });
+}
+
+async function inTransaction(db, fn) {
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await fn(client);
+        await client.query('COMMIT');
+        return result;
+    } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+    } finally {
+        client.release();
+    }
+}
+
+const AUCTION_FIELDS = `a.id, a.start_price, a.buyout, a.bid, a.bids, a.status, a.ends_at, a.created_at,
+    a.seller_id = $1 AS mine, a.bidder_id = $1 AS leading, s.username AS seller,
+    (SELECT MAX(amount) FROM auction_bids b WHERE b.auction_id = a.id AND b.user_id = $1) AS my_bid,
+    COALESCE(uc.count, 0) AS have,
+    json_build_object('id', c.id, 'num', c.num, 'name', c.name, 'sci_name', c.sci_name, 'type', c.type, 'rarity', c.rarity,
+                      'views', c.views, 'thumb_url', c.thumb_url, 'hp', (c.stats->>'hp')::int) AS card`;
+const AUCTION_SORTS = {
+    ending: 'a.ends_at',
+    new: 'a.created_at DESC',
+    cheap: 'COALESCE(a.bid, a.start_price)',
+    rarity: `${RARITY_ORDER} DESC, a.ends_at`,
+};
+const shapeAuction = ({ bid, start_price, ...a }) => ({ ...a, bid, start_price, minBid: minBid({ bid, start_price }) });
+
 const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.image_url, c.thumb_url,
                      c.extract, c.wiki_url, c.iucn, c.stats`;
 
 const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp`;
-const RARITY_ORDER = `CASE c.rarity WHEN 'secret' THEN 5 WHEN 'legendary' THEN 4 WHEN 'epic' THEN 3 WHEN 'rare' THEN 2 WHEN 'uncommon' THEN 1 ELSE 0 END`;
 let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
 // The catalogue builder skips article intros (too many pages to fetch in bulk):
@@ -267,28 +430,29 @@ const actions = {
         return { user: await publicUser(db, rows[0]) };
     },
 
-    async buyBooster(db, body, event) {
-        const user = await requireUser(db, event);
-        const { rows } = await db.query(
-            `UPDATE users SET coins = coins - $2, boosters = boosters + 1
-             WHERE id = $1 AND coins >= $2 RETURNING *`,
-            [user.id, BOOSTER_PRICE]
-        );
-        if (!rows[0]) throw new HttpError(402, 'Pas assez de pièces');
-        return { user: await publicUser(db, rows[0]) };
-    },
-
+    // Pays with a free charge first, then a bonus booster (trophies), then graines if `pay`.
     async openBooster(db, body, event) {
         const user = await requireUser(db, event);
         const pools = await getRarityPools(db);
         const client = await db.connect();
         try {
             await client.query('BEGIN');
-            const { rows: [locked] } = await client.query(
-                `UPDATE users SET boosters = boosters - 1 WHERE id = $1 AND boosters > 0 RETURNING *`,
-                [user.id]
-            );
-            if (!locked) throw new HttpError(402, 'Aucun booster à ouvrir');
+            const { rows: [current] } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+            const now = Date.now();
+            const charge = chargeState(current, now);
+            let update, params, paidWith;
+            if (charge.charges > 0) {
+                // A full gauge starts its 30-minute timer at this opening; otherwise keep the timer running.
+                const since = charge.charges >= MAX_CHARGES ? now : charge.from + charge.ticks * CHARGE_MS;
+                [update, params, paidWith] = [`charges = $2, charges_at = $3`, [charge.charges - 1, new Date(since)], 'charge'];
+            } else if (current.boosters > 0) {
+                [update, params, paidWith] = [`boosters = boosters - 1`, [], 'booster'];
+            } else if (body.pay && current.coins >= BOOSTER_PRICE) {
+                [update, params, paidWith] = [`coins = coins - $2`, [BOOSTER_PRICE], 'coins'];
+            } else {
+                throw new HttpError(402, body.pay ? 'Pas assez de graines' : 'Plus de charge : attends la prochaine ou paie en graines');
+            }
+            const { rows: [locked] } = await client.query(`UPDATE users SET ${update} WHERE id = $1 RETURNING *`, [user.id, ...params]);
 
             const ids = drawBooster(pools);
             const { rows: before } = await client.query(
@@ -314,7 +478,7 @@ const actions = {
                 seen.add(id);
                 return { ...byId[id], isNew };
             });
-            return { cards: pack, user: await publicUser(db, locked) };
+            return { cards: pack, paidWith, user: await publicUser(db, locked) };
         } catch (err) {
             await client.query('ROLLBACK').catch(() => {});
             throw err;
@@ -410,6 +574,164 @@ const actions = {
         return { user: await publicUser(db, updated), ...(await dailyChallenges(db, user.id)) };
     },
 
+    async trophies(db, body, event) {
+        const user = await requireUser(db, event);
+        return { trophies: await trophyList(db, user.id) };
+    },
+
+    async claimTrophy(db, body, event) {
+        const user = await requireUser(db, event);
+        const trophy = (await trophyList(db, user.id)).find((t) => t.key === body.key);
+        if (!trophy) throw new HttpError(404, 'Trophée inconnu');
+        if (trophy.progress < trophy.goal) throw new HttpError(400, 'Trophée pas encore obtenu');
+        const { rowCount } = await db.query(
+            `INSERT INTO trophy_claims (user_id, key) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [user.id, trophy.key]
+        );
+        if (!rowCount) throw new HttpError(409, 'Récompense déjà récupérée');
+        const { rows: [updated] } = await db.query(
+            `UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1 RETURNING *`,
+            [user.id, trophy.coins, trophy.nuggets]
+        );
+        return { user: await publicUser(db, updated), trophies: await trophyList(db, user.id) };
+    },
+
+    async claimAllTrophies(db, body, event) {
+        const user = await requireUser(db, event);
+        const ready = (await trophyList(db, user.id)).filter((t) => !t.claimed && t.progress >= t.goal);
+        const { rows: inserted } = await db.query(
+            `INSERT INTO trophy_claims (user_id, key) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING RETURNING key`,
+            [user.id, ready.map((t) => t.key)]
+        );
+        const won = ready.filter((t) => inserted.some((r) => r.key === t.key));
+        const coins = won.reduce((sum, t) => sum + t.coins, 0);
+        const nuggets = won.reduce((sum, t) => sum + t.nuggets, 0);
+        const { rows: [updated] } = await db.query(
+            `UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1 RETURNING *`, [user.id, coins, nuggets]
+        );
+        return { claimed: won.length, coins, nuggets, user: await publicUser(db, updated), trophies: await trophyList(db, user.id) };
+    },
+
+    // view: market (every open auction) | selling (mine) | bidding (auctions I bid on)
+    async auctions(db, body, event) {
+        const user = await requireUser(db, event);
+        const view = ['selling', 'bidding'].includes(body.view) ? body.view : 'market';
+        const q = String(body.query || '').trim();
+        const where = {
+            market: `a.status = 'open'`,
+            selling: `a.seller_id = $1`,
+            bidding: `EXISTS (SELECT 1 FROM auction_bids b WHERE b.auction_id = a.id AND b.user_id = $1)`,
+        }[view];
+        const order = view === 'market' ? AUCTION_SORTS[body.sort] || AUCTION_SORTS.ending : `a.status <> 'open', a.ends_at DESC`;
+        const { rows } = await db.query(
+            `SELECT ${AUCTION_FIELDS}, COUNT(*) OVER()::int AS matches
+             FROM auctions a JOIN cards c ON c.id = a.card_id JOIN users s ON s.id = a.seller_id
+             LEFT JOIN user_cards uc ON uc.card_id = a.card_id AND uc.user_id = $1
+             WHERE ${where} AND ($2::text IS NULL OR c.type = $2) AND ($3::text IS NULL OR c.rarity = $3)
+               AND ($4 = '' OR c.name ILIKE '%' || $4 || '%' OR c.sci_name ILIKE '%' || $4 || '%')
+             ORDER BY ${order} LIMIT 60 OFFSET $5`,
+            [user.id, body.type || null, body.rarity || null, q, Math.max(Number(body.offset) || 0, 0)]
+        );
+        return {
+            matches: rows[0]?.matches || 0,
+            auctions: rows.map(({ matches, ...a }) => shapeAuction(a)),
+            hours: AUCTION_HOURS, fee: AUCTION_FEE, maxListings: MAX_LISTINGS,
+        };
+    },
+
+    // Duplicates that can be put up for auction (the collection always keeps one copy).
+    async sellable(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows } = await db.query(
+            `SELECT ${LIGHT_FIELDS}, uc.count FROM user_cards uc JOIN cards c ON c.id = uc.card_id
+             WHERE uc.user_id = $1 AND uc.count > 1 ORDER BY ${RARITY_ORDER} DESC, c.views DESC LIMIT 400`,
+            [user.id]
+        );
+        return { cards: rows, hours: AUCTION_HOURS, fee: AUCTION_FEE, recycleValue: RECYCLE_VALUE };
+    },
+
+    async createAuction(db, body, event) {
+        const user = await requireUser(db, event);
+        const start = Number(body.startPrice);
+        const buyout = body.buyout ? Number(body.buyout) : null;
+        const hours = Number(body.hours);
+        if (!Number.isInteger(start) || start < 1 || start > MAX_PRICE) throw new HttpError(400, 'Mise de départ invalide');
+        if (buyout != null && (!Number.isInteger(buyout) || buyout <= start || buyout > MAX_PRICE)) {
+            throw new HttpError(400, 'Le prix d\'achat immédiat doit dépasser la mise de départ');
+        }
+        if (!AUCTION_HOURS.includes(hours)) throw new HttpError(400, 'Durée invalide');
+        return inTransaction(db, async (client) => {
+            await client.query(`SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+            const { rows: [{ open }] } = await client.query(
+                `SELECT COUNT(*)::int AS open FROM auctions WHERE seller_id = $1 AND status = 'open'`, [user.id]
+            );
+            if (open >= MAX_LISTINGS) throw new HttpError(429, `${MAX_LISTINGS} ventes en cours au maximum`);
+            const { rowCount } = await client.query(
+                `UPDATE user_cards SET count = count - 1 WHERE user_id = $1 AND card_id = $2 AND count > 1`,
+                [user.id, Number(body.cardId)]
+            );
+            if (!rowCount) throw new HttpError(400, 'Tu ne peux vendre que tes doublons');
+            const { rows: [auction] } = await client.query(
+                `INSERT INTO auctions (seller_id, card_id, start_price, buyout, ends_at)
+                 VALUES ($1, $2, $3, $4, now() + make_interval(hours => $5)) RETURNING id`,
+                [user.id, Number(body.cardId), start, buyout, hours]
+            );
+            return { id: auction.id };
+        });
+    },
+
+    // Bidding debits the bid right away and refunds whoever is outbid. Reaching the buy-now
+    // price (or calling with `buyNow`) closes the auction at once.
+    async bid(db, body, event) {
+        const user = await requireUser(db, event);
+        const sold = await inTransaction(db, async (client) => {
+            const { rows: [a] } = await client.query(`SELECT * FROM auctions WHERE id = $1 FOR UPDATE`, [Number(body.id)]);
+            if (!a) throw new HttpError(404, 'Enchère introuvable');
+            if (a.status !== 'open' || new Date(a.ends_at) <= new Date()) throw new HttpError(409, 'Cette enchère est terminée');
+            if (a.seller_id === user.id) throw new HttpError(400, 'Tu ne peux pas enchérir sur ta propre vente');
+            let amount = body.buyNow ? a.buyout : Number(body.amount);
+            if (!Number.isInteger(amount)) throw new HttpError(400, body.buyNow ? 'Pas d\'achat immédiat sur cette vente' : 'Montant invalide');
+            const buyNow = a.buyout != null && amount >= a.buyout;
+            if (buyNow) amount = a.buyout;
+            else if (amount < minBid(a)) throw new HttpError(400, `Offre minimum : ${minBid(a)} pépites`);
+            if (amount > MAX_PRICE) throw new HttpError(400, 'Montant trop élevé');
+
+            const own = a.bidder_id === user.id ? a.bid : 0; // raising my own bid only costs the difference
+            const { rows: [me] } = await client.query(
+                `UPDATE users SET nuggets = nuggets - $2 WHERE id = $1 AND nuggets >= $2 RETURNING id`, [user.id, amount - own]
+            );
+            if (!me) throw new HttpError(402, 'Pas assez de pépites');
+            if (a.bidder_id && a.bidder_id !== user.id) {
+                await client.query(`UPDATE users SET nuggets = nuggets + $2 WHERE id = $1`, [a.bidder_id, a.bid]);
+            }
+            await client.query(`INSERT INTO auction_bids (auction_id, user_id, amount) VALUES ($1, $2, $3)`, [a.id, user.id, amount]);
+            // A late bid pushes the end back to 2 minutes so nobody wins by sniping.
+            const { rows: [updated] } = await client.query(
+                `UPDATE auctions SET bid = $2, bidder_id = $3, bids = bids + 1,
+                        ends_at = GREATEST(ends_at, now() + interval '2 minutes')
+                 WHERE id = $1 RETURNING *`,
+                [a.id, amount, user.id]
+            );
+            if (buyNow) await closeAuction(client, updated);
+            return buyNow;
+        });
+        const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
+        return { sold, user: await publicUser(db, fresh) };
+    },
+
+    async cancelAuction(db, body, event) {
+        const user = await requireUser(db, event);
+        await inTransaction(db, async (client) => {
+            const { rows: [a] } = await client.query(
+                `SELECT * FROM auctions WHERE id = $1 AND seller_id = $2 FOR UPDATE`, [Number(body.id), user.id]
+            );
+            if (!a || a.status !== 'open') throw new HttpError(404, 'Vente introuvable ou terminée');
+            if (a.bidder_id) throw new HttpError(409, 'Impossible d\'annuler : il y a déjà une offre');
+            await giveCard(client, user.id, a.card_id);
+            await client.query(`UPDATE auctions SET status = 'cancelled', settled_at = now() WHERE id = $1`, [a.id]);
+        });
+        return { ok: true };
+    },
+
     async recycle(db, body, event) {
         const user = await requireUser(db, event);
         const cardId = body.cardId ? Number(body.cardId) : null; // null = every duplicate
@@ -427,13 +749,13 @@ const actions = {
                 [user.id, cardId]
             );
             const recycled = rows.reduce((sum, r) => sum + r.extra, 0);
-            const coins = rows.reduce((sum, r) => sum + r.extra * RECYCLE_VALUE[r.rarity], 0);
+            const nuggets = rows.reduce((sum, r) => sum + r.extra * RECYCLE_VALUE[r.rarity], 0);
             const { rows: [updated] } = await client.query(
-                `UPDATE users SET coins = coins + $2 WHERE id = $1 RETURNING *`,
-                [user.id, coins]
+                `UPDATE users SET nuggets = nuggets + $2, recycled = recycled + $3 WHERE id = $1 RETURNING *`,
+                [user.id, nuggets, recycled]
             );
             await client.query('COMMIT');
-            return { recycled, coins, user: await publicUser(db, updated) };
+            return { recycled, nuggets, user: await publicUser(db, updated) };
         } catch (err) {
             await client.query('ROLLBACK').catch(() => {});
             throw err;
@@ -442,6 +764,8 @@ const actions = {
         }
     },
 };
+
+const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout']);
 
 export const handler = async (event) => {
     if (event.requestContext?.http?.method === 'OPTIONS') {
@@ -452,6 +776,7 @@ export const handler = async (event) => {
         const body = JSON.parse(event.body || '{}');
         const fn = actions[body.action];
         if (!fn) return json({ error: 'Unknown action', available: Object.keys(actions) }, 400);
+        if (!PUBLIC_ACTIONS.has(body.action)) await settleAuctions(getPool());
         return json(await fn(getPool(), body, event));
     } catch (error) {
         if (error instanceof HttpError) return json({ error: error.message }, error.status);

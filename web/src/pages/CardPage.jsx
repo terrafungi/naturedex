@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Eye, Recycle, Ruler, Weight } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Eye, Gavel, Recycle, Ruler, Weight } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
 import { IUCN, RARITIES, TYPES, formatViews } from '../game.jsx';
@@ -94,8 +94,13 @@ export default function CardPage() {
                         <span className="font-display text-lg">Tu possèdes <b>{card.count}</b> exemplaire{card.count > 1 ? 's' : ''}</span>
                         {card.count > 1 && (
                             <button onClick={recycle} className="flex items-center gap-2 px-4 py-2 rounded-full nd-btn text-sm font-semibold">
-                                <Recycle className="w-4 h-4" />Recycler {card.count - 1} doublon{card.count > 2 ? 's' : ''} · +{recycleCoins} pièces
+                                <Recycle className="w-4 h-4" />Recycler {card.count - 1} doublon{card.count > 2 ? 's' : ''} · +{recycleCoins} pépites
                             </button>
+                        )}
+                        {card.count > 1 && (
+                            <Link to={`/encheres?vendre=${card.id}`} className="nd-cta-gold flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold">
+                                <Gavel className="w-4 h-4" />Vendre aux enchères
+                            </Link>
                         )}
                     </div>
                 </div>

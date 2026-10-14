@@ -70,7 +70,7 @@ export default function Collection() {
         const res = await api('recycle');
         setUser(res.user);
         await refreshCollection();
-        setMessage(`${res.recycled} doublon${res.recycled > 1 ? 's' : ''} recyclé${res.recycled > 1 ? 's' : ''} : +${res.coins} pièces`);
+        setMessage(`${res.recycled} doublon${res.recycled > 1 ? 's' : ''} recyclé${res.recycled > 1 ? 's' : ''} : +${res.nuggets} pépites`);
     }
 
     if (!catalog) return <div className="py-32 text-center font-display text-xl text-ink-soft">Chargement…</div>;
@@ -86,7 +86,7 @@ export default function Collection() {
                 </div>
                 {duplicates.count > 0 && (
                     <button onClick={recycleAll} className="flex items-center gap-2 px-4 py-2.5 rounded-full nd-btn text-sm font-semibold">
-                        <Recycle className="w-4 h-4" /> Recycler {duplicates.count} doublon{duplicates.count > 1 ? 's' : ''} · +{duplicates.coins} pièces
+                        <Recycle className="w-4 h-4" /> Recycler {duplicates.count} doublon{duplicates.count > 1 ? 's' : ''} · +{duplicates.coins} pépites
                     </button>
                 )}
             </div>

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Coins, Layers, LogOut, Package } from 'lucide-react';
+import { Award, Gavel, Layers, LogOut, Package } from 'lucide-react';
 import { useGame } from '../api.jsx';
 import { LeafLogo } from '../components/Layout.jsx';
 import { RARITIES } from '../game.jsx';
@@ -17,8 +17,8 @@ export default function Profile() {
     const stats = [
         ['Espèces', discovered.toLocaleString('fr-FR')],
         ['Cartes', copies.toLocaleString('fr-FR')],
-        ['Pièces', user.coins.toLocaleString('fr-FR')],
-        ['Boosters', user.boosters],
+        ['Graines', user.coins.toLocaleString('fr-FR')],
+        ['Pépites', user.nuggets.toLocaleString('fr-FR')],
     ];
 
     return (
@@ -57,7 +57,9 @@ export default function Profile() {
 
             <div className="mt-6 flex flex-wrap gap-3">
                 <Link to="/collection" className="nd-cta-glass inline-flex items-center gap-2 px-5 py-3 rounded-full font-semibold text-white"><Layers className="w-5 h-5 text-[#a8f0c6]" />Ma collection</Link>
-                <Link to="/booster" className="nd-cta-glass inline-flex items-center gap-2 px-5 py-3 rounded-full font-semibold text-white"><Package className="w-5 h-5 text-[#f4d88f]" />Boosters<Coins className="w-4 h-4 text-[#f4d88f]" /></Link>
+                <Link to="/booster" className="nd-cta-glass inline-flex items-center gap-2 px-5 py-3 rounded-full font-semibold text-white"><Package className="w-5 h-5 text-[#f4d88f]" />Boosters</Link>
+                <Link to="/trophees" className="nd-cta-glass inline-flex items-center gap-2 px-5 py-3 rounded-full font-semibold text-white"><Award className="w-5 h-5 text-[#f4d88f]" />Trophées</Link>
+                <Link to="/encheres" className="nd-cta-glass inline-flex items-center gap-2 px-5 py-3 rounded-full font-semibold text-white"><Gavel className="w-5 h-5 text-[#f4d88f]" />Enchères</Link>
                 <button onClick={logout} className="inline-flex items-center gap-2 px-5 py-3 rounded-full font-semibold text-white/70 hover:text-white hover:bg-white/5"><LogOut className="w-5 h-5" />Se déconnecter</button>
             </div>
         </div>

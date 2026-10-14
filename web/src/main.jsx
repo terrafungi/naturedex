@@ -11,6 +11,8 @@ import Collection from './pages/Collection.jsx';
 import CardPage from './pages/CardPage.jsx';
 import Challenges from './pages/Challenges.jsx';
 import Profile from './pages/Profile.jsx';
+import Trophies from './pages/Trophies.jsx';
+import Auctions from './pages/Auctions.jsx';
 
 function Private({ children }) {
     const { user, ready } = useGame();
@@ -28,6 +30,8 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/connexion" element={<Auth />} />
                         <Route path="/booster" element={<Private><Boosters /></Private>} />
                         <Route path="/defis" element={<Private><Challenges /></Private>} />
+                        <Route path="/trophees" element={<Private><Trophies /></Private>} />
+                        <Route path="/encheres" element={<Private><Auctions /></Private>} />
                         <Route path="/profil" element={<Private><Profile /></Private>} />
                         <Route path="/collection" element={<Private><Collection /></Private>} />
                         <Route path="/carte/:id" element={<Private><CardPage /></Private>} />

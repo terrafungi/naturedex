@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Package } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
-import { ChallengeCard, GoldLeaf } from '../components/Challenge.jsx';
+import { ChallengeCard } from '../components/Challenge.jsx';
+import { Amount } from '../components/Currency.jsx';
 
 export default function Challenges() {
     const { setUser } = useGame();
@@ -35,7 +36,7 @@ export default function Challenges() {
             <h1 className="mt-1 font-display text-4xl sm:text-5xl font-medium text-white">Défis du jour</h1>
             <p className="mt-3 text-ink-soft max-w-xl">
                 Quatre nouveaux défis chaque jour à minuit. Ils avancent avec les cartes que tu tires dans tes boosters.
-                {left > 0 && <> Encore <b className="inline-flex items-center gap-1 text-[#f4d88f]"><GoldLeaf />{left} pièces</b> à gagner aujourd'hui.</>}
+                {left > 0 && <> Encore <Amount seeds={left} /> graines à gagner aujourd'hui.</>}
             </p>
             {error && <p className="mt-4 text-sm font-semibold text-[#ffb4a2]">{error}</p>}
             {!data ? (

@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Coins, Home, Layers, LogIn, LogOut, Menu, Package, Trophy, User, X } from 'lucide-react';
+import { Award, Gavel, Home, Layers, LogIn, LogOut, Menu, Package, Trophy, User, X } from 'lucide-react';
+import { Nugget, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
 export const NAV = [
     { to: '/', label: 'Accueil', Icon: Home, end: true },
     { to: '/collection', label: 'Collection', Icon: Layers },
     { to: '/booster', label: 'Booster', Icon: Package },
+    { to: '/encheres', label: 'Enchères', Icon: Gavel },
     { to: '/defis', label: 'Défis', Icon: Trophy },
+    { to: '/trophees', label: 'Trophées', Icon: Award },
     { to: '/profil', label: 'Profil', Icon: User },
 ];
+// The mobile tab bar has room for five: home and profile stay in the menu.
+const TABS = NAV.filter(({ to }) => !['/', '/profil'].includes(to));
 
 export function LeafLogo({ className = 'w-9 h-9' }) {
     return (
@@ -43,11 +48,17 @@ function Brand() {
 
 const fmt = (n) => Number(n).toLocaleString('fr-FR');
 
-function CoinPill({ coins }) {
+function Wallet({ user }) {
     return (
-        <Link to="/booster" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#e9c46a]/10 ring-1 ring-[#e9c46a]/30 font-bold text-[#f4d88f] text-sm" title="Pièces">
-            <Coins className="w-4 h-4" />{fmt(coins)}
-        </Link>
+        <div className="flex items-center rounded-full bg-white/[0.06] ring-1 ring-white/12 text-sm font-bold tabular-nums">
+            <Link to="/booster" className="flex items-center gap-1 pl-2.5 pr-2 py-1.5 text-[#8ee6a8]" title="Graines : pour ouvrir des boosters">
+                <Seed />{fmt(user.coins)}
+            </Link>
+            <span className="w-px h-4 bg-white/15" />
+            <Link to="/encheres" className="flex items-center gap-1 pl-2 pr-2.5 py-1.5 text-[#f4c25b]" title="Pépites : pour les enchères">
+                <Nugget />{fmt(user.nuggets)}
+            </Link>
+        </div>
     );
 }
 function MenuSheet({ onClose }) {
@@ -64,7 +75,8 @@ function MenuSheet({ onClose }) {
                 {user && (
                     <div className="mb-4 rounded-2xl nd-glass p-4">
                         <div className="font-display text-xl text-white">{user.username}</div>
-                        <div className="mt-1 flex items-center gap-1.5 text-sm text-[#f4d88f]"><Coins className="w-4 h-4" />{fmt(user.coins)} pièces</div>
+                        <div className="mt-1 flex items-center gap-1.5 text-sm text-[#8ee6a8]"><Seed />{fmt(user.coins)} graines</div>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-sm text-[#f4c25b]"><Nugget />{fmt(user.nuggets)} pépites</div>
                     </div>
                 )}
                 {NAV.map(({ to, label, Icon, end }) => (
@@ -91,9 +103,9 @@ function MenuSheet({ onClose }) {
 
 function TabBar() {
     return (
-        <nav className="nd-tabbar fixed inset-x-0 bottom-0 z-40 md:hidden">
+        <nav className="nd-tabbar fixed inset-x-0 bottom-0 z-40 lg:hidden">
             <div className="grid grid-cols-5 px-2 pt-2 pb-2">
-                {NAV.map(({ to, label, Icon, end }) => (
+                {TABS.map(({ to, label, Icon, end }) => (
                     <NavLink key={to} to={to} end={end}
                         className={({ isActive }) => `flex flex-col items-center gap-1 py-2 rounded-2xl text-[11px] font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/55'}`}>
                         <Icon className="w-5 h-5" strokeWidth={1.8} />{label}
@@ -116,24 +128,24 @@ export default function Layout() {
             <header className={`${home ? 'absolute' : 'sticky bg-[#05130d]/75 backdrop-blur-xl border-b border-white/[0.07]'} top-0 inset-x-0 z-40`}>
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-3">
                     <Brand />
-                    <nav className="hidden md:flex items-center gap-1">
+                    <nav className="hidden lg:flex items-center gap-0.5">
                         {NAV.map(({ to, label, end }) => (
                             <NavLink key={to} to={to} end={end}
-                                className={({ isActive }) => `px-3.5 py-2 rounded-full text-sm font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6] ring-1 ring-[#4fd18b]/25' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
+                                className={({ isActive }) => `px-3 py-2 rounded-full text-sm font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6] ring-1 ring-[#4fd18b]/25' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
                                 {label}
                             </NavLink>
                         ))}
                     </nav>
-                    {user && <CoinPill coins={user.coins} />}
+                    {user && <Wallet user={user} />}
                     <button onClick={() => setMenu(true)} className="grid place-items-center w-11 h-11 rounded-full nd-cta-glass shrink-0" aria-label="Ouvrir le menu">
                         <Menu className="w-5 h-5 text-white" />
                     </button>
                 </div>
             </header>
-            <main className="flex-1 pb-24 md:pb-0">
+            <main className="flex-1 pb-24 lg:pb-0">
                 <Outlet />
             </main>
-            <footer className="border-t border-white/[0.07] px-4 pt-6 pb-28 md:pb-6 text-center text-xs text-ink-soft">
+            <footer className="border-t border-white/[0.07] px-4 pt-6 pb-28 lg:pb-6 text-center text-xs text-ink-soft">
                 NatureDex · Images et textes : <a className="underline hover:text-white" href="https://fr.wikipedia.org" target="_blank" rel="noreferrer">Wikipédia</a> & Wikimedia Commons (licences libres) · Données : Wikidata
             </footer>
             <TabBar />

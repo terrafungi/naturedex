@@ -58,7 +58,7 @@ export default function Auth() {
                 </label>
                 {error && <p className="text-sm font-semibold text-rust">{error}</p>}
                 <button disabled={busy} className="w-full py-3.5 rounded-full nd-btn font-semibold disabled:opacity-60">
-                    {busy ? '…' : mode === 'register' ? 'Créer mon compte — 3 boosters offerts' : 'Se connecter'}
+                    {busy ? '…' : mode === 'register' ? 'Créer mon compte — 10 boosters gratuits' : 'Se connecter'}
                 </button>
             </form>
         </div>

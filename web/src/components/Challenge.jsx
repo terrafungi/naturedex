@@ -1,3 +1,4 @@
+import { Seed } from './Currency.jsx';
 import { Bird, Bone, Bug, Check, Compass, Droplet, Gem, Leaf, PawPrint, Sparkles, Sun } from 'lucide-react';
 
 const ICONS = {
@@ -49,7 +50,7 @@ export function ChallengeCard({ challenge: c, onClaim, busy }) {
                     <span className="text-xs font-semibold tabular-nums text-white/70">{c.progress}/{c.goal}</span>
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 font-bold text-sm text-[#f4d88f]"><GoldLeaf />+{c.reward}</span>
+                    <span className="flex items-center gap-1.5 font-bold text-sm text-[#8ee6a8]"><Seed />+{c.reward}</span>
                     {onClaim && (c.claimed ? (
                         <span className="flex items-center gap-1 text-xs font-semibold text-[#a8f0c6]"><Check className="w-4 h-4" />Récupéré</span>
                     ) : done ? (
