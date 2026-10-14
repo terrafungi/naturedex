@@ -236,3 +236,28 @@ CREATE TABLE IF NOT EXISTS battles (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS battles_one_active ON battles (user_id) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS battles_user_ended ON battles (user_id, ended_at DESC);
+
+-- Daily battle cap: battles started beyond the free ones are paid in nuggets.
+ALTER TABLE battles ADD COLUMN IF NOT EXISTS paid BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS battles_user_created ON battles (user_id, created_at DESC);
+
+-- Monthly arena seasons (YYYY-MM, Paris time). The rollover ranks everyone, stores the
+-- rewards to claim, then resets ratings.
+CREATE TABLE IF NOT EXISTS arena_season (
+    id      INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    current TEXT NOT NULL
+);
+INSERT INTO arena_season (id, current) VALUES (1, to_char(now() AT TIME ZONE 'Europe/Paris', 'YYYY-MM')) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS season_results (
+    season     TEXT NOT NULL,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rank       INTEGER NOT NULL,
+    rating     INTEGER NOT NULL,
+    wins       INTEGER NOT NULL,
+    losses     INTEGER NOT NULL,
+    coins      INTEGER NOT NULL,
+    nuggets    INTEGER NOT NULL,
+    claimed_at TIMESTAMPTZ,
+    PRIMARY KEY (season, user_id)
+);
+CREATE INDEX IF NOT EXISTS season_results_user ON season_results (user_id) WHERE claimed_at IS NULL;

@@ -8,6 +8,51 @@ import { ABILITIES, RULES, STRONG, TEAM_SIZE, battleStats, newBattle, playRound,
 export const DAILY_REWARDS = 5; // rewarded wins per day (ranked + campaign replays)
 export const WIN_COINS = 30; // ranked win
 export const REPLAY_COINS = 15; // cleared campaign stage won again
+export const DAILY_BATTLES = 10; // free battle starts per day, all modes
+export const EXTRA_BATTLES = 5; // extra starts per day, paid in nuggets
+export const EXTRA_BATTLE_NUGGETS = 15;
+// Monthly season: final rank → reward. Only players with enough ranked games are ranked.
+export const SEASON_MIN_GAMES = 5;
+export const SEASON_REWARDS = [
+    { upTo: 1, coins: 3000, nuggets: 500 },
+    { upTo: 2, coins: 2000, nuggets: 300 },
+    { upTo: 3, coins: 1500, nuggets: 200 },
+    { upTo: 10, coins: 800, nuggets: 100 },
+    { upTo: 50, coins: 400, nuggets: 50 },
+    { upTo: 100, coins: 200, nuggets: 20 },
+    { upTo: null, coins: 100, nuggets: 0 },
+];
+// Ranked tiers also need the starting rating, so a lone loser is not « 1st » of a quiet month.
+export const SEASON_MIN_RATING = 1000;
+const seasonReward = (rank, rating) => SEASON_REWARDS.find((r) => r.upTo == null || (rating >= SEASON_MIN_RATING && rank <= r.upTo));
+const PARIS_MONTH = `to_char(now() AT TIME ZONE 'Europe/Paris', 'YYYY-MM')`;
+const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+export const seasonLabel = (id) => { const [y, m] = id.split('-'); return `${MONTHS[Number(m) - 1]} ${y}`; };
+
+/**
+ * Closes the past season once the Paris month has changed: ranks the players, stores
+ * their rewards (claimed from the combat page) and resets every rating. Idempotent.
+ */
+export async function seasonRollover(db, inTransaction) {
+    const { rows: [s] } = await db.query(`SELECT current, ${PARIS_MONTH} AS now FROM arena_season WHERE id = 1`);
+    if (!s || s.current === s.now) return false;
+    return inTransaction(db, async (client) => {
+        const { rows: [locked] } = await client.query(`SELECT current FROM arena_season WHERE id = 1 FOR UPDATE`);
+        if (locked.current === s.now) return false;
+        const { rows } = await client.query(
+            `SELECT a.user_id, a.rating, a.wins, a.losses, ROW_NUMBER() OVER (ORDER BY a.rating DESC, a.wins DESC, a.updated_at, a.user_id)::int AS rank
+             FROM arena a WHERE a.wins + a.losses >= $1`, [SEASON_MIN_GAMES]);
+        for (const r of rows) {
+            const rw = seasonReward(r.rank, r.rating);
+            await client.query(
+                `INSERT INTO season_results (season, user_id, rank, rating, wins, losses, coins, nuggets) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 ON CONFLICT DO NOTHING`, [locked.current, r.user_id, r.rank, r.rating, r.wins, r.losses, rw.coins, rw.nuggets]);
+        }
+        await client.query(`UPDATE arena SET rating = 1000, wins = 0, losses = 0 WHERE rating <> 1000 OR wins + losses > 0`);
+        await client.query(`UPDATE arena_season SET current = $1 WHERE id = 1`, [s.now]);
+        return true;
+    });
+}
 const ELO_K = 32;
 const MIN_RATING = 100;
 
@@ -101,6 +146,32 @@ export function arenaActions({ requireUser, inTransaction, HttpError, publicUser
         return Math.max(0, DAILY_REWARDS - n);
     }
 
+    // Battles started today (Paris), free and paid.
+    async function battlesToday(db, userId) {
+        const { rows: [r] } = await db.query(
+            `SELECT COUNT(*) FILTER (WHERE NOT paid)::int AS free, COUNT(*) FILTER (WHERE paid)::int AS paid FROM battles
+             WHERE user_id = $1 AND (created_at AT TIME ZONE 'Europe/Paris')::date = (now() AT TIME ZONE 'Europe/Paris')::date`, [userId]);
+        return { battlesLeft: Math.max(0, DAILY_BATTLES - r.free), extraLeft: Math.max(0, EXTRA_BATTLES - r.paid) };
+    }
+
+    async function seasonInfo(db, userId, a, rank) {
+        const [{ rows: [s] }, { rows: pending }, { rows: last }] = await Promise.all([
+            db.query(`SELECT current, (date_trunc('month', now() AT TIME ZONE 'Europe/Paris') + interval '1 month') AT TIME ZONE 'Europe/Paris' AS ends_at
+                      FROM arena_season WHERE id = 1`),
+            db.query(`SELECT season, rank, rating, wins, losses, coins, nuggets FROM season_results WHERE user_id = $1 AND claimed_at IS NULL ORDER BY season`, [userId]),
+            db.query(`SELECT r.rank, r.rating, u.username FROM season_results r JOIN users u ON u.id = r.user_id
+                      WHERE r.season = (SELECT MAX(season) FROM season_results) AND r.rank <= 3 ORDER BY r.rank`),
+        ]);
+        const games = a.wins + a.losses;
+        return {
+            id: s.current, label: seasonLabel(s.current), endsAt: s.ends_at, minGames: SEASON_MIN_GAMES, games,
+            projected: games >= SEASON_MIN_GAMES ? { rank, ...seasonReward(rank, a.rating) } : null, minRating: SEASON_MIN_RATING,
+            rewards: SEASON_REWARDS,
+            pending: pending.map((p) => ({ ...p, label: seasonLabel(p.season) })),
+            podium: last,
+        };
+    }
+
     function shapeBattle(b) {
         return {
             id: Number(b.id), mode: b.mode, stage: b.stage, status: b.status,
@@ -166,17 +237,20 @@ export function arenaActions({ requireUser, inTransaction, HttpError, publicUser
         // Everything the combat page needs.
         async arena(db, body, event) {
             const user = await requireUser(db, event);
+            await seasonRollover(db, inTransaction);
             const a = await arenaRow(db, user.id);
-            const [team, stages, left, active, day, { rows: history }, { rows: [rank] }] = await Promise.all([
+            const [team, stages, left, active, day, today, { rows: history }, { rows: [rank] }] = await Promise.all([
                 teamCards(db, user.id, a.team),
                 stageTeams(db),
                 rewardsLeft(db, user.id),
                 loadBattle(db, user.id),
                 parisDay(db),
+                battlesToday(db, user.id),
                 db.query(`SELECT id, mode, stage, opponent_name, status, reward, rating_delta, ended_at FROM battles
                           WHERE user_id = $1 AND status <> 'active' ORDER BY id DESC LIMIT 8`, [user.id]),
-                db.query(`SELECT COUNT(*)::int + 1 AS rank FROM arena WHERE rating > $1 AND wins + losses > 0`, [a.rating]),
+                db.query(`SELECT COUNT(*)::int + 1 AS rank FROM arena WHERE rating > $1 AND wins + losses >= $2`, [a.rating, SEASON_MIN_GAMES]),
             ]);
+            const season = await seasonInfo(db, user.id, a, rank.rank);
             const [players, bots, { rows: friends }] = await Promise.all([
                 opponents(db, user, a.rating), rangers(db, a.rating, day),
                 db.query(`SELECT u.username, a.rating, array_length(a.team, 1) = ${TEAM_SIZE} AS ready FROM friendships f
@@ -189,6 +263,8 @@ export function arenaActions({ requireUser, inTransaction, HttpError, publicUser
                 team: team.map(shapeCard),
                 rating: a.rating, wins: a.wins, losses: a.losses, rank: a.wins + a.losses ? rank.rank : null, campaign: a.campaign,
                 rewardsLeft: left, dailyRewards: DAILY_REWARDS, winCoins: WIN_COINS, replayCoins: REPLAY_COINS,
+                ...today, dailyBattles: DAILY_BATTLES, extraBattles: EXTRA_BATTLES, extraPrice: EXTRA_BATTLE_NUGGETS,
+                season,
                 active: active && { id: Number(active.id), mode: active.mode, opponent: active.opponent_name, round: active.state.round },
                 stages: STAGES.map((s, i) => ({
                     n: i + 1, name: s.name, text: s.text, ai: s.ai, boss: !!s.boss, coins: s.coins, nuggets: s.nuggets || 0,
@@ -253,15 +329,41 @@ export function arenaActions({ requireUser, inTransaction, HttpError, publicUser
 
             const state = newBattle(mine, foe.cards, { ai: foe.ai, names: [user.username, foe.name] });
             try {
-                const { rows: [b] } = await db.query(
-                    `INSERT INTO battles (user_id, mode, stage, opponent_id, opponent_name, opponent_rating, state)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-                    [user.id, opts.mode, opts.stage || null, foe.id || null, foe.name, foe.rating ?? null, state]);
-                return { battle: shapeBattle(b) };
+                return await inTransaction(db, async (client) => {
+                    // one start at a time per player, so the daily count cannot be raced
+                    const { rows: [u] } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+                    const { battlesLeft, extraLeft } = await battlesToday(client, user.id);
+                    const paid = battlesLeft === 0;
+                    if (paid && extraLeft === 0) throw new HttpError(429, `Tu as joué tous tes combats du jour. Reviens demain !`);
+                    if (paid && !body.pay) throw new HttpError(402, `Tes ${DAILY_BATTLES} combats gratuits du jour sont joués. Combat supplémentaire : ${EXTRA_BATTLE_NUGGETS} pépites.`);
+                    if (paid && u.nuggets < EXTRA_BATTLE_NUGGETS) throw new HttpError(402, `Il te faut ${EXTRA_BATTLE_NUGGETS} pépites pour un combat supplémentaire.`);
+                    let updated = u;
+                    if (paid) {
+                        ({ rows: [updated] } = await client.query(`UPDATE users SET nuggets = nuggets - $2 WHERE id = $1 RETURNING *`, [user.id, EXTRA_BATTLE_NUGGETS]));
+                    }
+                    const { rows: [b] } = await client.query(
+                        `INSERT INTO battles (user_id, mode, stage, opponent_id, opponent_name, opponent_rating, state, paid)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+                        [user.id, opts.mode, opts.stage || null, foe.id || null, foe.name, foe.rating ?? null, state, paid]);
+                    return { battle: shapeBattle(b), ...(paid ? { user: await publicUser(client, updated) } : {}) };
+                });
             } catch (err) {
                 if (err.code === '23505') throw new HttpError(409, 'Un combat est déjà en cours : termine-le ou abandonne-le');
                 throw err;
             }
+        },
+
+        async seasonClaim(db, body, event) {
+            const user = await requireUser(db, event);
+            return inTransaction(db, async (client) => {
+                const { rows: [r] } = await client.query(
+                    `UPDATE season_results SET claimed_at = now() WHERE user_id = $1 AND season = $2 AND claimed_at IS NULL RETURNING coins, nuggets`,
+                    [user.id, String(body.season || '')]);
+                if (!r) throw new HttpError(409, 'Récompense déjà récupérée');
+                const { rows: [u] } = await client.query(
+                    `UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1 RETURNING *`, [user.id, r.coins, r.nuggets]);
+                return { coins: r.coins, nuggets: r.nuggets, user: await publicUser(client, u) };
+            });
         },
 
         async battle(db, body, event) {

@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
-    BookOpen, Check, ChevronRight, Crown, Flag, Lock, Map as MapIcon, Search, Shield, Skull, Swords, Trophy, Users, Wind, X, Zap,
+    BookOpen, CalendarClock, Check, ChevronRight, Crown, Gift, Medal, Flag, Lock, Map as MapIcon, Search, Shield, Skull, Swords, Trophy, Users, Wind, X, Zap,
 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Amount } from '../components/Currency.jsx';
+import { useCountdown } from './Boosters.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
 import { ABILITIES, AbilityLine, Avatar, MultTag, PROFILES, RarityDot, STRONG, Stats, TypeChip, WEAK_TO, matchup } from '../components/Fighter.jsx';
 
@@ -124,14 +125,59 @@ function Opponent({ name, rating, team, mine, onFight, busy, sub }) {
     );
 }
 
+function Season({ season }) {
+    const left = useCountdown(season.endsAt);
+    const days = Math.ceil((new Date(season.endsAt) - Date.now()) / 864e5);
+    const p = season.projected;
+    const tier = (r, i) => {
+        const prev = season.rewards[i - 1]?.upTo;
+        return r.upTo == null ? 'Les autres' : r.upTo === 1 ? '1er' : prev === r.upTo - 1 ? `${r.upTo}e` : `${(prev || 0) + 1}e – ${r.upTo}e`;
+    };
+    return (
+        <section className="p-4 sm:p-5 rounded-3xl border border-[#e9c46a]/30 bg-gradient-to-br from-[#e9c46a]/[0.10] to-transparent">
+            <div className="flex flex-wrap items-start gap-3">
+                <Medal className="w-8 h-8 text-[#f4d88f]" />
+                <div className="flex-1 min-w-48">
+                    <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-brass-deep">Saison en cours</p>
+                    <h3 className="font-display text-2xl font-semibold capitalize">{season.label}</h3>
+                    <p className="text-sm text-ink-soft flex items-center gap-1.5"><CalendarClock className="w-4 h-4" />
+                        Fin dans {days > 1 ? `${days} jours` : left || 'quelques instants'} · ensuite toutes les cotes repartent à 1000.</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-black/25 text-sm min-w-52">
+                    {p ? (
+                        <>
+                            <p className="text-xs text-ink-soft">Si la saison finissait maintenant</p>
+                            <p className="font-bold">{p.upTo == null ? 'Participation' : `${p.rank}e place`}</p>
+                            <Reward coins={p.coins} nuggets={p.nuggets} sign />
+                        </>
+                    ) : <p className="text-xs text-white/70">Joue encore <b className="text-white">{season.minGames - season.games}</b> combat{season.minGames - season.games > 1 ? 's' : ''} classé{season.minGames - season.games > 1 ? 's' : ''} pour être classé cette saison.</p>}
+                </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                {season.rewards.map((r, i) => (
+                    <div key={i} className={`p-2 rounded-xl text-center text-xs ${p && p.upTo === r.upTo ? 'bg-[#e9c46a]/25 ring-1 ring-[#e9c46a]' : 'bg-white/[0.05]'}`}>
+                        <p className="font-bold">{tier(r, i)}</p>
+                        <Reward coins={r.coins} nuggets={r.nuggets} />
+                    </div>
+                ))}
+            </div>
+            <p className="mt-2 text-[11px] text-white/50">Classement final : au moins {season.minGames} combats classés. Les places récompensées demandent une cote d'au moins {season.minRating}.</p>
+            {season.podium.length > 0 && (
+                <p className="mt-2 text-xs text-white/70">Podium de la saison passée : {season.podium.map((x) => `${x.rank}. ${x.username} (${x.rating})`).join(' · ')}</p>
+            )}
+        </section>
+    );
+}
+
 function Arena({ data, start, busy }) {
     return (
         <div className="space-y-6">
+            <Season season={data.season} />
             <div className="grid sm:grid-cols-3 gap-3">
                 <div className="p-4 rounded-3xl nd-glass">
                     <p className="text-xs text-ink-soft">Ta cote</p>
                     <p className="font-display text-3xl font-bold">{data.rating}</p>
-                    <p className="text-xs text-white/60">{data.rank ? `${data.rank}e au classement` : 'Pas encore classé'}</p>
+                    <p className="text-xs text-white/60">{data.season.projected ? `${data.rank}e de la saison` : 'Pas encore classé'}</p>
                 </div>
                 <div className="p-4 rounded-3xl nd-glass">
                     <p className="text-xs text-ink-soft">Bilan</p>
@@ -347,6 +393,8 @@ function Rules() {
                     <li>Campagne : 15 étapes de plus en plus dures, 3 boss. Chaque 1re victoire paie des graines, et des pépites pour les boss.</li>
                     <li>Arène classée : ta cote monte quand tu gagnes, surtout contre plus fort que toi. Tes 5 premières victoires du jour rapportent des graines.</li>
                     <li>Ton équipe sert aussi de défense : les autres joueurs peuvent l'affronter.</li>
+                    <li>Saisons mensuelles : à la fin du mois, chacun reçoit une récompense selon sa place finale, puis toutes les cotes repartent à 1000.</li>
+                    <li>10 combats gratuits par jour (tous modes). Ensuite, jusqu'à 5 combats supplémentaires à 15 pépites.</li>
                     <li>Un combat dure 40 manches au plus : ensuite, l'équipe qui garde le plus de PV en % gagne.</li>
                 </ul>
             </div>
@@ -357,7 +405,7 @@ function Rules() {
 /* ---------- page ---------- */
 
 export default function Combat() {
-    const { refreshBadges } = useGame();
+    const { refreshBadges, user, setUser } = useGame();
     const navigate = useNavigate();
     const [data, setData] = useState(null);
     const [tab, setTab] = useState(null);
@@ -367,16 +415,33 @@ export default function Combat() {
     useEffect(() => { load(); }, []);
 
     async function start(params) {
+        if (data.battlesLeft === 0) {
+            if (data.extraLeft === 0) return setError('Tu as joué tous tes combats du jour. Reviens demain !');
+            if (!window.confirm(`Tes ${data.dailyBattles} combats gratuits du jour sont joués. Lancer un combat supplémentaire pour ${data.extraPrice} pépites ?`)) return;
+            params = { ...params, pay: true };
+        }
         setBusy(true);
         setError('');
         try {
-            const { battle } = await api('battleStart', params);
+            const { battle, user: u } = await api('battleStart', params);
+            if (u) setUser(u);
             refreshBadges?.();
             navigate(`/combat/${battle.id}`);
         } catch (e) { setError(e.message); setBusy(false); }
     }
 
+    async function claim(season) {
+        setBusy(true);
+        try {
+            const res = await api('seasonClaim', { season });
+            setUser(res.user);
+            refreshBadges?.();
+            await load();
+        } catch (e) { setError(e.message); } finally { setBusy(false); }
+    }
+
     if (!data) return <div className="max-w-5xl mx-auto px-4 py-16 text-ink-soft">{error || 'Chargement de l\'arène…'}</div>;
+    const noFight = data.battlesLeft === 0 && (data.extraLeft === 0 || user.nuggets < data.extraPrice);
     return (
         <div className="max-w-5xl mx-auto px-4 py-8 sm:py-10 space-y-6">
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -388,6 +453,8 @@ export default function Combat() {
                 <div className="flex gap-2 text-sm">
                     <span className="px-3 py-1.5 rounded-full bg-white/[0.06] flex items-center gap-1.5"><Crown className="w-4 h-4 text-[#f4d88f]" />{data.rating}</span>
                     <span className="px-3 py-1.5 rounded-full bg-white/[0.06] flex items-center gap-1.5"><Flag className="w-4 h-4 text-[#8ee6a8]" />Étape {Math.min(15, data.campaign + 1)}/15</span>
+                    <span className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 ${data.battlesLeft ? 'bg-white/[0.06]' : 'bg-rust/20 text-[#ffb4a2]'}`} title="Combats gratuits restants aujourd'hui">
+                        <Swords className="w-4 h-4" />{data.battlesLeft}/{data.dailyBattles} aujourd'hui</span>
                 </div>
             </div>
 
@@ -398,6 +465,26 @@ export default function Combat() {
                     <span className="flex-1">Combat en cours contre {data.active.opponent} — manche {data.active.round}</span>
                     Reprendre <ChevronRight className="w-5 h-5" />
                 </motion.button>
+            )}
+
+            {data.season.pending.map((p) => (
+                <motion.div key={p.season} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+                    className="p-4 rounded-3xl nd-glass nd-ring flex flex-wrap items-center gap-3">
+                    <Gift className="w-7 h-7 text-[#f4d88f]" />
+                    <div className="flex-1 min-w-48">
+                        <p className="font-bold">Saison de <span className="capitalize">{p.label}</span> terminée : tu finis {p.rank}e ({p.rating} points, {p.wins} V · {p.losses} D)</p>
+                        <Reward coins={p.coins} nuggets={p.nuggets} sign />
+                    </div>
+                    <button disabled={busy} onClick={() => claim(p.season)} className="px-5 py-2.5 rounded-full nd-cta-gold font-bold">Récupérer</button>
+                </motion.div>
+            ))}
+
+            {!data.active && data.battlesLeft === 0 && (
+                <p className="p-3 rounded-2xl bg-rust/10 border border-rust/30 text-sm">
+                    {data.extraLeft > 0
+                        ? <>Tes {data.dailyBattles} combats gratuits du jour sont joués. Il reste {data.extraLeft} combat{data.extraLeft > 1 ? 's' : ''} supplémentaire{data.extraLeft > 1 ? 's' : ''} à <Amount nuggets={data.extraPrice} /> chacun{user.nuggets < data.extraPrice && <> (<Link to="/boutique" className="text-[#f4d88f] underline">recharger en pépites</Link>)</>}, sinon reviens demain.</>
+                        : 'Tu as joué tous tes combats du jour. Ton équipe se repose : reviens demain !'}
+                </p>
             )}
 
             <TeamStrip team={data.team} onEdit={() => setTab('team')} />
@@ -412,8 +499,8 @@ export default function Combat() {
                 ))}
             </div>
 
-            {tab === 'campaign' && <Campaign data={data} start={start} busy={busy || !!data.active} />}
-            {tab === 'arena' && <Arena data={data} start={start} busy={busy || !!data.active} />}
+            {tab === 'campaign' && <Campaign data={data} start={start} busy={busy || !!data.active || noFight} />}
+            {tab === 'arena' && <Arena data={data} start={start} busy={busy || !!data.active || noFight} />}
             {tab === 'team' && <TeamBuilder data={data} onSaved={(team) => { setData((d) => ({ ...d, team })); load(); }} />}
             {tab === 'rules' && <Rules />}
 

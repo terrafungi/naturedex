@@ -19,7 +19,7 @@ import {
 import {
     ASSOCIATIONS, DONATION_SHARE, PACKS, createCheckout, donationOf, getCheckout, stripeReady, stripeTestMode, verifyWebhook,
 } from './shop.mjs';
-import { DAILY_REWARDS, arenaActions } from './arena.mjs';
+import { DAILY_BATTLES, DAILY_REWARDS, arenaActions, seasonRollover } from './arena.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -415,7 +415,10 @@ async function badgeCounts(db, user, pub) {
                   FROM users u WHERE invited_by = $1`, [user.id, INVITE_DAYS]),
         db.query(`SELECT EXISTS (SELECT 1 FROM battles WHERE user_id = $1 AND status = 'active') AS active,
                          (SELECT COUNT(*)::int FROM battles WHERE user_id = $1 AND (reward->>'daily')::boolean
-                            AND (ended_at AT TIME ZONE 'Europe/Paris')::date = ${PARIS_DAY}) AS rewarded`, [user.id]),
+                            AND (ended_at AT TIME ZONE 'Europe/Paris')::date = ${PARIS_DAY}) AS rewarded,
+                         (SELECT COUNT(*)::int FROM battles WHERE user_id = $1 AND NOT paid
+                            AND (created_at AT TIME ZONE 'Europe/Paris')::date = ${PARIS_DAY}) AS started,
+                         (SELECT COUNT(*)::int FROM season_results WHERE user_id = $1 AND claimed_at IS NULL) AS seasons`, [user.id]),
     ]);
     const s = pub.social;
     return {
@@ -426,7 +429,8 @@ async function badgeCounts(db, user, pub) {
         '/inviter': Math.min(inv.ready, Math.max(0, INVITE_CAP - inv.rewarded)),
         '/amis': s.friendRequests + s.tradeOffers,
         '/messages': s.unreadMessages,
-        '/combat': fight.active ? 1 : Math.max(0, DAILY_REWARDS - fight.rewarded),
+        // rewarded wins are only worth showing while free battles remain to play them
+        '/combat': fight.active ? 1 : fight.seasons + (fight.started < DAILY_BATTLES ? Math.min(DAILY_BATTLES - fight.started, Math.max(0, DAILY_REWARDS - fight.rewarded)) : 0),
     };
 }
 
@@ -1640,6 +1644,7 @@ const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'invit
 export const handler = async (event) => {
     if (event.source === 'schedule') {
         await settleAuctions(getPool());
+        await seasonRollover(getPool(), inTransaction);
         return { ok: true };
     }
     if (event.requestContext?.http?.method === 'OPTIONS') {
