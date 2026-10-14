@@ -17,6 +17,8 @@ import Friends from './pages/Friends.jsx';
 import Quiz from './pages/Quiz.jsx';
 import Shop from './pages/Shop.jsx';
 
+// Sign-up is mandatory: every page (home included) needs an account, so a first
+// visit lands on the sign-up form (Auth switches to log-in for returning players).
 function Private({ children }) {
     const { user, ready } = useGame();
     if (!ready) return <div className="py-32 text-center font-display text-xl text-ink-soft">Chargement…</div>;
@@ -29,7 +31,7 @@ createRoot(document.getElementById('root')).render(
             <GameProvider>
                 <Routes>
                     <Route element={<Layout />}>
-                        <Route path="/" element={<Landing />} />
+                        <Route path="/" element={<Private><Landing /></Private>} />
                         <Route path="/connexion" element={<Auth />} />
                         <Route path="/booster" element={<Private><Boosters /></Private>} />
                         <Route path="/defis" element={<Private><Challenges /></Private>} />

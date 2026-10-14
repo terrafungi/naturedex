@@ -2,10 +2,18 @@ import { useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useGame } from '../api.jsx';
 
+const RETURNING_KEY = 'naturdex.returning';
+
 export default function Auth() {
     const { user, authenticate } = useGame();
     const [params] = useSearchParams();
-    const [mode, setMode] = useState(params.get('mode') === 'register' ? 'register' : 'login');
+    // New visitors see the sign-up form first; someone who already signed in on this
+    // device (or asked for ?mode=login) gets the log-in form.
+    const [mode, setMode] = useState(() => {
+        const asked = params.get('mode');
+        if (asked === 'login' || asked === 'register') return asked;
+        return localStorage.getItem(RETURNING_KEY) ? 'login' : 'register';
+    });
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -20,6 +28,7 @@ export default function Auth() {
         setError('');
         try {
             await authenticate(mode, username, password);
+            localStorage.setItem(RETURNING_KEY, '1');
             navigate('/booster');
         } catch (err) {
             setError(err.message);

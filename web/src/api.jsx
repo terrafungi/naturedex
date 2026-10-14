@@ -65,6 +65,7 @@ export function GameProvider({ children }) {
     const logout = useCallback(async () => {
         await api('logout').catch(() => {});
         localStorage.removeItem(TOKEN_KEY);
+        localStorage.setItem('naturdex.returning', '1'); // next visit shows log-in, not sign-up
         setUser(null);
         setOwned({});
         setOwnedInfo({});

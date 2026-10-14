@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
-import { Award, Brain, Gavel, Home, Layers, LogIn, LogOut, Menu, Package, Plus, ShoppingBag, Trophy, User, Users, X } from 'lucide-react';
+import { Award, Brain, Gavel, Home, Layers, Package, Plus, ShoppingBag, Trophy, User, Users } from 'lucide-react';
 import { Nugget, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
@@ -14,11 +13,9 @@ export const NAV = [
     { to: '/amis', label: 'Amis', Icon: Users },
     { to: '/defis', label: 'Défis', Icon: Trophy },
     { to: '/trophees', label: 'Trophées', Icon: Award },
-    { to: '/boutique', label: 'Boutique solidaire', Icon: ShoppingBag },
+    { to: '/boutique', label: 'Boutique solidaire', short: 'Boutique', Icon: ShoppingBag },
     { to: '/profil', label: 'Profil', Icon: User },
 ];
-// The mobile tab bar has room for five: the rest stays in the menu.
-const TABS = NAV.filter(({ to }) => !['/', '/profil', '/trophees', '/defis', '/boutique'].includes(to));
 
 // Pending friend requests + trade offers, shown as a red dot count on the Amis link.
 function useSocialCount() {
@@ -48,15 +45,15 @@ export function LeafLogo({ className = 'w-9 h-9' }) {
     );
 }
 
-// `compact` (logged in, wallet shown): smaller wordmark and no tagline on phones,
-// so the wallet never overlaps the name; below 360 px only the leaf stays.
+// `compact` (logged in, wallet shown): no tagline on phones and a slightly smaller
+// wordmark, so the wallet never overlaps the name; below 340 px only the leaf stays.
 function Brand({ compact }) {
     return (
         <Link to="/" className="group flex items-center gap-2 sm:gap-2.5 mr-auto min-w-0" aria-label="NatureDex, accueil">
-            <LeafLogo className={`${compact ? 'w-8 h-8' : 'w-9 h-9'} sm:w-10 sm:h-10 shrink-0 drop-shadow-[0_0_12px_rgba(79,209,139,0.45)] transition-transform group-hover:-rotate-12`} />
-            <span className={`leading-none min-w-0 ${compact ? 'max-[359px]:hidden' : ''}`}>
-                <span className={`block font-display ${compact ? 'text-[1.2rem]' : 'text-[1.6rem]'} sm:text-[1.8rem] font-semibold text-white truncate`}>NatureDex</span>
-                <span className={`${compact ? 'hidden sm:block' : 'block'} lg:hidden xl:block mt-1 text-[8.5px] sm:text-[9.5px] font-semibold uppercase tracking-[0.2em] text-white/55 truncate`}>Des cartes pour un monde plus vivant</span>
+            <LeafLogo className={`${'w-9 h-9'} sm:w-10 sm:h-10 shrink-0 drop-shadow-[0_0_12px_rgba(79,209,139,0.45)] transition-transform group-hover:-rotate-12`} />
+            <span className={`leading-none min-w-0 ${compact ? 'max-[339px]:hidden' : ''}`}>
+                <span className={`block font-display ${compact ? 'text-[1.45rem]' : 'text-[1.6rem]'} sm:text-[1.8rem] font-semibold text-white truncate`}>NatureDex</span>
+                <span className={`${compact ? 'hidden sm:block' : 'block'} mt-1 text-[8.5px] sm:text-[9.5px] font-semibold uppercase tracking-[0.2em] text-white/55 truncate`}>Des cartes pour un monde plus vivant</span>
             </span>
         </Link>
     );
@@ -82,61 +79,21 @@ function Wallet({ user }) {
         </div>
     );
 }
-function MenuSheet({ onClose }) {
-    const { user, logout } = useGame();
-    return (
-        <motion.div className="fixed inset-0 z-50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <motion.nav className="absolute right-0 top-0 h-full w-[min(320px,85vw)] bg-[#081a11] border-l border-white/10 px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex flex-col gap-0.5 overflow-y-auto overscroll-contain"
-                initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}>
-                <div className="flex items-center justify-between mb-4 shrink-0">
-                    <LeafLogo className="w-9 h-9" />
-                    <button onClick={onClose} className="grid place-items-center w-10 h-10 rounded-full nd-cta-glass" aria-label="Fermer le menu"><X className="w-5 h-5" /></button>
-                </div>
-                {user && (
-                    <div className="mb-3 shrink-0 rounded-2xl nd-glass px-4 py-3 flex items-center gap-3">
-                        <div className="min-w-0 flex-1">
-                            <div className="font-display text-lg text-white truncate">{user.username}</div>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-sm font-semibold tabular-nums">
-                                <span className="flex items-center gap-1 text-[#8ee6a8]"><Seed />{fmt(user.coins)}</span>
-                                <span className="flex items-center gap-1 text-[#f4c25b]"><Nugget />{fmt(user.nuggets)}</span>
-                            </div>
-                        </div>
-                        <Link to="/boutique" onClick={onClose} className="grid place-items-center w-9 h-9 rounded-full bg-[#e9c46a] text-[#2a1c00] shrink-0" title="Boutique solidaire" aria-label="Boutique solidaire">
-                            <Plus className="w-5 h-5" strokeWidth={3} />
-                        </Link>
-                    </div>
-                )}
-                {NAV.map(({ to, label, Icon, end }) => (
-                    <NavLink key={to} to={to} end={end} onClick={onClose}
-                        className={({ isActive }) => `shrink-0 flex items-center gap-3 px-4 py-2.5 rounded-xl font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6]' : 'text-white/80 hover:bg-white/5'}`}>
-                        <Icon className="w-5 h-5" />{label}<NavBadge to={to} className="ml-auto" />
-                    </NavLink>
-                ))}
-                <div className="mt-auto pt-3 shrink-0">
-                    {user ? (
-                        <button onClick={() => { logout(); onClose(); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/70 hover:bg-white/5">
-                            <LogOut className="w-5 h-5" />Se déconnecter
-                        </button>
-                    ) : (
-                        <Link to="/connexion" onClick={onClose} className="nd-cta-gold flex items-center justify-center gap-2 px-4 py-3 rounded-full font-bold">
-                            <LogIn className="w-5 h-5" />Se connecter
-                        </Link>
-                    )}
-                </div>
-            </motion.nav>
-        </motion.div>
-    );
-}
-
+// Floating bottom bar = the whole navigation. It scrolls sideways on phones
+// (fade on the edges hints there is more) and the active page is kept in view.
 function TabBar() {
+    const { pathname } = useLocation();
+    const ref = useRef(null);
+    useEffect(() => {
+        ref.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    }, [pathname]);
     return (
-        <nav className="nd-tabbar fixed inset-x-0 bottom-0 z-40 lg:hidden">
-            <div className="grid grid-cols-5 px-2 pt-2 pb-2">
-                {TABS.map(({ to, label, Icon, end }) => (
+        <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none" aria-label="Navigation">
+            <div ref={ref} className="nd-tabbar nd-tabbar-scroll pointer-events-auto mx-auto w-fit max-w-full flex gap-1 p-1.5 rounded-[1.6rem] overflow-x-auto overscroll-x-contain snap-x">
+                {NAV.map(({ to, label, short, Icon, end }) => (
                     <NavLink key={to} to={to} end={end}
-                        className={({ isActive }) => `relative flex flex-col items-center gap-1 py-2 rounded-2xl text-[11px] font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/55'}`}>
-                        <Icon className="w-5 h-5" strokeWidth={1.8} />{label}<NavBadge to={to} className="absolute top-1 right-[calc(50%-1.4rem)]" />
+                        className={({ isActive }) => `relative snap-start shrink-0 w-[3.9rem] sm:w-[4.9rem] flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/55 hover:text-white'}`}>
+                        <Icon className="w-5 h-5" strokeWidth={1.8} />{short || label}<NavBadge to={to} className="absolute top-1 right-[calc(50%-1.4rem)]" />
                     </NavLink>
                 ))}
             </div>
@@ -146,7 +103,6 @@ function TabBar() {
 
 export default function Layout() {
     const { user } = useGame();
-    const [menu, setMenu] = useState(false);
     const { pathname } = useLocation();
     const home = pathname === '/';
     useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
@@ -154,30 +110,18 @@ export default function Layout() {
     return (
         <div className="min-h-screen flex flex-col">
             <header className={`${home ? 'absolute' : 'sticky bg-[#05130d]/75 backdrop-blur-xl border-b border-white/[0.07]'} top-0 inset-x-0 z-40`}>
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-2 sm:gap-3">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-3">
                     <Brand compact={!!user} />
-                    <nav className="hidden lg:flex items-center gap-0.5">
-                        {NAV.filter(({ to }) => to !== '/' && to !== '/boutique').map(({ to, label, end }) => (
-                            <NavLink key={to} to={to} end={end}
-                                className={({ isActive }) => `flex items-center gap-1 px-2.5 py-2 rounded-full text-sm font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6] ring-1 ring-[#4fd18b]/25' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
-                                {label}<NavBadge to={to} />
-                            </NavLink>
-                        ))}
-                    </nav>
                     {user && <Wallet user={user} />}
-                    <button onClick={() => setMenu(true)} className="grid place-items-center w-10 h-10 sm:w-11 sm:h-11 rounded-full nd-cta-glass shrink-0" aria-label="Ouvrir le menu">
-                        <Menu className="w-5 h-5 text-white" />
-                    </button>
                 </div>
             </header>
-            <main className="flex-1 pb-24 lg:pb-0">
+            <main className={`flex-1 ${user ? 'pb-28' : ''}`}>
                 <Outlet />
             </main>
-            <footer className="border-t border-white/[0.07] px-4 pt-6 pb-28 lg:pb-6 text-center text-xs text-ink-soft">
+            <footer className={`border-t border-white/[0.07] px-4 pt-6 ${user ? 'pb-32' : 'pb-6'} text-center text-xs text-ink-soft`}>
                 NatureDex · Images et textes : <a className="underline hover:text-white" href="https://fr.wikipedia.org" target="_blank" rel="noreferrer">Wikipédia</a> & Wikimedia Commons (licences libres) · Données : Wikidata
             </footer>
-            <TabBar />
-            <AnimatePresence>{menu && <MenuSheet onClose={() => setMenu(false)} />}</AnimatePresence>
+            {user && <TabBar />}
         </div>
     );
 }
