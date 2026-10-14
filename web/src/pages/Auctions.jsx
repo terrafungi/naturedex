@@ -14,10 +14,10 @@ const TABS = [
     ['sell', 'Vendre une carte'],
 ];
 const SORTS = [
-    ['ending', 'Se termine bientôt'],
+    ['ending', 'Fin proche'],
     ['new', 'Nouveautés'],
-    ['cheap', 'Prix croissant'],
-    ['rarity', 'Les plus rares'],
+    ['cheap', 'Moins chères'],
+    ['rarity', 'Plus rares'],
 ];
 
 function useNow() {
@@ -59,7 +59,7 @@ function AuctionTile({ a, now, total, busy, onBid, onBuy, onCancel }) {
     const open = a.status === 'open' && new Date(a.ends_at).getTime() > now;
     const soon = open && new Date(a.ends_at).getTime() - now < 5 * 60_000;
     return (
-        <motion.div layout className="rounded-3xl nd-glass p-3 flex flex-col gap-3">
+        <motion.div layout className="@container rounded-3xl nd-glass p-2.5 sm:p-3 flex flex-col gap-3">
             <div className="relative">
                 <Link to={a.have ? `/carte/${a.card.id}` : '#'} onClick={(e) => !a.have && e.preventDefault()}><Card card={a.card} number={a.card.num} total={total} /></Link>
                 {!a.have && !a.mine && (
@@ -68,34 +68,34 @@ function AuctionTile({ a, now, total, busy, onBid, onBuy, onCancel }) {
                     </span>
                 )}
             </div>
-            <div className="px-1 flex items-center justify-between gap-2 text-xs">
-                <span className="text-white/60 truncate">par <b className="text-white/85">{a.mine ? 'toi' : a.seller}</b></span>
-                <span className={`flex items-center gap-1 font-semibold tabular-nums ${soon ? 'text-[#ff8a80]' : 'text-white/70'}`}><Clock className="w-3.5 h-3.5" />{timeLeft(a.ends_at, now)}</span>
+            <div className="px-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs">
+                <span className="text-white/60 truncate max-w-full">par <b className="text-white/85">{a.mine ? 'toi' : a.seller}</b></span>
+                <span className={`flex items-center gap-1 font-semibold tabular-nums whitespace-nowrap ${soon ? 'text-[#ff8a80]' : 'text-white/70'}`}><Clock className="w-3.5 h-3.5" />{timeLeft(a.ends_at, now)}</span>
             </div>
-            <div className="px-1 flex items-end justify-between gap-2">
+            <div className="px-1 flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
                 <div>
                     <div className="text-[11px] uppercase tracking-wider text-white/50">{a.bid ? `Offre · ${a.bids} enchère${a.bids > 1 ? 's' : ''}` : 'Mise de départ'}</div>
                     <Amount nuggets={a.bid ?? a.start_price} className="text-lg" />
                 </div>
-                {status && <span className="text-xs font-bold text-right" style={{ color: status[1] }}>{status[0]}</span>}
+                {status && <span className="text-xs font-bold whitespace-nowrap" style={{ color: status[1] }}>{status[0]}</span>}
             </div>
             {open && !a.mine && (
                 <div className="mt-auto space-y-2">
                     {!(a.buyout && a.minBid >= a.buyout) && (
-                        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); onBid(a, Number(amount)); }}>
+                        <form className="flex flex-col @[15rem]:flex-row gap-2" onSubmit={(e) => { e.preventDefault(); onBid(a, Number(amount)); }}>
                             <label className="flex-1 min-w-0 flex items-center gap-1.5 px-3 rounded-full bg-black/30 ring-1 ring-white/15 focus-within:ring-[#e9c46a]/60">
                                 <Nugget className="w-4 h-4 shrink-0" />
                                 <input type="number" min={a.minBid} value={amount} onChange={(e) => setAmount(e.target.value)}
                                     className="w-full min-w-0 bg-transparent py-2 text-sm font-bold text-white outline-none tabular-nums" aria-label="Montant de l'offre" />
                             </label>
-                            <button disabled={busy || Number(amount) < a.minBid} className="nd-btn px-3.5 rounded-full text-sm font-bold disabled:opacity-50 flex items-center gap-1">
+                            <button disabled={busy || Number(amount) < a.minBid} className="nd-btn px-3.5 py-2 rounded-full text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1">
                                 <Gavel className="w-4 h-4" />{a.leading ? 'Relancer' : 'Enchérir'}
                             </button>
                         </form>
                     )}
                     {a.buyout && (
-                        <button disabled={busy} onClick={() => onBuy(a)} className="w-full py-2 rounded-full border border-[#e9c46a]/60 text-[#f4d88f] text-sm font-bold hover:bg-[#e9c46a]/10 disabled:opacity-50 flex items-center justify-center gap-1.5">
-                            <Zap className="w-4 h-4" />Acheter tout de suite · <Nugget className="w-4 h-4" />{a.buyout.toLocaleString('fr-FR')}
+                        <button disabled={busy} onClick={() => onBuy(a)} className="w-full px-2 py-2 rounded-full border border-[#e9c46a]/60 text-[#f4d88f] text-[13px] @[15rem]:text-sm font-bold whitespace-nowrap hover:bg-[#e9c46a]/10 disabled:opacity-50 flex items-center justify-center gap-1.5">
+                            <Zap className="w-4 h-4 shrink-0" />Achat immédiat<span className="hidden @[15rem]:inline">&nbsp;·</span> <Nugget className="w-4 h-4 shrink-0" />{a.buyout.toLocaleString('fr-FR')}
                         </button>
                     )}
                 </div>
@@ -116,19 +116,19 @@ function Filters({ filters, setFilters }) {
         const t = setTimeout(() => setFilters((f) => (f.query === query ? f : { ...f, query })), 300);
         return () => clearTimeout(t);
     }, [query, setFilters]);
-    const select = 'px-3.5 py-2 rounded-full bg-white/5 ring-1 ring-white/10 text-sm font-semibold text-white outline-none [&>option]:bg-[#081a11]';
+    const select = 'min-w-0 px-3 sm:px-3.5 py-2 rounded-full bg-white/5 ring-1 ring-white/10 text-sm font-semibold text-white outline-none [&>option]:bg-[#081a11]';
     return (
-        <div className="flex flex-wrap gap-2">
-            <label className="flex items-center gap-2 px-3.5 rounded-full bg-white/5 ring-1 ring-white/10 focus-within:ring-[#4fd18b]/50 flex-1 min-w-[180px]">
+        <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2">
+            <label className="col-span-3 flex items-center gap-2 px-3.5 rounded-full bg-white/5 ring-1 ring-white/10 focus-within:ring-[#4fd18b]/50 flex-1 min-w-[180px]">
                 <Search className="w-4 h-4 text-white/50" />
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Chercher une espèce…" className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-white/40" />
             </label>
             <select value={filters.rarity || ''} onChange={(e) => setFilters({ ...filters, rarity: e.target.value || null })} className={select} aria-label="Rareté">
-                <option value="">Toutes raretés</option>
+                <option value="">Rareté : toutes</option>
                 {Object.entries(RARITIES).reverse().map(([key, r]) => <option key={key} value={key}>{r.symbol} {r.label}</option>)}
             </select>
             <select value={filters.type || ''} onChange={(e) => setFilters({ ...filters, type: e.target.value || null })} className={select} aria-label="Type">
-                <option value="">Tous les types</option>
+                <option value="">Type : tous</option>
                 {Object.entries(TYPES).map(([key, t]) => <option key={key} value={key}>{t.label}</option>)}
             </select>
             <select value={filters.sort} onChange={(e) => setFilters({ ...filters, sort: e.target.value })} className={select} aria-label="Tri">
@@ -302,10 +302,10 @@ export default function Auctions() {
                 </div>
             </div>
 
-            <div className="mt-8 flex gap-1 p-1 rounded-full bg-white/5 ring-1 ring-white/10 overflow-x-auto w-fit max-w-full">
+            <div className="mt-8 grid grid-cols-2 sm:flex gap-1 p-1 rounded-3xl sm:rounded-full bg-white/5 ring-1 ring-white/10 sm:w-fit">
                 {TABS.map(([key, label]) => (
                     <button key={key} onClick={() => switchTab(key)}
-                        className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${tab === key ? 'bg-[#e9c46a] text-[#05130d]' : 'text-white/75 hover:text-white'}`}>
+                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${tab === key ? 'bg-[#e9c46a] text-[#05130d]' : 'text-white/75 hover:text-white'}`}>
                         {label}
                     </button>
                 ))}
