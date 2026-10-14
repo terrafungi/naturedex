@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Recycle, Search } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
-import { Card, MysteryCard } from '../components/Card.jsx';
+import { Card } from '../components/Card.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
 
 const PAGE = 60;
@@ -23,7 +23,6 @@ export default function Collection() {
     const { catalog, owned, ownedInfo, user, setUser, refreshCollection } = useGame();
     const [type, setType] = useState(null);
     const [rarity, setRarity] = useState(null);
-    const [onlyOwned, setOnlyOwned] = useState(false);
     const [query, setQuery] = useState('');
     const [debounced, setDebounced] = useState('');
     const [page, setPage] = useState(null); // { cards, matches } for the current filters
@@ -36,7 +35,8 @@ export default function Collection() {
     }, [query]);
 
     // The catalogue is far too big for the browser: the server sorts and filters, we fetch pages.
-    const filters = useMemo(() => ({ type, rarity, onlyOwned, query: debounced }), [type, rarity, onlyOwned, debounced]);
+    // Only the player's own cards are listed; undiscovered ones stay hidden.
+    const filters = useMemo(() => ({ type, rarity, onlyOwned: true, query: debounced }), [type, rarity, debounced]);
     useEffect(() => {
         let alive = true;
         setPage(null);
@@ -108,11 +108,7 @@ export default function Collection() {
                             {r.symbol} {r.label}
                         </Chip>
                     ))}
-                    <label className="ml-auto flex items-center gap-2 text-sm font-semibold cursor-pointer">
-                        <input type="checkbox" checked={onlyOwned} onChange={(e) => setOnlyOwned(e.target.checked)} className="accent-emerald-400 w-4 h-4" />
-                        Seulement mes cartes
-                    </label>
-                    <div className="relative">
+                    <div className="relative ml-auto">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
                         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Chercher une carte…"
                             className="pl-9 pr-3 py-2 rounded-full bg-white/5 border border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
@@ -125,7 +121,7 @@ export default function Collection() {
                 <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
                     {page.cards.map((c) => (
                         <Link key={c.id} to={`/carte/${c.id}`} className="relative block transition-transform hover:-translate-y-1">
-                            {c.count ? <Card card={c} number={c.num} total={catalog.total} /> : <MysteryCard card={c} number={c.num} />}
+                            <Card card={c} number={c.num} total={catalog.total} />
                             {c.count > 1 && (
                                 <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#04150d] text-xs font-bold shadow-lg shadow-emerald-500/30">×{c.count}</span>
                             )}
@@ -133,7 +129,14 @@ export default function Collection() {
                     ))}
                 </div>
             )}
-            {page?.matches === 0 && <p className="py-20 text-center text-ink-soft">Aucune carte ne correspond à ces filtres.</p>}
+            {page?.matches === 0 && (Object.keys(owned).length ? (
+                <p className="py-20 text-center text-ink-soft">Aucune de tes cartes ne correspond à ces filtres.</p>
+            ) : (
+                <div className="py-20 text-center">
+                    <p className="text-ink-soft">Ta collection est vide pour l'instant.</p>
+                    <Link to="/booster" className="mt-4 inline-block nd-cta-gold px-5 py-2.5 rounded-full text-sm font-bold">Ouvrir un booster</Link>
+                </div>
+            ))}
             {page && page.matches > page.cards.length && (
                 <div className="mt-10 text-center">
                     <button onClick={loadMore} disabled={loadingMore} className="px-6 py-3 rounded-full border border-white/10 text-white font-semibold hover:bg-white/10 disabled:opacity-60">

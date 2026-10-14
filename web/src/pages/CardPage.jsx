@@ -97,12 +97,17 @@ export default function CardPage() {
                                 <Recycle className="w-4 h-4" />Recycler {card.count - 1} doublon{card.count > 2 ? 's' : ''} · +{recycleCoins} pépites
                             </button>
                         )}
-                        {card.count > 1 && (
+                        {card.count > 1 ? (
                             <Link to={`/encheres?vendre=${card.id}`} className="nd-cta-gold flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold">
-                                <Gavel className="w-4 h-4" />Vendre aux enchères
+                                <Gavel className="w-4 h-4" />Mettre aux enchères
                             </Link>
+                        ) : (
+                            <span className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 text-sm font-semibold text-ink-soft cursor-not-allowed" title="Seuls les doublons peuvent être vendus">
+                                <Gavel className="w-4 h-4" />Mettre aux enchères
+                            </span>
                         )}
                     </div>
+                    {card.count === 1 && <p className="mt-2 text-xs text-ink-soft">Il te faut un doublon pour la mettre aux enchères : tu gardes toujours un exemplaire.</p>}
                 </div>
             </div>
         </div>
