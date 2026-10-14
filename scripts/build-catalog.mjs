@@ -36,7 +36,7 @@ const TYPES = [
     { key: 'plant', anchors: ['Angiospermae', 'Magnoliophyta', 'Polypodiopsida', 'Bryophyta', 'Lycopodiopsida'], ranks: ['species'], limit: 260 },
     { key: 'mammal', anchors: ['Mammalia'], ranks: ['species'], limit: 260 },
     { key: 'bird', anchors: ['Aves'], ranks: ['species'], limit: 240 },
-    { key: 'reptile', anchors: ['Reptilia', 'Squamata', 'Testudines', 'Crocodilia', 'Amphibia'], ranks: ['species'], limit: 200 },
+    { key: 'reptile', anchors: ['Reptilia', 'Squamata', 'Testudines', 'Crocodilia', 'Amphibia'], exclude: ['Aves', 'Mammalia'], ranks: ['species'], limit: 200 },
     { key: 'fish', anchors: ['Actinopterygii', 'Chondrichthyes', 'Coelacanthiformes'], ranks: ['species'], limit: 200 },
     { key: 'arthropod', anchors: ['Insecta', 'Arachnida', 'Myriapoda'], ranks: ['species'], limit: 240 },
     { key: 'marine', anchors: ['Cephalopoda', 'Bivalvia', 'Cnidaria', 'Echinodermata', 'Porifera', 'Decapoda'], ranks: ['species', 'genus'], limit: 180 },
@@ -148,7 +148,8 @@ async function fetchType(type, anchorIds) {
         ? '?item wdt:P31 wd:Q23038290.'
         : `VALUES ?anchor { ${type.anchors.map((n) => anchorIds[n]).filter(Boolean).map((q) => `wd:${q}`).join(' ')} }
            ?item wdt:P171* ?anchor.
-           VALUES ?rank { ${type.ranks.map((r) => RANK[r]).join(' ')} } ?item wdt:P105 ?rank.`;
+           VALUES ?rank { ${type.ranks.map((r) => RANK[r]).join(' ')} } ?item wdt:P105 ?rank.
+           ${type.exclude ? `MINUS { VALUES ?ex { ${type.exclude.map((n) => `wd:${anchorIds[n]}`).join(' ')} } ?item wdt:P171* ?ex. }` : ''}`;
     const rows = await sparql(`SELECT DISTINCT ?item ?title ?sl WHERE {
         ${taxonClause}
         ?item wikibase:sitelinks ?sl.
@@ -242,7 +243,7 @@ async function main() {
     if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
 
     console.log('Resolving taxon anchors…');
-    const anchorIds = await resolveAnchors(TYPES.flatMap((t) => t.anchors || []));
+    const anchorIds = await resolveAnchors(TYPES.flatMap((t) => [...(t.anchors || []), ...(t.exclude || [])]));
 
     console.log('Querying Wikidata per type…');
     const seen = new Map();
@@ -307,6 +308,12 @@ async function main() {
             [c.qid, c.name, c.sci_name, c.type, c.rarity, c.views, c.image_url, c.thumb_url, c.extract, c.wiki_url, c.iucn, c.stats],
         );
     }
+    // Drop cards that left the catalog, unless a player already owns them.
+    const gone = await db.query(
+        `DELETE FROM cards WHERE NOT (qid = ANY($1)) AND id NOT IN (SELECT card_id FROM user_cards) RETURNING id`,
+        [cards.map((c) => c.qid)],
+    );
+    console.log(`Removed ${gone.rowCount} stale cards`);
     const { rows } = await db.query(`SELECT type, rarity, COUNT(*)::int AS n FROM cards GROUP BY 1, 2 ORDER BY 1, 2`);
     console.table(rows);
     await db.end();

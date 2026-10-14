@@ -41,9 +41,10 @@ body::before {
 
 /* ---------- cards ---------- */
 
+/* cqi units resolve against the nearest *ancestor* container, so the card sits in a sizing box */
+.nd-box { container-type: inline-size; }
 .nd-card {
     --type: #6b8e23;
-    container-type: inline-size;
     position: relative;
     aspect-ratio: 5 / 7;
     border-radius: 4.5cqi;
@@ -131,7 +132,6 @@ body::before {
 
 /* undiscovered silhouette */
 .nd-mystery {
-    container-type: inline-size;
     aspect-ratio: 5 / 7;
     border-radius: 4.5cqi;
     border: 0.7cqi dashed color-mix(in oklab, var(--type) 55%, transparent);

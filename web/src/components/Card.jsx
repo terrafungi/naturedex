@@ -35,6 +35,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
     }
 
     return (
+        <div className="nd-box">
         <div
             ref={ref}
             className={`nd-card transition-transform duration-200 ease-out ${className}`}
@@ -78,12 +79,14 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                 </div>
             </div>
         </div>
+        </div>
     );
 }
 
 export function MysteryCard({ card, number }) {
     const t = TYPES[card.type] || TYPES.plant;
     return (
+        <div className="nd-box">
         <div className="nd-mystery" style={{ '--type': t.color }}>
             <div className="flex flex-col items-center gap-[3cqi] text-center">
                 <span className="nd-type-icon !w-[16cqi] !h-[16cqi] opacity-50" style={{ '--type': t.color }}>
@@ -93,12 +96,14 @@ export function MysteryCard({ card, number }) {
                 {number != null && <span style={{ fontSize: '5cqi' }} className="font-display font-semibold">#{String(number).padStart(3, '0')}</span>}
             </div>
         </div>
+        </div>
     );
 }
 
 /** Card back, used during booster reveals. */
 export function CardBack() {
     return (
+        <div className="nd-box">
         <div className="nd-card" style={{ '--type': '#1f3d2b' }}>
             <div className="h-full rounded-[2.6cqi] grid place-items-center"
                 style={{
@@ -109,6 +114,7 @@ export function CardBack() {
                     Natur<br /><i>Dex</i>
                 </div>
             </div>
+        </div>
         </div>
     );
 }
