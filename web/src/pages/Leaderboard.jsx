@@ -102,7 +102,7 @@ export default function Leaderboard() {
             <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Classement</p>
             <h1 className="mt-1 font-display text-4xl sm:text-5xl font-medium text-white">Les meilleurs naturalistes</h1>
 
-            <div className="mt-6 -mx-4 px-4 flex gap-2 overflow-x-auto nd-tabbar-scroll">
+            <div className="mt-6 flex flex-wrap gap-2">
                 {BOARDS.map(({ key, label, Icon }) => (
                     <Pill key={key} active={boardKey === key} onClick={() => setBoardKey(key)}><Icon className="w-4 h-4" />{label}</Pill>
                 ))}

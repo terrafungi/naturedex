@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, Brain, Gavel, Home, Layers, Medal, Package, Plus, ShoppingBag, Trophy, User, Users } from 'lucide-react';
+import { Award, Brain, Gavel, Home, Layers, LayoutGrid, Medal, Package, Plus, ShoppingBag, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
@@ -80,25 +81,67 @@ function Wallet({ user }) {
         </div>
     );
 }
-// Floating bottom bar = the whole navigation. It scrolls sideways on phones
-// (fade on the edges hints there is more) and the active page is kept in view.
+// Floating bottom bar = the whole navigation. On phones and tablets it shows the
+// main pages plus a "Plus" button that opens the rest; on large screens all fit.
+const PRIMARY = 4;
+
+function TabItem({ to, label, short, Icon, end, className = '' }) {
+    return (
+        <NavLink to={to} end={end}
+            className={({ isActive }) => `relative flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/55 hover:text-white'} ${className}`}>
+            <Icon className="w-5 h-5" strokeWidth={1.8} />{short || label}<NavBadge to={to} className="absolute top-1 right-[calc(50%-1.4rem)]" />
+        </NavLink>
+    );
+}
+
 function TabBar() {
     const { pathname } = useLocation();
-    const ref = useRef(null);
+    const [open, setOpen] = useState(false);
+    const social = useSocialCount();
+    const primary = NAV.slice(0, PRIMARY);
+    const more = NAV.slice(PRIMARY);
+    const activeMore = more.find(({ to }) => pathname === to || pathname.startsWith(`${to}/`));
+    const moreBadge = more.some(({ to }) => to === '/amis') ? social : 0;
+
+    useEffect(() => { setOpen(false); }, [pathname]);
     useEffect(() => {
-        ref.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
-    }, [pathname]);
+        if (!open) return;
+        const onKey = (e) => e.key === 'Escape' && setOpen(false);
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [open]);
+
+    const MoreIcon = open ? X : activeMore?.Icon || LayoutGrid;
     return (
-        <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none" aria-label="Navigation">
-            <div ref={ref} className="nd-tabbar nd-tabbar-scroll pointer-events-auto mx-auto w-fit max-w-full flex gap-1 p-1.5 rounded-[1.6rem] overflow-x-auto overscroll-x-contain snap-x">
-                {NAV.map(({ to, label, short, Icon, end }) => (
-                    <NavLink key={to} to={to} end={end}
-                        className={({ isActive }) => `relative snap-start shrink-0 w-[3.9rem] sm:w-[4.9rem] flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/55 hover:text-white'}`}>
-                        <Icon className="w-5 h-5" strokeWidth={1.8} />{short || label}<NavBadge to={to} className="absolute top-1 right-[calc(50%-1.4rem)]" />
-                    </NavLink>
-                ))}
-            </div>
-        </nav>
+        <>
+            <AnimatePresence>
+                {open && (
+                    <motion.div key="backdrop" className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" onClick={() => setOpen(false)}
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+                )}
+            </AnimatePresence>
+            <nav className="fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none" aria-label="Navigation">
+                <AnimatePresence>
+                    {open && (
+                        <motion.div key="sheet" id="nd-more" className="lg:hidden nd-tabbar pointer-events-auto mx-auto mb-2 w-full max-w-md p-2 rounded-[1.6rem] grid grid-cols-3 sm:grid-cols-4 gap-1"
+                            initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.97 }} transition={{ duration: 0.18 }}>
+                            {more.map((item) => <TabItem key={item.to} {...item} short={item.label} className="py-3 px-1 text-center text-[11.5px]" />)}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+                <div className="nd-tabbar pointer-events-auto mx-auto w-full max-w-md lg:w-fit lg:max-w-none flex gap-1 p-1.5 rounded-[1.6rem]">
+                    {primary.map((item) => <TabItem key={item.to} {...item} className="flex-1 min-w-0 lg:flex-none lg:w-[4.9rem]" />)}
+                    {more.map((item) => <TabItem key={item.to} {...item} className="hidden lg:flex lg:w-[4.9rem]" />)}
+                    <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="nd-more"
+                        className={`lg:hidden relative flex-1 min-w-0 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors ${open || activeMore ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/80 hover:text-white'}`}>
+                        <MoreIcon className="w-5 h-5" strokeWidth={1.8} />
+                        <span className="max-w-full truncate px-0.5">{open ? 'Fermer' : activeMore ? (activeMore.short || activeMore.label) : 'Plus'}</span>
+                        {!open && !activeMore && <Plus className="absolute top-1.5 right-[calc(50%-1.3rem)] w-3 h-3 p-px rounded-full bg-[#e9c46a] text-[#2a1c00]" strokeWidth={3.5} />}
+                        {!open && moreBadge > 0 && <span className="absolute top-1 right-[calc(50%-1.4rem)] min-w-[1.1rem] h-[1.1rem] px-1 inline-grid place-items-center rounded-full bg-[#ff6b6b] text-white text-[10px] font-bold leading-none">{moreBadge > 9 ? '9+' : moreBadge}</span>}
+                    </button>
+                </div>
+            </nav>
+        </>
     );
 }
 
