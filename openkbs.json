@@ -12,7 +12,8 @@
       "name": "api",
       "runtime": "nodejs24.x",
       "memory": 512,
-      "timeout": 30
+      "timeout": 30,
+      "schedule": "rate(1 minute)"
     }
   ],
   "site": "./site",

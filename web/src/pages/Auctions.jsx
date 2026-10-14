@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Clock, Crown, Gavel, Search, Sparkles, Tag, X, Zap } from 'lucide-react';
+import { Clock, Crown, Gavel, Radio, Search, Sparkles, Tag, X, Zap } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { Amount, Nugget } from '../components/Currency.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
+import LiveAuction, { timeLeft, useNow } from '../components/LiveAuction.jsx';
 
 const TABS = [
     ['market', 'Le marché'],
@@ -20,22 +21,6 @@ const SORTS = [
     ['rarity', 'Plus rares'],
 ];
 
-function useNow() {
-    const [now, setNow] = useState(Date.now());
-    useEffect(() => {
-        const t = setInterval(() => setNow(Date.now()), 1000);
-        return () => clearInterval(t);
-    }, []);
-    return now;
-}
-
-function timeLeft(iso, now) {
-    const ms = new Date(iso).getTime() - now;
-    if (ms <= 0) return 'Terminée';
-    const h = Math.floor(ms / 3.6e6), m = Math.floor((ms % 3.6e6) / 6e4), s = Math.floor((ms % 6e4) / 1000);
-    return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m ${String(s).padStart(2, '0')}s`;
-}
-
 // How an auction ended (or stands) from the current player's point of view.
 function statusOf(a, now) {
     const ended = a.status !== 'open' || new Date(a.ends_at).getTime() <= now;
@@ -45,14 +30,14 @@ function statusOf(a, now) {
         if (a.status === 'cancelled') return ['Annulée', '#9ca3af'];
         return ended ? ['Clôture en cours…', '#e9c46a'] : ['En vente', '#e9c46a'];
     }
-    if (a.status === 'sold') return a.leading ? ['Remportée !', '#4fd18b'] : ['Perdue', '#ff8a80'];
+    if (a.status === 'sold') return a.leading ? ['Remportée · dans ta collection', '#4fd18b'] : ['Perdue', '#ff8a80'];
     if (a.status !== 'open') return ['Terminée', '#9ca3af'];
     if (a.leading) return ['Tu mènes', '#4fd18b'];
     if (a.my_bid) return ['Surenchérie', '#ff8a80'];
     return null;
 }
 
-function AuctionTile({ a, now, total, busy, onBid, onBuy, onCancel }) {
+function AuctionTile({ a, now, total, busy, onBid, onBuy, onCancel, onOpen }) {
     const [amount, setAmount] = useState(a.minBid);
     useEffect(() => setAmount(a.minBid), [a.minBid]);
     const status = statusOf(a, now);
@@ -61,7 +46,7 @@ function AuctionTile({ a, now, total, busy, onBid, onBuy, onCancel }) {
     return (
         <motion.div layout className="@container rounded-3xl nd-glass p-2.5 sm:p-3 flex flex-col gap-3">
             <div className="relative">
-                <Link to={a.have ? `/carte/${a.card.id}` : '#'} onClick={(e) => !a.have && e.preventDefault()}><Card card={a.card} number={a.card.num} total={total} /></Link>
+                <button type="button" onClick={() => onOpen(a)} className="block w-full text-left" aria-label={`Suivre l'enchère ${a.card.name}`}><Card card={a.card} number={a.card.num} total={total} /></button>
                 {!a.have && !a.mine && (
                     <span className="absolute top-2 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 rounded-full bg-[#4fd18b] text-[#05130d] text-[11px] font-bold shadow-lg flex items-center gap-1">
                         <Sparkles className="w-3 h-3" />Nouvelle pour toi
@@ -76,9 +61,13 @@ function AuctionTile({ a, now, total, busy, onBid, onBuy, onCancel }) {
                 <div>
                     <div className="text-[11px] uppercase tracking-wider text-white/50">{a.bid ? `Offre · ${a.bids} enchère${a.bids > 1 ? 's' : ''}` : 'Mise de départ'}</div>
                     <Amount nuggets={a.bid ?? a.start_price} className="text-lg" />
+                    {a.leader && <div className="text-[11px] text-white/60 truncate">par <b className={a.leading ? 'text-[#8ee6a8]' : 'text-white/85'}>{a.leading ? 'toi' : a.leader}</b></div>}
                 </div>
                 {status && <span className="text-xs font-bold whitespace-nowrap" style={{ color: status[1] }}>{status[0]}</span>}
             </div>
+            <button type="button" onClick={() => onOpen(a)} className={`${open ? '' : 'mt-auto'} w-full py-1.5 rounded-full bg-white/5 ring-1 ring-white/10 text-xs font-bold text-white/80 hover:text-white hover:bg-white/10 flex items-center justify-center gap-1.5`}>
+                {open ? <><Radio className="w-3.5 h-3.5 text-[#ff8a80]" />Suivre en direct</> : 'Voir le récapitulatif'}
+            </button>
             {open && !a.mine && (
                 <div className="mt-auto space-y-2">
                     {!(a.buyout && a.minBid >= a.buyout) && (
@@ -249,6 +238,7 @@ export default function Auctions() {
     const [data, setData] = useState(null);
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState(null);
+    const [live, setLive] = useState(null); // auction id shown in the live view
     const now = useNow();
 
     const load = useCallback(() => {
@@ -258,7 +248,7 @@ export default function Auctions() {
     useEffect(() => { load(); }, [load]);
     // Keep bids fresh while the page is open.
     useEffect(() => {
-        const t = setInterval(load, 20_000);
+        const t = setInterval(load, 8000);
         return () => clearInterval(t);
     }, [load]);
 
@@ -335,13 +325,16 @@ export default function Auctions() {
                             <>
                                 {tab === 'market' && <p className="mt-4 text-sm text-white/50">{data.matches} carte{data.matches > 1 ? 's' : ''} en vente</p>}
                                 <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                                    {list.map((a) => <AuctionTile key={a.id} a={a} now={now} total={catalog?.total} busy={busy} onBid={onBid} onBuy={onBuy} onCancel={onCancel} />)}
+                                    {list.map((a) => <AuctionTile key={a.id} a={a} now={now} total={catalog?.total} busy={busy} onBid={onBid} onBuy={onBuy} onCancel={onCancel} onOpen={(x) => setLive(x.id)} />)}
                                 </div>
                             </>
                         )}
                     </>
                 )}
             </div>
+            <AnimatePresence>
+                {live && <LiveAuction key={live} id={live} total={catalog?.total} onClose={() => { setLive(null); load(); }} onChange={load} />}
+            </AnimatePresence>
         </div>
     );
 }

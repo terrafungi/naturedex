@@ -321,16 +321,21 @@ async function closeAuction(client, a) {
     await client.query(`UPDATE auctions SET status = $2, settled_at = now() WHERE id = $1`, [a.id, a.bidder_id ? 'sold' : 'expired']);
 }
 
-// Auctions are settled lazily, by whichever request comes first after they end.
+// Ended auctions are settled every minute by the schedule, and also by whichever request
+// comes first after they end. Each batch is one transaction: card, nuggets and status move together.
 async function settleAuctions(db) {
-    const { rows: due } = await db.query(`SELECT 1 FROM auctions WHERE status = 'open' AND ends_at <= now() LIMIT 1`);
-    if (!due.length) return;
-    await inTransaction(db, async (client) => {
-        const { rows } = await client.query(
-            `SELECT * FROM auctions WHERE status = 'open' AND ends_at <= now() ORDER BY id LIMIT 50 FOR UPDATE SKIP LOCKED`
-        );
-        for (const a of rows) await closeAuction(client, a);
-    });
+    for (;;) {
+        const { rows: due } = await db.query(`SELECT 1 FROM auctions WHERE status = 'open' AND ends_at <= now() LIMIT 1`);
+        if (!due.length) return;
+        const settled = await inTransaction(db, async (client) => {
+            const { rows } = await client.query(
+                `SELECT * FROM auctions WHERE status = 'open' AND ends_at <= now() ORDER BY id LIMIT 50 FOR UPDATE SKIP LOCKED`
+            );
+            for (const a of rows) await closeAuction(client, a);
+            return rows.length;
+        });
+        if (settled < 50) return; // the rest (if any) is locked by a concurrent request settling it
+    }
 }
 
 async function inTransaction(db, fn) {
@@ -349,7 +354,8 @@ async function inTransaction(db, fn) {
 }
 
 const AUCTION_FIELDS = `a.id, a.start_price, a.buyout, a.bid, a.bids, a.status, a.ends_at, a.created_at,
-    a.seller_id = $1 AS mine, a.bidder_id = $1 AS leading, s.username AS seller,
+    a.settled_at, a.seller_id = $1 AS mine, a.bidder_id = $1 AS leading, s.username AS seller,
+    (SELECT username FROM users WHERE id = a.bidder_id) AS leader,
     (SELECT MAX(amount) FROM auction_bids b WHERE b.auction_id = a.id AND b.user_id = $1) AS my_bid,
     COALESCE(uc.count, 0) AS have,
     json_build_object('id', c.id, 'num', c.num, 'name', c.name, 'sci_name', c.sci_name, 'type', c.type, 'rarity', c.rarity,
@@ -638,6 +644,27 @@ const actions = {
         };
     },
 
+    // One auction with its bid history, polled by the live view.
+    async auction(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows: [a] } = await db.query(
+            `SELECT ${AUCTION_FIELDS}
+             FROM auctions a JOIN cards c ON c.id = a.card_id JOIN users s ON s.id = a.seller_id
+             LEFT JOIN user_cards uc ON uc.card_id = a.card_id AND uc.user_id = $1
+             WHERE a.id = $2`,
+            [user.id, Number(body.id)]
+        );
+        if (!a) throw new HttpError(404, 'Enchère introuvable');
+        const { rows: bids } = await db.query(
+            `SELECT b.amount, b.at, u.username AS user, b.user_id = $2 AS me
+             FROM auction_bids b JOIN users u ON u.id = b.user_id
+             WHERE b.auction_id = $1 ORDER BY b.amount DESC, b.at DESC LIMIT 50`,
+            [a.id, user.id]
+        );
+        const bidders = new Set(bids.map((b) => b.user)).size;
+        return { auction: shapeAuction(a), bids, bidders, serverNow: new Date().toISOString() };
+    },
+
     // Every owned card can be put up for auction, even the last copy.
     async sellable(db, body, event) {
         const user = await requireUser(db, event);
@@ -770,6 +797,10 @@ const actions = {
 const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout']);
 
 export const handler = async (event) => {
+    if (event.source === 'schedule') {
+        await settleAuctions(getPool());
+        return { ok: true };
+    }
     if (event.requestContext?.http?.method === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
     }
