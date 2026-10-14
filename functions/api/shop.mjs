@@ -37,7 +37,7 @@ export const donationOf = (cents) => Math.round(cents * DONATION_SHARE);
 export const euros = (cents) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 export const stripeReady = () => !!process.env.STRIPE_SECRET_KEY;
-export const stripeTestMode = () => (process.env.STRIPE_SECRET_KEY || '').startsWith('sk_test_');
+export const stripeTestMode = () => /^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY || '');
 
 // Stripe expects nested form fields: { a: { b: 1 } } → a[b]=1
 function form(obj, prefix = '', out = new URLSearchParams()) {
