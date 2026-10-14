@@ -111,11 +111,13 @@ async function publicUser(db, user) {
 
 // ---------- booster draw ----------
 
-let rarityPools; // { rarity: [cardId, ...] } — cached per Lambda container
+let rarityPools, poolsAt = 0; // { rarity: [cardId, ...] } — cached per Lambda container for 10 min
 async function getRarityPools(db) {
-    if (!rarityPools) {
+    if (!rarityPools || Date.now() - poolsAt > 600_000) {
         const { rows } = await db.query(`SELECT rarity, array_agg(id) AS ids FROM cards GROUP BY rarity`);
+        if (!rows.length) throw new HttpError(503, 'Le catalogue de cartes est en cours de préparation');
         rarityPools = Object.fromEntries(rows.map((r) => [r.rarity, r.ids]));
+        poolsAt = Date.now();
     }
     return rarityPools;
 }

@@ -49,7 +49,7 @@ export default function CardPage() {
 
     const stats = card.stats || {};
     const facts = [
-        { Icon: Eye, label: 'Lectures Wikipédia (12 mois)', value: Number(card.views).toLocaleString('fr-FR') },
+        { Icon: Eye, label: 'Lectures Wikipédia par an (estimation)', value: Number(card.views).toLocaleString('fr-FR') },
         stats.mass_kg && { Icon: Weight, label: 'Masse', value: formatMeasure(stats.mass_kg, 'kg') },
         stats.length_m && { Icon: Ruler, label: 'Longueur', value: formatMeasure(stats.length_m, 'm') },
         stats.height_m && { Icon: Ruler, label: 'Hauteur', value: formatMeasure(stats.height_m, 'm') },
@@ -87,7 +87,7 @@ export default function CardPage() {
                         ))}
                     </dl>
                     <p className="mt-4 text-sm text-ink-soft">
-                        Sa rareté vient de sa popularité : {formatViews(Number(card.views))} lectures en un an, comparées aux autres espèces de type {t.label.toLowerCase()}.
+                        Sa rareté vient de sa popularité : {formatViews(Number(card.views))} lectures par an (estimées sur les 60 derniers jours), comparées aux autres espèces de type {t.label.toLowerCase()}.
                     </p>
 
                     <div className="mt-8 flex flex-wrap items-center gap-3">

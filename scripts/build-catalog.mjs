@@ -77,24 +77,51 @@ async function sparql(query, { timeoutMs = 65_000 } = {}) {
 }
 
 async function getJson(url) {
-    for (let attempt = 1; attempt <= 4; attempt++) {
+    for (let attempt = 1; attempt <= 6; attempt++) {
         const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
         if (res?.ok) return res.json();
         if (res && res.status === 404) return null;
-        await sleep(1_500 * attempt);
+        await sleep((res?.status === 429 ? 20_000 : 1_500) * attempt);
     }
-    return null;
+    return undefined; // failed: not cached, retried on the next run
 }
 
-async function pool(items, concurrency, fn) {
-    let i = 0, done = 0;
-    await Promise.all(Array.from({ length: concurrency }, async () => {
-        while (i < items.length) {
-            const item = items[i++];
-            await fn(item);
-            if (++done % 100 === 0) process.stdout.write(`  ${done}/${items.length}\n`);
+// Batched intro + image lookup via the MediaWiki action API (20 titles per call;
+// the REST summary endpoint rate-limits one-by-one lookups hard).
+async function fetchSummaries(titles) {
+    const out = {};
+    for (let i = 0; i < titles.length; i += 20) {
+        const batch = titles.slice(i, i + 20);
+        const params = new URLSearchParams({
+            action: 'query', format: 'json', formatversion: '2', redirects: '1',
+            prop: 'extracts|pageimages|pageprops|info', exintro: '1', explaintext: '1', exsentences: '3', exlimit: '20',
+            piprop: 'thumbnail|original', pithumbsize: '960', ppprop: 'disambiguation', inprop: 'url',
+            titles: batch.join('|'),
+        });
+        const res = await getJson(`https://fr.wikipedia.org/w/api.php?${params}`);
+        if (!res?.query) continue;
+        const alias = new Map();
+        for (const n of [...(res.query.normalized || []), ...(res.query.redirects || [])]) alias.set(n.from, n.to);
+        const pages = new Map((res.query.pages || []).map((p) => [p.title, p]));
+        for (const t of batch) {
+            let final = t;
+            for (let k = 0; k < 3 && alias.has(final); k++) final = alias.get(final);
+            const p = pages.get(final);
+            if (!p || p.missing) { out[t] = null; continue; }
+            const thumb = p.thumbnail?.source || p.original?.source;
+            out[t] = p.pageprops?.disambiguation !== undefined || !thumb || !p.extract ? null : {
+                title: p.title,
+                canonical: p.title.replace(/ /g, '_'),
+                extract: p.extract,
+                image: thumb,
+                thumb: thumb.includes('/960px-') ? thumb.replace('/960px-', '/500px-') : thumb,
+                url: p.fullurl,
+            };
         }
-    }));
+        if ((i / 20) % 20 === 0) console.log(`  ${Math.min(i + 20, titles.length)}/${titles.length}`);
+        await sleep(200);
+    }
+    return out;
 }
 
 const qidOf = (uri) => uri.split('/').pop();
@@ -156,20 +183,33 @@ async function fetchDetails(qids) {
     return out;
 }
 
-// Wikimedia only serves a fixed set of thumbnail widths.
-function sizedImage(summary, width) {
-    const orig = summary.originalimage;
-    if (orig && orig.width <= width) return orig.source;
-    const thumb = summary.thumbnail?.source;
-    return thumb ? thumb.replace(/\/\d+px-/, `/${width}px-`) : orig?.source;
-}
-
-function viewsRange() {
-    const end = new Date();
-    end.setUTCDate(0); // last day of previous month
-    const start = new Date(Date.UTC(end.getUTCFullYear() - 1, end.getUTCMonth() + 1, 1));
-    const fmt = (d) => d.toISOString().slice(0, 10).replace(/-/g, '');
-    return [fmt(start), fmt(end)];
+// Popularity = fr.wikipedia page views over the last 60 days (the max the action API
+// serves), batched 50 titles per call and scaled to a yearly estimate. The per-article
+// REST pageviews endpoint rate-limits bulk lookups far too hard.
+const VIEW_DAYS = 60;
+async function fetchPageviews(titles) {
+    const out = {};
+    for (let i = 0; i < titles.length; i += 50) {
+        const batch = titles.slice(i, i + 50);
+        let cont = {};
+        do { // the API returns pageviews for part of the batch, then a `continue` token
+            const params = new URLSearchParams({
+                action: 'query', format: 'json', formatversion: '2',
+                prop: 'pageviews', pvipdays: String(VIEW_DAYS), titles: batch.join('|'), ...cont,
+            });
+            const res = await getJson(`https://fr.wikipedia.org/w/api.php?${params}`);
+            for (const p of res?.query?.pages || []) {
+                if (!p.pageviews) continue;
+                const sum = Object.values(p.pageviews).reduce((a, v) => a + (v || 0), 0);
+                out[p.title] = Math.round((sum * 365) / VIEW_DAYS);
+            }
+            cont = res?.continue || null;
+            if (cont) await sleep(1_000);
+        } while (cont);
+        if ((i / 50) % 10 === 0) console.log(`  ${Math.min(i + 50, titles.length)}/${titles.length}`);
+        await sleep(3_000);
+    }
+    return out;
 }
 
 function hpFor(views, rarity) {
@@ -225,28 +265,20 @@ async function main() {
 
     console.log('Fetching Wikipedia summaries…');
     const summaries = cache('summaries');
-    await pool(candidates.filter((c) => !(c.qid in summaries.data)), 8, async (c) => {
-        const s = await getJson(`https://fr.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(c.title.replace(/ /g, '_'))}`);
-        summaries.data[c.qid] = s && s.type !== 'disambiguation' && s.thumbnail ? {
-            title: s.title,
-            canonical: s.titles?.canonical || s.title.replace(/ /g, '_'),
-            extract: s.extract,
-            image: sizedImage(s, 960),
-            thumb: sizedImage(s, 500),
-            url: s.content_urls?.desktop?.page,
-        } : null;
-    });
+    const missing = candidates.filter((c) => !(c.qid in summaries.data));
+    const byTitle = await fetchSummaries(missing.map((c) => c.title));
+    for (const c of missing) if (c.title in byTitle) summaries.data[c.qid] = byTitle[c.title];
     summaries.save();
 
-    const [from, to] = viewsRange();
-    console.log(`Fetching page views ${from}→${to}…`);
-    const views = cache(`views-${from}-${to}`);
+    console.log(`Fetching page views (last ${VIEW_DAYS} days)…`);
+    const views = cache(`views-${new Date().toISOString().slice(0, 7)}`);
     const withSummary = candidates.filter((c) => summaries.data[c.qid]);
-    await pool(withSummary.filter((c) => !(c.qid in views.data)), 8, async (c) => {
-        const article = encodeURIComponent(summaries.data[c.qid].canonical);
-        const res = await getJson(`https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/fr.wikipedia/all-access/user/${article}/monthly/${from}/${to}`);
-        views.data[c.qid] = (res?.items || []).reduce((sum, m) => sum + m.views, 0);
-    });
+    const todo = withSummary.filter((c) => !(c.qid in views.data));
+    const byPage = await fetchPageviews(todo.map((c) => summaries.data[c.qid].title));
+    for (const c of todo) {
+        const v = byPage[summaries.data[c.qid].title];
+        if (v !== undefined) views.data[c.qid] = v;
+    }
     views.save();
 
     const cards = withSummary.map((c) => {

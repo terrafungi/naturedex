@@ -68,7 +68,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                     ))}
                 </div>
                 <div className="nd-foot">
-                    <span className="flex items-center gap-[1cqi]" title="Vues Wikipédia sur 12 mois">
+                    <span className="flex items-center gap-[1cqi]" title="Lectures Wikipédia par an (estimation)">
                         {card.views != null && <><Eye className="w-[3.6cqi] h-[3.6cqi]" />{formatViews(Number(card.views))}</>}
                     </span>
                     <span className="font-bold tracking-wide" style={{ color: r.color }} title={r.label}>
