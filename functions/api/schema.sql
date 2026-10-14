@@ -184,3 +184,11 @@ CREATE TABLE IF NOT EXISTS purchases (
     paid_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS purchases_user ON purchases (user_id, created_at DESC);
+
+-- Invitations: each player gets a code; a new account signed up with it records its sponsor.
+-- The sponsor's reward is claimed once the invitee has played on INVITE_DAYS different days.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code TEXT UNIQUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_by INT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_rewarded_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_share DATE;
+CREATE INDEX IF NOT EXISTS users_invited_by ON users (invited_by);

@@ -1,11 +1,27 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowDown, HeartHandshake } from 'lucide-react';
-import { useGame } from '../api.jsx';
+import { ArrowDown, Gift, HeartHandshake } from 'lucide-react';
+import { api, useGame } from '../api.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
 
 const RETURNING_KEY = 'naturdex.returning';
+const INVITE_KEY = 'naturdex.invite';
+
+// ?parrain=CODE is kept in localStorage until sign-up, so it survives page changes.
+function useInvite(params) {
+    const [invite, setInvite] = useState(null);
+    useEffect(() => {
+        const fromUrl = params.get('parrain');
+        if (fromUrl) localStorage.setItem(INVITE_KEY, fromUrl);
+        const code = fromUrl || localStorage.getItem(INVITE_KEY);
+        if (!code) return;
+        api('inviteInfo', { code })
+            .then((res) => setInvite({ code, ...res }))
+            .catch(() => localStorage.removeItem(INVITE_KEY));
+    }, [params]);
+    return invite;
+}
 
 // Three of the most viewed species (legendary, epic, rare), each of a different type.
 function useSampleCards(catalog) {
@@ -94,6 +110,7 @@ export default function Auth() {
     const [mode, setMode] = useState(() => {
         const asked = params.get('mode');
         if (asked === 'login' || asked === 'register') return asked;
+        if (params.get('parrain')) return 'register';
         return localStorage.getItem(RETURNING_KEY) ? 'login' : 'register';
     });
     const [username, setUsername] = useState('');
@@ -101,6 +118,7 @@ export default function Auth() {
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
     const navigate = useNavigate();
+    const invite = useInvite(params);
 
     if (user) return <Navigate to="/" replace />;
 
@@ -109,8 +127,9 @@ export default function Auth() {
         setBusy(true);
         setError('');
         try {
-            await authenticate(mode, username, password);
+            await authenticate(mode, username, password, mode === 'register' && invite ? { invite: invite.code } : {});
             localStorage.setItem(RETURNING_KEY, '1');
+            if (mode === 'register') localStorage.removeItem(INVITE_KEY);
             navigate('/booster');
         } catch (err) {
             setError(err.message);
@@ -134,6 +153,14 @@ export default function Auth() {
             <h1 className="font-display text-4xl font-semibold text-white text-center">
                 {mode === 'register' ? <>Ton carnet de<br /><span className="nd-grad-text">naturaliste</span></> : <>Bon retour,<br /><span className="nd-grad-text">explorateur</span></>}
             </h1>
+            {invite && mode === 'register' && (
+                <div className="mt-6 flex items-center gap-3 rounded-2xl p-3.5 bg-[#4fd18b]/10 ring-1 ring-[#4fd18b]/30">
+                    <span className="grid place-items-center w-10 h-10 shrink-0 rounded-full bg-[#4fd18b] text-[#05130d]"><Gift className="w-5 h-5" /></span>
+                    <p className="text-sm text-white/90 leading-snug">
+                        <strong className="text-white">{invite.username}</strong> t'invite ! Inscris-toi pour recevoir <strong className="text-[#8ee6a8]">+{invite.bonus.coins} graines</strong> et <strong className="text-[#f4c25b]">+{invite.bonus.nuggets} pépites</strong> en bonus.
+                    </p>
+                </div>
+            )}
             <form onSubmit={submit} className="mt-10 p-6 rounded-3xl bg-white/[0.04] backdrop-blur border border-white/10 shadow-xl shadow-black/30 space-y-4">
                 <div className="flex gap-1 p-1 rounded-full bg-white/5 border border-white/10">
                     {tab('login', 'Connexion')}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeftRight, Check, Clock, Minus, Plus, Search, Send, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react';
+import InviteBanner from '../components/InviteBanner.jsx';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { RARITIES } from '../game.jsx';
@@ -352,6 +353,7 @@ export default function Friends() {
             <p className="mt-3 text-ink-soft max-w-xl">Ajoute tes amis avec leur pseudo, puis échangez vos cartes. Ton pseudo : <b className="text-white">{user.username}</b></p>
 
             <div className="mt-6"><AddFriend onDone={load} /></div>
+            <InviteBanner className="mt-4" />
 
             <div className="mt-8 grid grid-cols-3 sm:flex gap-1 p-1 rounded-full bg-white/5 ring-1 ring-white/10 sm:w-fit">
                 {TABS.map(([key, label]) => (

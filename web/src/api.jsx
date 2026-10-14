@@ -55,8 +55,8 @@ export function GameProvider({ children }) {
         return () => clearInterval(t);
     }, [loggedIn]);
 
-    const authenticate = useCallback(async (mode, username, password) => {
-        const { token, user } = await api(mode, { username, password });
+    const authenticate = useCallback(async (mode, username, password, extra = {}) => {
+        const { token, user } = await api(mode, { username, password, ...extra });
         localStorage.setItem(TOKEN_KEY, token);
         setUser(user);
         await refreshCollection();

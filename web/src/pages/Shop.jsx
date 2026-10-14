@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Check, CheckCircle2, ExternalLink, FlaskConical, HeartHandshake, Info, Loader2, Lock, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
+import InviteBanner from '../components/InviteBanner.jsx';
 import { api, useGame } from '../api.jsx';
 import { Amount, Nugget, Seed } from '../components/Currency.jsx';
 
@@ -197,6 +198,7 @@ export default function Shop() {
         <div className="max-w-5xl mx-auto px-5 py-10">
             <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Boutique solidaire</p>
             <h1 className="mt-1 font-display text-4xl sm:text-5xl font-medium text-white">Des crédits qui font pousser la nature</h1>
+            <InviteBanner className="mt-5" />
 
             <div className="mt-6 rounded-3xl p-5 sm:p-6 ring-1 ring-[#4fd18b]/35 bg-[linear-gradient(135deg,rgba(79,209,139,0.16),rgba(79,209,139,0.03))] flex flex-col sm:flex-row sm:items-center gap-5">
                 <div className="flex items-center gap-4 flex-1">

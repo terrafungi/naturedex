@@ -37,6 +37,13 @@ const MAX_CHARGES = 10;
 const CHARGE_MS = 30 * 60 * 1000;
 const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
 const SESSION_DAYS = 60;
+// Invitations and sharing. The sponsor is paid only once the invitee has really played
+// (INVITE_DAYS different days), and at most INVITE_CAP times, so fake accounts don't pay.
+const INVITE_REWARD = { coins: 1000, nuggets: 150 };
+const INVITEE_BONUS = { coins: 300, nuggets: 50 };
+const INVITE_DAYS = 2;
+const INVITE_CAP = 30;
+const SHARE_COINS = 100; // once a day, for sharing the game link
 // pépites per recycled duplicate
 const RECYCLE_VALUE = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, secret: 1000 };
 
@@ -312,6 +319,47 @@ const BOARDS = {
                      FROM user_cards uc JOIN cards c ON c.id = uc.card_id GROUP BY 1`,
     trophies: () => `SELECT user_id, COUNT(*)::int AS score, 0 AS extra FROM trophy_claims GROUP BY 1`,
 };
+
+async function findSponsor(db, code) {
+    const { rows } = await db.query(`SELECT id, username FROM users WHERE invite_code = $1`, [String(code).trim().toLowerCase()]);
+    return rows[0] || null;
+}
+
+// The player's invite code, created the first time it is needed.
+async function inviteCode(db, user) {
+    if (user.invite_code) return user.invite_code;
+    for (;;) {
+        const code = crypto.randomBytes(6).toString('base64url').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 7);
+        if (code.length < 6) continue;
+        const { rows } = await db.query(
+            `UPDATE users SET invite_code = $2 WHERE id = $1 AND invite_code IS NULL
+             AND NOT EXISTS (SELECT 1 FROM users WHERE invite_code = $2) RETURNING invite_code`, [user.id, code]);
+        if (rows[0]) return rows[0].invite_code;
+        const { rows: [again] } = await db.query(`SELECT invite_code FROM users WHERE id = $1`, [user.id]);
+        if (again.invite_code) return again.invite_code;
+    }
+}
+
+const PARIS_DAY = `(now() AT TIME ZONE 'Europe/Paris')::date`;
+
+async function inviteState(db, user) {
+    const code = await inviteCode(db, user);
+    const { rows: invitees } = await db.query(
+        `SELECT u.username, u.created_at, u.invite_rewarded_at IS NOT NULL AS rewarded,
+                (SELECT COUNT(DISTINCT d)::int FROM (
+                    SELECT (at AT TIME ZONE 'Europe/Paris')::date AS d FROM openings WHERE user_id = u.id
+                    UNION SELECT day FROM quizzes WHERE user_id = u.id AND status = 'done') x) AS days
+         FROM users u WHERE u.invited_by = $1 ORDER BY u.created_at DESC LIMIT 200`, [user.id]);
+    const { rows: [me] } = await db.query(`SELECT last_share IS NOT NULL AND last_share >= ${PARIS_DAY} AS shared FROM users WHERE id = $1`, [user.id]);
+    const rewarded = invitees.filter((i) => i.rewarded).length;
+    return {
+        code,
+        reward: INVITE_REWARD, inviteeBonus: INVITEE_BONUS, days: INVITE_DAYS, cap: INVITE_CAP, shareCoins: SHARE_COINS,
+        rewarded,
+        sharedToday: me.shared,
+        invitees: invitees.map((i) => ({ ...i, ready: !i.rewarded && i.days >= INVITE_DAYS && rewarded < INVITE_CAP })),
+    };
+}
 
 async function trophyList(db, userId) {
     const [{ rows: [m] }, { rows: groups }, { rows: claims }] = await Promise.all([
@@ -639,10 +687,15 @@ const actions = {
         if (password.length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
         const exists = await db.query(`SELECT 1 FROM users WHERE lower(username) = lower($1)`, [username]);
         if (exists.rows[0]) throw new HttpError(409, 'Ce pseudo est déjà pris');
-        const { rows } = await db.query(
-            `INSERT INTO users (username, pass_hash) VALUES ($1, $2) RETURNING *`,
-            [username, await hashPassword(password)]
+        const sponsor = body.invite ? await findSponsor(db, body.invite) : null;
+        let { rows } = await db.query(
+            `INSERT INTO users (username, pass_hash, invited_by) VALUES ($1, $2, $3) RETURNING *`,
+            [username, await hashPassword(password), sponsor?.id || null]
         );
+        if (sponsor) {
+            ({ rows } = await db.query(`UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1 RETURNING *`,
+                [rows[0].id, INVITEE_BONUS.coins, INVITEE_BONUS.nuggets]));
+        }
         return { token: await createSession(db, rows[0].id), user: await publicUser(db, rows[0]) };
     },
 
@@ -854,6 +907,54 @@ const actions = {
             top: rows.filter((r) => r.rank <= 50).slice(0, 50).map(({ players, ...r }) => r),
             me: me && (({ players, ...r }) => r)(me),
         };
+    },
+
+    // Public: who sent this invite link (shown on the sign-up page).
+    async inviteInfo(db, body) {
+        const sponsor = body.code ? await findSponsor(db, body.code) : null;
+        if (!sponsor) throw new HttpError(404, 'Lien d\'invitation inconnu');
+        return { username: sponsor.username, bonus: INVITEE_BONUS };
+    },
+
+    async invites(db, body, event) {
+        const user = await requireUser(db, event);
+        return inviteState(db, user);
+    },
+
+    // Pays the sponsor for every invitee who has played INVITE_DAYS days, within the cap.
+    async claimInvites(db, body, event) {
+        const user = await requireUser(db, event);
+        const paid = await inTransaction(db, async (client) => {
+            const { rows: [u] } = await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+            const { rows: [{ n }] } = await client.query(`SELECT COUNT(*)::int AS n FROM users WHERE invited_by = $1 AND invite_rewarded_at IS NOT NULL`, [u.id]);
+            const room = Math.max(0, INVITE_CAP - n);
+            if (!room) return 0;
+            const { rowCount } = await client.query(
+                `UPDATE users SET invite_rewarded_at = now() WHERE id IN (
+                    SELECT u.id FROM users u WHERE u.invited_by = $1 AND u.invite_rewarded_at IS NULL
+                      AND (SELECT COUNT(DISTINCT d) FROM (
+                            SELECT (at AT TIME ZONE 'Europe/Paris')::date AS d FROM openings WHERE user_id = u.id
+                            UNION SELECT day FROM quizzes WHERE user_id = u.id AND status = 'done') x) >= $2
+                    ORDER BY u.created_at LIMIT $3)`, [u.id, INVITE_DAYS, room]);
+            if (rowCount) {
+                await client.query(`UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1`,
+                    [u.id, rowCount * INVITE_REWARD.coins, rowCount * INVITE_REWARD.nuggets]);
+            }
+            return rowCount;
+        });
+        if (!paid) throw new HttpError(400, 'Aucune récompense à récupérer pour l\'instant');
+        const { rows: [updated] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
+        return { paid, coins: paid * INVITE_REWARD.coins, nuggets: paid * INVITE_REWARD.nuggets, user: await publicUser(db, updated), invites: await inviteState(db, updated) };
+    },
+
+    // Sharing can't be verified, so it pays little and once a day.
+    async shareReward(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows: [updated] } = await db.query(
+            `UPDATE users SET coins = coins + $2, last_share = ${PARIS_DAY}
+             WHERE id = $1 AND (last_share IS NULL OR last_share < ${PARIS_DAY}) RETURNING *`, [user.id, SHARE_COINS]);
+        if (!updated) throw new HttpError(409, 'Bonus de partage déjà reçu aujourd\'hui');
+        return { coins: SHARE_COINS, user: await publicUser(db, updated), invites: await inviteState(db, updated) };
     },
 
     async claimTrophy(db, body, event) {
@@ -1419,7 +1520,7 @@ const actions = {
     },
 };
 
-const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout']);
+const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo']);
 
 export const handler = async (event) => {
     if (event.source === 'schedule') {

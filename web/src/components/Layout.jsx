@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, Brain, Gavel, Home, Layers, LayoutGrid, Medal, Package, Plus, ShoppingBag, Trophy, User, Users, X } from 'lucide-react';
+import { Award, Brain, Gavel, Gift, Home, Layers, LayoutGrid, Medal, Package, Plus, ShoppingBag, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
@@ -16,6 +16,7 @@ export const NAV = [
     { to: '/defis', label: 'Défis', Icon: Trophy },
     { to: '/trophees', label: 'Trophées', Icon: Award },
     { to: '/boutique', label: 'Boutique solidaire', short: 'Boutique', Icon: ShoppingBag },
+    { to: '/inviter', label: 'Inviter des amis', short: 'Inviter', Icon: Gift },
     { to: '/profil', label: 'Profil', Icon: User },
 ];
 

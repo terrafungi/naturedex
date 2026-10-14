@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import './index.css';
 import { GameProvider, useGame } from './api.jsx';
 import Layout from './components/Layout.jsx';
@@ -13,6 +13,7 @@ import Challenges from './pages/Challenges.jsx';
 import Profile from './pages/Profile.jsx';
 import Trophies from './pages/Trophies.jsx';
 import Leaderboard from './pages/Leaderboard.jsx';
+import Invite from './pages/Invite.jsx';
 import Auctions from './pages/Auctions.jsx';
 import Friends from './pages/Friends.jsx';
 import Quiz from './pages/Quiz.jsx';
@@ -22,8 +23,10 @@ import Shop from './pages/Shop.jsx';
 // visit lands on the sign-up form (Auth switches to log-in for returning players).
 function Private({ children }) {
     const { user, ready } = useGame();
+    const { search } = useLocation();
     if (!ready) return <div className="py-32 text-center font-display text-xl text-ink-soft">Chargement…</div>;
-    return user ? children : <Navigate to="/connexion" replace />;
+    // keep ?parrain=… (invite links point at the home page)
+    return user ? children : <Navigate to={`/connexion${search}`} replace />;
 }
 
 createRoot(document.getElementById('root')).render(
@@ -38,6 +41,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/defis" element={<Private><Challenges /></Private>} />
                         <Route path="/trophees" element={<Private><Trophies /></Private>} />
                         <Route path="/classement" element={<Private><Leaderboard /></Private>} />
+                        <Route path="/inviter" element={<Private><Invite /></Private>} />
                         <Route path="/encheres" element={<Private><Auctions /></Private>} />
                         <Route path="/quiz" element={<Private><Quiz /></Private>} />
                         <Route path="/boutique" element={<Private><Shop /></Private>} />
