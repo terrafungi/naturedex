@@ -56,19 +56,19 @@ export default function Boosters() {
             <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Carnet de {user.username}</p>
-                    <h1 className="font-display text-4xl sm:text-5xl font-black text-forest mt-1">
+                    <h1 className="font-display text-4xl sm:text-5xl font-black text-white mt-1">
                         {discovered} <span className="text-ink-soft font-medium text-2xl sm:text-3xl">/ {total} espèces découvertes</span>
                     </h1>
                 </div>
             </div>
-            <div className="mt-4 h-2.5 rounded-full bg-forest/10 overflow-hidden">
-                <motion.div className="h-full bg-gradient-to-r from-forest to-brass" initial={{ width: 0 }} animate={{ width: `${(discovered / Math.max(total, 1)) * 100}%` }} transition={{ duration: 1 }} />
+            <div className="mt-4 h-2.5 rounded-full bg-white/10 overflow-hidden">
+                <motion.div className="h-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-500" initial={{ width: 0 }} animate={{ width: `${(discovered / Math.max(total, 1)) * 100}%` }} transition={{ duration: 1 }} />
             </div>
 
             <div className="mt-10 grid lg:grid-cols-[1fr_1.2fr] gap-8 items-start">
                 {/* the pack */}
-                <div className="relative flex flex-col items-center p-8 rounded-[2rem] bg-forest text-paper overflow-hidden">
-                    <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(circle at 50% 30%, #c9a24a, transparent 60%)' }} />
+                <div className="relative flex flex-col items-center p-8 rounded-[2rem] nd-glass nd-ring text-paper overflow-hidden">
+                    <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(circle at 50% 30%, #7c5cff, transparent 55%), radial-gradient(circle at 30% 90%, #22e58b, transparent 50%)' }} />
                     <motion.button
                         disabled={busy || user.boosters < 1}
                         onClick={open}
@@ -86,7 +86,7 @@ export default function Boosters() {
                     <button
                         disabled={busy || user.boosters < 1}
                         onClick={open}
-                        className="relative mt-8 w-full max-w-xs py-3.5 rounded-full bg-brass text-forest-deep font-bold text-lg hover:bg-[#d8b25a] disabled:opacity-40"
+                        className="relative mt-8 w-full max-w-xs py-3.5 rounded-full nd-btn font-bold text-lg disabled:opacity-40"
                     >
                         {user.boosters > 0 ? 'Ouvrir un booster' : 'Aucun booster'}
                     </button>
@@ -96,17 +96,17 @@ export default function Boosters() {
                 <div className="space-y-6">
                     {/* daily + shop */}
                     <div className="grid sm:grid-cols-2 gap-4">
-                        <div className="p-5 rounded-3xl border border-forest/15 bg-paper-deep/50">
+                        <div className="p-5 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur">
                             <Gift className="w-6 h-6 text-rust" />
                             <h2 className="mt-2 font-display text-xl font-bold">Bonus du jour</h2>
                             <p className="text-sm text-ink-soft">+{user.dailyCoins} pièces toutes les 20 heures.</p>
                             <button disabled={busy || !!countdown} onClick={daily}
-                                className="mt-4 w-full py-2.5 rounded-full bg-forest text-paper font-semibold hover:bg-forest-deep disabled:bg-forest/20 disabled:text-ink-soft">
+                                className="mt-4 w-full py-2.5 rounded-full nd-btn font-semibold disabled:opacity-40 disabled:grayscale">
                                 {countdown ? `Revient dans ${countdown}` : 'Récupérer'}
                             </button>
                         </div>
-                        <div className="p-5 rounded-3xl border border-forest/15 bg-paper-deep/50">
-                            <Package className="w-6 h-6 text-forest" />
+                        <div className="p-5 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur">
+                            <Package className="w-6 h-6 text-white" />
                             <h2 className="mt-2 font-display text-xl font-bold">Boutique</h2>
                             <p className="text-sm text-ink-soft">Tu as <b className="text-brass-deep">{user.coins} pièces</b>. Recycle tes doublons pour en gagner.</p>
                             <button disabled={busy || user.coins < user.boosterPrice} onClick={buy}
@@ -117,7 +117,7 @@ export default function Boosters() {
                     </div>
 
                     {/* progress by type */}
-                    <div className="p-5 rounded-3xl border border-forest/15">
+                    <div className="p-5 rounded-3xl border border-white/10">
                         <h2 className="font-display text-xl font-bold">Progression par type</h2>
                         <ul className="mt-4 grid sm:grid-cols-2 gap-x-6 gap-y-2.5">
                             {byType.map(({ key, total, have }) => {
@@ -126,7 +126,7 @@ export default function Boosters() {
                                     <li key={key} className="flex items-center gap-2.5 text-sm">
                                         <t.Icon className="w-4 h-4 shrink-0" style={{ color: t.color }} />
                                         <span className="w-36 truncate">{t.label}</span>
-                                        <span className="flex-1 h-1.5 rounded-full bg-forest/10 overflow-hidden">
+                                        <span className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
                                             <span className="block h-full rounded-full" style={{ width: `${(have / Math.max(total, 1)) * 100}%`, background: t.color }} />
                                         </span>
                                         <span className="w-14 text-right tabular-nums text-ink-soft">{have}/{total}</span>

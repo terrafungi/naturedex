@@ -57,7 +57,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                 </div>
                 <div className="nd-strip">
                     <span className="nd-sci">{card.sci_name || t.label}</span>
-                    <span className="shrink-0 font-semibold" style={{ color: r.color }}>{t.label}</span>
+                    <span className="shrink-0 font-semibold" style={{ color: `color-mix(in oklab, ${r.color} 72%, black)` }}>{t.label}</span>
                 </div>
                 <div className="mt-[1.5cqi]">
                     {attacksFor(card).map((a) => (
@@ -72,7 +72,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                     <span className="flex items-center gap-[1cqi]" title="Lectures Wikipédia par an (estimation)">
                         {card.views != null && <><Eye className="w-[3.6cqi] h-[3.6cqi]" />{formatViews(Number(card.views))}</>}
                     </span>
-                    <span className="font-bold tracking-wide" style={{ color: r.color }} title={r.label}>
+                    <span className="font-bold tracking-wide" style={{ color: `color-mix(in oklab, ${r.color} 72%, black)` }} title={r.label}>
                         {r.symbol} {r.label}
                     </span>
                     {number != null && <span>{String(number).padStart(3, '0')}/{total}</span>}
@@ -104,14 +104,14 @@ export function MysteryCard({ card, number }) {
 export function CardBack() {
     return (
         <div className="nd-box">
-        <div className="nd-card" style={{ '--type': '#1f3d2b' }}>
+        <div className="nd-card" style={{ '--type': '#4c3bd1' }}>
             <div className="h-full rounded-[2.6cqi] grid place-items-center"
                 style={{
-                    background: 'repeating-linear-gradient(45deg, #24483a 0 4cqi, #1d3b2f 4cqi 8cqi)',
-                    boxShadow: '0 0 0 0.8cqi #c9a24a inset',
+                    background: 'radial-gradient(circle at 50% 45%, rgb(255 255 255 / 0.25), transparent 45%), repeating-linear-gradient(45deg, rgb(255 255 255 / 0.06) 0 4cqi, transparent 4cqi 8cqi), conic-gradient(from 200deg, #14c8d6, #7c5cff, #ff4f9a, #ffc53d, #3cf29b, #14c8d6)',
+                    boxShadow: '0 0 0 0.8cqi rgb(255 255 255 / 0.6) inset',
                 }}>
-                <div className="font-display text-[#e8cf8f] text-center" style={{ fontSize: '10cqi', lineHeight: 1 }}>
-                    Natur<br /><i>Dex</i>
+                <div className="font-display font-extrabold text-white text-center tracking-tight" style={{ fontSize: '11cqi', lineHeight: 0.95, textShadow: '0 1cqi 4cqi rgb(30 0 80 / 0.5)' }}>
+                    Natur<br />Dex
                 </div>
             </div>
         </div>

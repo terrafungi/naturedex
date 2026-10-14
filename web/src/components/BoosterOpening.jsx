@@ -6,7 +6,7 @@ import { Card, CardBack } from './Card.jsx';
 import { RARITIES } from '../game.jsx';
 import { Pack } from './Pack.jsx';
 
-const GLOW = { rare: '#e7c35a', epic: '#c18bff', legendary: '#ffd36e' };
+const GLOW = { rare: '#ffb627', epic: '#c084fc', legendary: '#ffd84d' };
 
 function Burst({ rarity }) {
     const color = GLOW[rarity];
@@ -56,7 +56,7 @@ function FlipCard({ card, revealed, onClick }) {
     );
 }
 
-export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain }) {
+export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, demo }) {
     const [stage, setStage] = useState('pack'); // pack → reveal → summary
     const [index, setIndex] = useState(0);
     const [revealed, setRevealed] = useState(false);
@@ -78,7 +78,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain }
     const rarityLabel = current && RARITIES[current.rarity];
 
     return (
-        <motion.div className="fixed inset-0 z-50 bg-forest-deep/95 backdrop-blur-sm overflow-y-auto"
+        <motion.div className="fixed inset-0 z-50 bg-[#05070f]/95 backdrop-blur-sm overflow-y-auto"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <button onClick={onClose} className="absolute top-4 right-4 z-10 p-2 rounded-full text-paper/70 hover:text-paper hover:bg-white/10" title="Fermer">
                 <X className="w-6 h-6" />
@@ -134,26 +134,32 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain }
 
                     {stage === 'summary' && (
                         <motion.div key="summary" className="w-full max-w-5xl flex flex-col items-center gap-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                            <h2 className="font-display text-paper text-3xl font-bold">
-                                {cards.filter((c) => c.isNew).length} nouvelle{cards.filter((c) => c.isNew).length > 1 ? 's' : ''} espèce{cards.filter((c) => c.isNew).length > 1 ? 's' : ''} !
+                            <h2 className="font-display text-paper text-3xl font-bold text-center">
+                                {demo ? <>Joli tirage ! <span className="nd-grad-text">Garde-le pour de vrai.</span></> : <>{cards.filter((c) => c.isNew).length} nouvelle{cards.filter((c) => c.isNew).length > 1 ? 's' : ''} espèce{cards.filter((c) => c.isNew).length > 1 ? 's' : ''} !</>}
                             </h2>
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
                                 {cards.map((card, i) => (
                                     <motion.div key={i} className="relative" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
-                                        <Link to={`/carte/${card.id}`}><Card card={card} /></Link>
+                                        {demo ? <Card card={card} /> : <Link to={`/carte/${card.id}`}><Card card={card} /></Link>}
                                         {card.isNew && <span className="absolute -top-2 -left-2 px-2 py-0.5 rounded-full bg-rust text-paper text-[10px] font-black uppercase">Nouveau</span>}
                                     </motion.div>
                                 ))}
                             </div>
                             <div className="flex flex-wrap justify-center gap-3">
                                 {canOpenAgain && (
-                                    <button onClick={onAgain} className="px-6 py-3 rounded-full bg-brass text-forest-deep font-bold hover:bg-[#d8b25a]">
-                                        Ouvrir un autre booster
+                                    <button onClick={onAgain} className={`px-6 py-3 rounded-full font-bold ${demo ? 'border border-paper/30 text-paper hover:bg-white/10' : 'nd-btn'}`}>
+                                        {demo ? 'Rouvrir un booster' : 'Ouvrir un autre booster'}
                                     </button>
                                 )}
-                                <Link to="/collection" className="px-6 py-3 rounded-full border border-paper/30 text-paper font-semibold hover:bg-white/10">
-                                    Voir ma collection
-                                </Link>
+                                {demo ? (
+                                    <Link to="/connexion?mode=register" className="px-6 py-3 rounded-full nd-btn font-bold">
+                                        Garder mes cartes — créer un compte
+                                    </Link>
+                                ) : (
+                                    <Link to="/collection" className="px-6 py-3 rounded-full border border-paper/30 text-paper font-semibold hover:bg-white/10">
+                                        Voir ma collection
+                                    </Link>
+                                )}
                                 <button onClick={onClose} className="px-6 py-3 rounded-full text-paper/70 hover:text-paper">Fermer</button>
                             </div>
                         </motion.div>

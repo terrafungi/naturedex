@@ -33,28 +33,28 @@ function SporesIcon(props) {
 }
 
 export const TYPES = {
-    mammal:    { label: 'Mammifère', color: '#a0522d', Icon: PawPrint, attacks: ['Coup de griffe', 'Charge', 'Hurlement', 'Morsure'] },
-    bird:      { label: 'Oiseau', color: '#3b6ea5', Icon: Bird, attacks: ['Piqué', 'Coup de bec', 'Bourrasque', 'Chant'] },
-    reptile:   { label: 'Reptile & amphibien', color: '#55803c', Icon: Turtle, attacks: ['Morsure', 'Mue', 'Langue collante', 'Carapace'] },
-    fish:      { label: 'Poisson', color: '#2a6f97', Icon: Fish, attacks: ['Banc tournoyant', 'Nage rapide', 'Aileron', 'Remous'] },
-    arthropod: { label: 'Insecte & arachnide', color: '#b8860b', Icon: Bug, attacks: ['Piqûre', 'Essaim', 'Toile', 'Mandibules'] },
-    marine:    { label: 'Créature marine', color: '#1f5f8b', Icon: Shell, attacks: ['Tentacules', 'Jet d\'encre', 'Pince', 'Courant'] },
-    plant:     { label: 'Plante', color: '#6b8e23', Icon: Flower2, attacks: ['Pollinisation', 'Épines', 'Lianes', 'Parfum'] },
-    tree:      { label: 'Arbre', color: '#2e5a2e', Icon: TreeDeciduous, attacks: ['Racines profondes', 'Chute de glands', 'Sève', 'Canopée'] },
-    alga:      { label: 'Algue', color: '#2f7d73', Icon: Waves, attacks: ['Photosynthèse', 'Marée verte', 'Enlacement', 'Bloom'] },
-    fungus:    { label: 'Champignon', color: '#9c4a2f', Icon: MushroomIcon, attacks: ['Nuage de spores', 'Mycélium', 'Toxine', 'Rond de sorcière'] },
-    mold:      { label: 'Moisissure & levure', color: '#6f7d4f', Icon: SporesIcon, attacks: ['Fermentation', 'Spores', 'Colonisation', 'Décomposition'] },
-    bacteria:  { label: 'Bactérie', color: '#6a4c93', Icon: BacteriumIcon, attacks: ['Division', 'Biofilm', 'Flagelle', 'Toxine'] },
-    virus:     { label: 'Virus', color: '#b0306a', Icon: Biohazard, attacks: ['Réplication', 'Mutation', 'Contagion', 'Capside'] },
-    fossil:    { label: 'Fossile', color: '#8a6d4b', Icon: Bone, attacks: ['Rugissement ancestral', 'Pétrification', 'Âge de pierre', 'Extinction'] },
+    mammal:    { label: 'Mammifère', color: '#e2683c', Icon: PawPrint, attacks: ['Coup de griffe', 'Charge', 'Hurlement', 'Morsure'] },
+    bird:      { label: 'Oiseau', color: '#3b82f6', Icon: Bird, attacks: ['Piqué', 'Coup de bec', 'Bourrasque', 'Chant'] },
+    reptile:   { label: 'Reptile & amphibien', color: '#22a35a', Icon: Turtle, attacks: ['Morsure', 'Mue', 'Langue collante', 'Carapace'] },
+    fish:      { label: 'Poisson', color: '#0ea5e9', Icon: Fish, attacks: ['Banc tournoyant', 'Nage rapide', 'Aileron', 'Remous'] },
+    arthropod: { label: 'Insecte & arachnide', color: '#e09b00', Icon: Bug, attacks: ['Piqûre', 'Essaim', 'Toile', 'Mandibules'] },
+    marine:    { label: 'Créature marine', color: '#4f46e5', Icon: Shell, attacks: ['Tentacules', 'Jet d\'encre', 'Pince', 'Courant'] },
+    plant:     { label: 'Plante', color: '#65a30d', Icon: Flower2, attacks: ['Pollinisation', 'Épines', 'Lianes', 'Parfum'] },
+    tree:      { label: 'Arbre', color: '#15803d', Icon: TreeDeciduous, attacks: ['Racines profondes', 'Chute de glands', 'Sève', 'Canopée'] },
+    alga:      { label: 'Algue', color: '#0d9488', Icon: Waves, attacks: ['Photosynthèse', 'Marée verte', 'Enlacement', 'Bloom'] },
+    fungus:    { label: 'Champignon', color: '#c2410c', Icon: MushroomIcon, attacks: ['Nuage de spores', 'Mycélium', 'Toxine', 'Rond de sorcière'] },
+    mold:      { label: 'Moisissure & levure', color: '#889c24', Icon: SporesIcon, attacks: ['Fermentation', 'Spores', 'Colonisation', 'Décomposition'] },
+    bacteria:  { label: 'Bactérie', color: '#8b5cf6', Icon: BacteriumIcon, attacks: ['Division', 'Biofilm', 'Flagelle', 'Toxine'] },
+    virus:     { label: 'Virus', color: '#e11d74', Icon: Biohazard, attacks: ['Réplication', 'Mutation', 'Contagion', 'Capside'] },
+    fossil:    { label: 'Fossile', color: '#a8763e', Icon: Bone, attacks: ['Rugissement ancestral', 'Pétrification', 'Âge de pierre', 'Extinction'] },
 };
 
 export const RARITIES = {
-    common:    { label: 'Commune', symbol: '●', order: 0, color: '#4b5a4f' },
-    uncommon:  { label: 'Peu commune', symbol: '◆', order: 1, color: '#2e6b4f' },
-    rare:      { label: 'Rare', symbol: '★', order: 2, color: '#b8860b' },
-    epic:      { label: 'Épique', symbol: '★★', order: 3, color: '#7b3fa0' },
-    legendary: { label: 'Légendaire', symbol: '★★★', order: 4, color: '#a7741a' },
+    common:    { label: 'Commune', symbol: '●', order: 0, color: '#9ca3af' },
+    uncommon:  { label: 'Peu commune', symbol: '◆', order: 1, color: '#10b981' },
+    rare:      { label: 'Rare', symbol: '★', order: 2, color: '#e09b00' },
+    epic:      { label: 'Épique', symbol: '★★', order: 3, color: '#a855f7' },
+    legendary: { label: 'Légendaire', symbol: '★★★', order: 4, color: '#ffc53d' },
 };
 
 export const IUCN = {
