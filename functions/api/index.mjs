@@ -175,7 +175,7 @@ async function dailyChallenges(db, userId) {
     const { rows: [{ day }] } = await db.query(`SELECT to_char((now() AT TIME ZONE 'Europe/Paris')::date, 'YYYY-MM-DD') AS day`);
     const today = `(o.at AT TIME ZONE 'Europe/Paris')::date = $2::date`;
     const [{ rows: pulled }, { rows: [stats] }, { rows: claims }] = await Promise.all([
-        db.query(`SELECT c.type, c.rarity FROM openings o CROSS JOIN unnest(o.card_ids) AS id JOIN cards c ON c.id = id
+        db.query(`SELECT c.type, c.rarity FROM openings o CROSS JOIN unnest(o.card_ids) AS u(card_id) JOIN cards c ON c.id = u.card_id
                   WHERE o.user_id = $1 AND ${today}`, [userId, day]),
         db.query(`SELECT (SELECT COUNT(*)::int FROM openings o WHERE o.user_id = $1 AND ${today}) AS opened,
                          (SELECT COUNT(*)::int FROM user_cards uc WHERE uc.user_id = $1 AND (uc.first_at AT TIME ZONE 'Europe/Paris')::date = $2::date) AS discovered`,
