@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Coins, Library, LogOut, Package } from 'lucide-react';
 import { useGame } from '../api.jsx';
 
@@ -8,14 +8,17 @@ const navClass = ({ isActive }) =>
     }`;
 
 export default function Layout() {
-    const { user, logout } = useGame();
+    const { user, logout, ready } = useGame();
+    const { pathname } = useLocation();
+    // The landing hero is dark, so the header blends into it.
+    const dark = ready && !user && pathname === '/';
     return (
         <div className="min-h-screen flex flex-col">
-            <header className="sticky top-0 z-40 backdrop-blur-sm bg-paper/80 border-b border-forest/15">
+            <header className={`sticky top-0 z-40 backdrop-blur-md border-b transition-colors ${dark ? 'bg-forest-deep/75 border-paper/10' : 'bg-paper/80 border-forest/15'}`}>
                 <div className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-3">
                     <Link to="/" className="flex items-baseline gap-1 mr-auto">
-                        <span className="font-display text-2xl font-black text-forest tracking-tight">Natur</span>
-                        <span className="font-display text-2xl italic text-brass-deep">Dex</span>
+                        <span className={`font-display text-2xl font-black tracking-tight ${dark ? 'text-paper' : 'text-forest'}`}>Natur</span>
+                        <span className={`font-display text-2xl italic ${dark ? 'text-brass' : 'text-brass-deep'}`}>Dex</span>
                     </Link>
                     {user ? (
                         <>
@@ -31,7 +34,7 @@ export default function Layout() {
                             </button>
                         </>
                     ) : (
-                        <Link to="/connexion" className="px-4 py-2 rounded-full bg-forest text-paper text-sm font-semibold hover:bg-forest-deep">
+                        <Link to="/connexion" className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${dark ? 'bg-paper/10 text-paper ring-1 ring-paper/25 hover:bg-paper/20' : 'bg-forest text-paper hover:bg-forest-deep'}`}>
                             Se connecter
                         </Link>
                     )}
