@@ -90,11 +90,12 @@ export function formatMass(kg) {
 // First sentences of an article intro, at most ~`max` characters.
 export function intro(text, max = 300) {
     if (!text) return null;
-    const sentences = text.replace(/\s+/g, ' ').match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/g) || [text];
+    // A sentence ends with . ! ? followed by a capital (so "L., 1753" or "env. 3 m" do not split).
+    const sentences = text.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Þ«])/);
     let out = '';
     for (const s of sentences) {
-        if (out && (out + s).length > max) break;
-        out += s;
+        if (out && (out + ' ' + s).length > max) break;
+        out += (out ? ' ' : '') + s;
     }
     return out.trim().slice(0, max + 80);
 }

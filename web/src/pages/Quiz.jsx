@@ -5,7 +5,7 @@ import {
     ArrowRight, BookOpen, Bone, Brain, Check, ExternalLink, Flame, Flower2, Globe2, Lightbulb, PawPrint, Play, RotateCcw, Shell, Target, Timer, X,
 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
-import { Card, TypeBadge } from '../components/Card.jsx';
+import { Card } from '../components/Card.jsx';
 import { Amount } from '../components/Currency.jsx';
 import { IUCN, RARITIES, TYPES } from '../game.jsx';
 
@@ -122,7 +122,7 @@ function Home({ state, onStart, busy, error }) {
                     <ul className="mt-3 space-y-2 text-sm text-white/80">
                         {LEVELS.map((l, i) => (
                             <li key={l.label} className="flex items-center justify-between">
-                                <span><span className="inline-block w-2 h-2 rounded-full mr-2" style={{ background: l.color }} />Bonne réponse {l.label.toLowerCase()}</span>
+                                <span><span className="inline-block w-2 h-2 rounded-full mr-2" style={{ background: l.color }} />Bonne réponse · niveau {l.label.toLowerCase()}</span>
                                 <Amount seeds={r.levelCoins[i]} sign />
                             </li>
                         ))}
@@ -197,7 +197,7 @@ function Option({ q, o, i, feedback, chosen, onPick, disabled }) {
                 <div className="aspect-square bg-black/40">
                     {o.image && <img src={img(o.image)} alt="" className="w-full h-full object-cover" loading="eager" />}
                 </div>
-                <span className="absolute top-2 left-2">{key}</span>
+                <span className="absolute z-10 top-2 left-2">{key}</span>
                 {(label || fact) && (
                     <div className="px-2.5 py-2 text-[13px] leading-tight text-white font-semibold">
                         {label}{fact && <div className="text-[11px] font-normal text-[#e9c46a] mt-0.5">{fact}</div>}
@@ -213,7 +213,7 @@ function Option({ q, o, i, feedback, chosen, onPick, disabled }) {
     return (
         <button disabled={disabled} onClick={() => onPick(i)} className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${ring} ${fade}`}>
             {key}
-            {type && <TypeBadge type={o.type} className="w-8 h-8 shrink-0" />}
+            {type && <span className="grid place-items-center w-8 h-8 rounded-full shrink-0 text-white" style={{ background: type.color }}><type.Icon className="w-4.5 h-4.5" /></span>}
             {iucn && <span className="px-1.5 py-0.5 rounded text-[11px] font-black text-white shrink-0" style={{ background: iucn.color }}>{o.iucn}</span>}
             <span className={`flex-1 font-semibold text-white leading-snug ${o.italic ? 'italic font-display' : ''}`}>{type ? type.label : label}</span>
             {isAnswer && <Check className="w-5 h-5 text-[#4fd18b] shrink-0" />}
@@ -240,7 +240,9 @@ function Learn({ learn, correct }) {
                 <div className="mt-1 font-display text-xl text-white leading-tight">{learn.name}</div>
                 {learn.sci_name && learn.sci_name !== learn.name && <div className="italic text-sm text-white/60">{learn.sci_name}</div>}
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
-                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-white/[0.07] text-white/80"><TypeBadge type={learn.type} className="w-4 h-4" />{TYPES[learn.type]?.label}</span>
+                    {TYPES[learn.type] && (() => { const T = TYPES[learn.type]; return (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-white/[0.07]" style={{ color: T.color }}><T.Icon className="w-3.5 h-3.5" />{T.label}</span>
+                    ); })()}
                     <span className="rounded-full px-2 py-0.5 bg-white/[0.07]" style={{ color: r.color }}>{r.label}</span>
                     {iucn && <span className="rounded-full px-2 py-0.5 text-white" style={{ background: iucn.color }}>{iucn.label}</span>}
                     {learn.count > 0 && <span className="rounded-full px-2 py-0.5 bg-[#4fd18b]/15 text-[#a8f0c6]">Dans ta collection ×{learn.count}</span>}
@@ -396,7 +398,8 @@ function QuizRun({ id, onExit }) {
 
 // ---------- end ----------
 
-function Summary({ res, recap, onExit }) {
+function Summary({ res, recap: local, onExit }) {
+    const recap = res.recap?.map((r) => ({ learn: r.card, correct: r.correct })) || local;
     const { quiz } = res;
     const message = res.perfect ? 'Sans faute, bravo naturaliste !' : quiz.score >= 8 ? 'Excellent !' : quiz.score >= 5 ? 'Bien joué !' : 'Chaque erreur est une espèce de plus apprise.';
     return (

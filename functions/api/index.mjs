@@ -472,8 +472,8 @@ async function quizState(db, userId) {
 // The species behind a question, shown after the answer so the player learns something.
 async function learnCard(db, cardId, userId) {
     const { rows: [c] } = await db.query(
-        `SELECT c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.thumb_url, c.image_url, c.iucn, c.wiki_url, c.extract,
-                (c.stats->>'mass_kg')::float AS mass, COALESCE(uc.count, 0) AS count
+        `SELECT c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, c.image_url, c.iucn, c.wiki_url, c.extract,
+                c.stats, (c.stats->>'hp')::int AS hp, COALESCE(uc.count, 0) AS count
          FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $2 WHERE c.id = $1`,
         [cardId, userId]
     );
@@ -1209,6 +1209,10 @@ const actions = {
         const { about, rewardCard, ...res } = result;
         res.learn = await learnCard(db, about, user.id);
         if (res.done) {
+            const { rows: [q] } = await db.query(`SELECT questions, answers FROM quizzes WHERE id = $1`, [Number(body.id)]);
+            const ids = q.questions.map((x) => x.about);
+            const { rows: cards } = await db.query(`SELECT id, name, sci_name, thumb_url, type FROM cards WHERE id = ANY($1::int[])`, [ids]);
+            res.recap = ids.map((id, i) => ({ card: cards.find((c) => c.id === id), correct: q.answers[i]?.correct, kind: q.questions[i].kind }));
             res.rewardCard = rewardCard ? await learnCard(db, rewardCard, user.id) : null;
             res.user = await publicUser(db, await requireUser(db, event));
         }
