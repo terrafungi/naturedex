@@ -162,3 +162,25 @@ CREATE TABLE IF NOT EXISTS quiz_seen (
     at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, card_id)
 );
+
+-- Real-money shop (Stripe Checkout). 20 % of each paid amount is set aside for the
+-- association the buyer picked; rows are kept even if the account is deleted (accounting).
+CREATE TABLE IF NOT EXISTS purchases (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) ON DELETE SET NULL,
+    username TEXT NOT NULL,
+    pack TEXT NOT NULL,
+    amount_cents INT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'eur',
+    donation_cents INT NOT NULL,
+    association TEXT NOT NULL,
+    coins INT NOT NULL DEFAULT 0,
+    nuggets INT NOT NULL DEFAULT 0,
+    stripe_session TEXT UNIQUE,
+    stripe_payment TEXT,
+    livemode BOOLEAN NOT NULL DEFAULT false,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'expired')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    paid_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS purchases_user ON purchases (user_id, created_at DESC);

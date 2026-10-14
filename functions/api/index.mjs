@@ -6,6 +6,8 @@
  *
  * Environment variables:
  * - DATABASE_URL (Postgres connection string)
+ * - STRIPE_SECRET_KEY (shop; without it the shop shows payments as unavailable)
+ * - STRIPE_WEBHOOK_SECRET (optional; Stripe webhook → POST <function url>/stripe-webhook)
  */
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
@@ -14,6 +16,9 @@ import {
     CARD_SCORE, IUCN_LABELS, KIND_LABELS, LEVEL_COINS, PERFECT_COINS, PERFECT_NUGGETS, QUIZ_PER_DAY, THEMES,
     buildQuiz, intro, isLate, publicQuestion,
 } from './quiz.mjs';
+import {
+    ASSOCIATIONS, DONATION_SHARE, PACKS, createCheckout, donationOf, getCheckout, stripeReady, stripeTestMode, verifyWebhook,
+} from './shop.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -289,6 +294,8 @@ const TROPHIES = [
     ...series('Quiz', 'target', 'quizPerfect', [[1, 'Sans faute'], [10, 'Infaillible'], [50, 'Oracle']], (g) => `Réussis ${g} quiz parfait${g > 1 ? 's' : ''} (10/10)`),
     ...series('Quiz', 'flame', 'quizDays', [[7, 'Une semaine de savoir'], [30, 'Un mois d\'apprentissage'], [100, 'Cent jours'], [365, 'Une année de quiz']],
         (g) => `Joue au quiz ${g} jours différents`),
+    ...series('Boutique', 'heart', 'patron', [[1, 'Mécène de la nature'], [5, 'Ami des associations']],
+        (g) => g > 1 ? `Soutiens ${g} fois une association nature via la boutique` : 'Soutiens une association nature via la boutique'),
     ...series('Enchères', 'recycle', 'recycled', [[10, 'Tri sélectif'], [100, 'Recycleur'], [1000, 'Compost géant']], (g) => `Recycle ${n(g)} doublons`),
 ];
 
@@ -308,6 +315,7 @@ async function trophyList(db, userId) {
                     (SELECT COALESCE(SUM(score), 0)::int FROM quizzes WHERE user_id = $1 AND status = 'done') AS "quizCorrect",
                     (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND status = 'done' AND score = jsonb_array_length(questions)) AS "quizPerfect",
                     (SELECT COUNT(DISTINCT day)::int FROM quizzes WHERE user_id = $1 AND status = 'done') AS "quizDays",
+                    (SELECT COUNT(*)::int FROM purchases WHERE user_id = $1 AND status = 'paid') AS patron,
                     recycled FROM users WHERE id = $1`, [userId]),
         db.query(`SELECT c.type, c.rarity, COUNT(*)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
                   WHERE uc.user_id = $1 GROUP BY 1, 2`, [userId]),
@@ -558,6 +566,53 @@ async function loadTrades(db, userId, where) {
         give: items.filter((i) => i.fromSide === t.mine),
         get: items.filter((i) => i.fromSide !== t.mine),
     }));
+}
+
+// ---------- shop (real money, Stripe) ----------
+
+const SITE_ORIGINS = ['https://diuqx6knr7is6.cloudfront.net', 'http://localhost:6100', 'http://localhost:5173'];
+
+// Credit a purchase once Stripe says it is paid. Idempotent: the webhook and the
+// return page may both call this, only the first one flips pending → paid.
+async function grantPurchase(db, session) {
+    const id = Number(session.metadata?.purchase_id || session.client_reference_id);
+    if (!id || session.payment_status !== 'paid') return null;
+    return inTransaction(db, async (client) => {
+        const { rows: [p] } = await client.query(
+            `UPDATE purchases SET status = 'paid', paid_at = now(), stripe_payment = $3, livemode = $4
+             WHERE id = $1 AND stripe_session = $2 AND status <> 'paid' AND amount_cents = $5 AND currency = $6 RETURNING *`,
+            [id, session.id, session.payment_intent, !!session.livemode, session.amount_total, session.currency]
+        );
+        if (!p) return null;
+        if (p.user_id) await client.query(`UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1`, [p.user_id, p.coins, p.nuggets]);
+        return p;
+    });
+}
+
+// A purchase left pending (closed tab, missed webhook): ask Stripe again.
+async function refreshPurchase(db, p) {
+    const session = await getCheckout(p.stripe_session);
+    if (session.payment_status === 'paid') return grantPurchase(db, session);
+    if (session.status === 'expired') await db.query(`UPDATE purchases SET status = 'expired' WHERE id = $1 AND status = 'pending'`, [p.id]);
+    return null;
+}
+
+const shapePurchase = (p) => ({
+    id: p.id, pack: p.pack, label: PACKS[p.pack]?.label || p.pack, amount: p.amount_cents, donation: p.donation_cents,
+    association: p.association, coins: p.coins, nuggets: p.nuggets, status: p.status, createdAt: p.created_at, paidAt: p.paid_at,
+});
+
+async function stripeWebhook(event) {
+    const raw = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : event.body || '';
+    const payload = verifyWebhook(raw, event.headers?.['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+    if (!payload) return json({ error: 'Signature invalide' }, 400);
+    const session = payload.data?.object;
+    if (payload.type === 'checkout.session.completed' || payload.type === 'checkout.session.async_payment_succeeded') {
+        await grantPurchase(getPool(), session);
+    } else if (payload.type === 'checkout.session.expired') {
+        await getPool().query(`UPDATE purchases SET status = 'expired' WHERE stripe_session = $1 AND status = 'pending'`, [session.id]);
+    }
+    return json({ received: true });
 }
 
 const actions = {
@@ -1219,6 +1274,73 @@ const actions = {
         return res;
     },
 
+    async shop(db, body, event) {
+        const user = await requireUser(db, event);
+        if (stripeReady()) {
+            const { rows: pending } = await db.query(
+                `SELECT * FROM purchases WHERE user_id = $1 AND status = 'pending' AND stripe_session IS NOT NULL
+                 AND created_at > now() - interval '2 days' ORDER BY id DESC LIMIT 3`, [user.id]);
+            await Promise.all(pending.map((p) => refreshPurchase(db, p).catch((err) => console.error('refresh', p.id, err.message))));
+        }
+        const live = !stripeTestMode();
+        const [{ rows: totals }, { rows: mine }] = await Promise.all([
+            db.query(`SELECT association, SUM(donation_cents)::int AS donated, COUNT(*)::int AS purchases
+                      FROM purchases WHERE status = 'paid' AND livemode = $1 GROUP BY 1`, [live]),
+            db.query(`SELECT * FROM purchases WHERE user_id = $1 AND status <> 'pending' OR (user_id = $1 AND created_at > now() - interval '1 hour')
+                      ORDER BY id DESC LIMIT 20`, [user.id]),
+        ]);
+        const byAssoc = Object.fromEntries(totals.map((t) => [t.association, t]));
+        return {
+            ready: stripeReady(),
+            testMode: stripeReady() && stripeTestMode(),
+            donationShare: DONATION_SHARE,
+            packs: Object.entries(PACKS).map(([id, p]) => ({ id, ...p, donation: donationOf(p.price) })),
+            associations: Object.entries(ASSOCIATIONS).map(([id, a]) => ({
+                id, ...a, donated: byAssoc[id]?.donated || 0, purchases: byAssoc[id]?.purchases || 0,
+            })),
+            totalDonated: totals.reduce((sum, t) => sum + t.donated, 0),
+            purchases: mine.map(shapePurchase),
+            user: await publicUser(db, await requireUser(db, event)),
+        };
+    },
+
+    async shopCheckout(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!stripeReady()) throw new HttpError(503, 'Le paiement n\'est pas encore activé');
+        const pack = PACKS[body.pack];
+        if (!pack) throw new HttpError(400, 'Pack inconnu');
+        if (!ASSOCIATIONS[body.association]) throw new HttpError(400, 'Choisis une association');
+        if (body.consent !== true) throw new HttpError(400, 'Confirme la livraison immédiate des crédits');
+        const { rows: [{ recent }] } = await db.query(
+            `SELECT COUNT(*)::int AS recent FROM purchases WHERE user_id = $1 AND created_at > now() - interval '10 minutes'`, [user.id]);
+        if (recent >= 5) throw new HttpError(429, 'Trop de tentatives, réessaie dans quelques minutes');
+        const origin = SITE_ORIGINS.includes(event.headers?.origin) ? event.headers.origin : SITE_ORIGINS[0];
+        const { rows: [p] } = await db.query(
+            `INSERT INTO purchases (user_id, username, pack, amount_cents, donation_cents, association, coins, nuggets)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+            [user.id, user.username, body.pack, pack.price, donationOf(pack.price), body.association, pack.coins, pack.nuggets]
+        );
+        let session;
+        try {
+            session = await createCheckout({ purchaseId: p.id, pack: body.pack, association: body.association, username: user.username, origin });
+        } catch (err) {
+            await db.query(`DELETE FROM purchases WHERE id = $1`, [p.id]);
+            throw new HttpError(502, 'Le service de paiement ne répond pas, réessaie plus tard');
+        }
+        await db.query(`UPDATE purchases SET stripe_session = $2 WHERE id = $1`, [p.id, session.id]);
+        return { url: session.url };
+    },
+
+    async shopConfirm(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!stripeReady()) throw new HttpError(503, 'Le paiement n\'est pas encore activé');
+        const { rows: [p] } = await db.query(`SELECT * FROM purchases WHERE stripe_session = $1 AND user_id = $2`, [String(body.session || ''), user.id]);
+        if (!p) throw new HttpError(404, 'Achat introuvable');
+        if (p.status === 'pending') await refreshPurchase(db, p);
+        const { rows: [now] } = await db.query(`SELECT * FROM purchases WHERE id = $1`, [p.id]);
+        return { purchase: shapePurchase(now), user: await publicUser(db, await requireUser(db, event)) };
+    },
+
     async recycle(db, body, event) {
         const user = await requireUser(db, event);
         const cardId = body.cardId ? Number(body.cardId) : null; // null = every duplicate
@@ -1261,6 +1383,14 @@ export const handler = async (event) => {
     }
     if (event.requestContext?.http?.method === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
+    }
+    if (event.rawPath === '/stripe-webhook') {
+        try {
+            return await stripeWebhook(event);
+        } catch (error) {
+            console.error('webhook', error);
+            return json({ error: 'Erreur serveur' }, 500); // Stripe retries
+        }
     }
 
     try {

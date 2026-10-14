@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Award, Brain, Gavel, Home, Layers, LogIn, LogOut, Menu, Package, Trophy, User, Users, X } from 'lucide-react';
+import { Award, Brain, Gavel, Home, Layers, LogIn, LogOut, Menu, Package, Plus, ShoppingBag, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
@@ -14,10 +14,11 @@ export const NAV = [
     { to: '/amis', label: 'Amis', Icon: Users },
     { to: '/defis', label: 'Défis', Icon: Trophy },
     { to: '/trophees', label: 'Trophées', Icon: Award },
+    { to: '/boutique', label: 'Boutique solidaire', Icon: ShoppingBag },
     { to: '/profil', label: 'Profil', Icon: User },
 ];
 // The mobile tab bar has room for five: the rest stays in the menu.
-const TABS = NAV.filter(({ to }) => !['/', '/profil', '/trophees', '/defis'].includes(to));
+const TABS = NAV.filter(({ to }) => !['/', '/profil', '/trophees', '/defis', '/boutique'].includes(to));
 
 // Pending friend requests + trade offers, shown as a red dot count on the Amis link.
 function useSocialCount() {
@@ -70,6 +71,9 @@ function Wallet({ user }) {
             <span className="w-px h-4 bg-white/15" />
             <Link to="/encheres" className="flex items-center gap-1 pl-2 pr-2.5 py-1.5 text-[#f4c25b]" title="Pépites : pour les enchères">
                 <Nugget />{fmt(user.nuggets)}
+            </Link>
+            <Link to="/boutique" className="grid place-items-center w-6 h-6 mr-1 rounded-full bg-[#e9c46a] text-[#2a1c00] hover:brightness-110" title="Boutique solidaire : acheter des crédits">
+                <Plus className="w-4 h-4" strokeWidth={3} />
             </Link>
         </div>
     );
@@ -142,7 +146,7 @@ export default function Layout() {
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-3">
                     <Brand />
                     <nav className="hidden lg:flex items-center gap-0.5">
-                        {NAV.filter(({ to }) => to !== '/').map(({ to, label, end }) => (
+                        {NAV.filter(({ to }) => to !== '/' && to !== '/boutique').map(({ to, label, end }) => (
                             <NavLink key={to} to={to} end={end}
                                 className={({ isActive }) => `flex items-center gap-1 px-2.5 py-2 rounded-full text-sm font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6] ring-1 ring-[#4fd18b]/25' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
                                 {label}<NavBadge to={to} />

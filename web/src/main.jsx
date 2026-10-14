@@ -15,6 +15,7 @@ import Trophies from './pages/Trophies.jsx';
 import Auctions from './pages/Auctions.jsx';
 import Friends from './pages/Friends.jsx';
 import Quiz from './pages/Quiz.jsx';
+import Shop from './pages/Shop.jsx';
 
 function Private({ children }) {
     const { user, ready } = useGame();
@@ -35,6 +36,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/trophees" element={<Private><Trophies /></Private>} />
                         <Route path="/encheres" element={<Private><Auctions /></Private>} />
                         <Route path="/quiz" element={<Private><Quiz /></Private>} />
+                        <Route path="/boutique" element={<Private><Shop /></Private>} />
                         <Route path="/amis" element={<Private><Friends /></Private>} />
                         <Route path="/profil" element={<Private><Profile /></Private>} />
                         <Route path="/collection" element={<Private><Collection /></Private>} />
