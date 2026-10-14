@@ -11,7 +11,7 @@ const BOARDS = [
     { key: 'quiz', label: 'Quiz', Icon: Brain, unit: 'bonnes réponses', text: 'Total des bonnes réponses aux quiz du jour. À égalité, le plus de quiz parfaits passe devant.', extra: (v) => v ? plural(v, 'quiz parfait') : null },
     { key: 'species', label: 'Espèces', Icon: Layers, unit: 'espèces', text: 'Nombre d\'espèces différentes découvertes dans le carnet.', extra: (v) => plural(v, 'carte') },
     { key: 'cards', label: 'Cartes', Icon: Gem, unit: 'cartes', text: 'Nombre total de cartes possédées, doublons compris.', extra: (v) => plural(v, 'espèce') },
-    { key: 'prestige', label: 'Prestige', Icon: Crown, unit: 'points', text: 'Chaque espèce rapporte selon sa rareté : Rare 3, Épique 8, Légendaire 25, Secrète 100, Peu commune 1.', extra: (v) => v ? plural(v, 'légendaire') : null },
+    { key: 'prestige', label: 'Prestige', Icon: Crown, unit: 'points', text: 'Chaque espèce découverte rapporte des points selon sa rareté : Peu commune 1, Rare 3, Épique 8, Légendaire 25, Secrète 100.', extra: (v) => v ? plural(v, 'légendaire') : null },
     { key: 'trophies', label: 'Trophées', Icon: Award, unit: 'trophées', text: 'Nombre de trophées récupérés.', extra: () => null },
 ];
 const PODIUM = ['#e9c46a', '#c3ccd8', '#cd8a4a'];
@@ -110,14 +110,13 @@ export default function Leaderboard() {
             <div className="mt-3 flex flex-wrap gap-2">
                 <Pill active={scope === 'all'} onClick={() => setScope('all')}><Globe2 className="w-4 h-4" />Tous les joueurs</Pill>
                 <Pill active={scope === 'friends'} onClick={() => setScope('friends')}><Users className="w-4 h-4" />Mes amis</Pill>
-                {boardKey === 'quiz' && (
-                    <>
-                        <span className="w-px bg-white/10 mx-1" />
-                        <Pill active={period === 'all'} onClick={() => setPeriod('all')}>Depuis toujours</Pill>
-                        <Pill active={period === 'week'} onClick={() => setPeriod('week')}>7 derniers jours</Pill>
-                    </>
-                )}
             </div>
+            {boardKey === 'quiz' && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                    <Pill active={period === 'all'} onClick={() => setPeriod('all')}>Depuis toujours</Pill>
+                    <Pill active={period === 'week'} onClick={() => setPeriod('week')}>7 derniers jours</Pill>
+                </div>
+            )}
             <p className="mt-4 text-sm text-ink-soft">{board.text}</p>
 
             {error && <p className="mt-6 text-sm font-semibold text-rust">{error}</p>}
@@ -130,7 +129,7 @@ export default function Leaderboard() {
                         <p className="text-sm text-white/85">
                             {me
                                 ? <>Ta position : <strong className="text-white">{me.rank}<sup>{me.rank === 1 ? 'er' : 'e'}</sup></strong> sur {plural(data.players, 'joueur')}, avec {n(me.score)} {board.unit}.</>
-                                : <>Tu n'es pas encore classé{boardKey === 'quiz' ? ' : termine un quiz du jour pour entrer dans la course' : ''}. {plural(data.players, 'joueur')} classé{data.players > 1 ? 's' : ''}.</>}
+                                : <>Tu n'es pas encore classé{boardKey === 'quiz' ? ' : termine un quiz du jour pour entrer dans la course' : ''}.{data.players > 0 && <> {plural(data.players, 'joueur')} classé{data.players > 1 ? 's' : ''}.</>}</>}
                         </p>
                     </div>
 
