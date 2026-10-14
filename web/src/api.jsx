@@ -45,6 +45,16 @@ export function GameProvider({ children }) {
             .finally(() => setReady(true));
     }, [refreshCollection]);
 
+    // Keep wallet and social badges (friend requests, trade offers) fresh.
+    const loggedIn = !!user;
+    useEffect(() => {
+        if (!loggedIn) return;
+        const t = setInterval(() => {
+            if (document.visibilityState === 'visible') api('me').then(({ user }) => setUser(user)).catch(() => {});
+        }, 45_000);
+        return () => clearInterval(t);
+    }, [loggedIn]);
+
     const authenticate = useCallback(async (mode, username, password) => {
         const { token, user } = await api(mode, { username, password });
         localStorage.setItem(TOKEN_KEY, token);

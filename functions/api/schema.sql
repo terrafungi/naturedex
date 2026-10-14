@@ -102,3 +102,36 @@ CREATE TABLE IF NOT EXISTS auction_bids (
     at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS auction_bids_user_idx ON auction_bids (user_id, auction_id);
+
+-- Friends: one row per pair, requester → addressee, pending until accepted.
+CREATE TABLE IF NOT EXISTS friendships (
+    requester_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    addressee_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    accepted_at TIMESTAMPTZ,
+    PRIMARY KEY (requester_id, addressee_id),
+    CHECK (requester_id <> addressee_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS friendships_pair ON friendships (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id));
+CREATE INDEX IF NOT EXISTS friendships_addressee ON friendships (addressee_id);
+
+-- Card trades between friends. Cards stay with their owners until the trade is accepted.
+CREATE TABLE IF NOT EXISTS trades (
+    id SERIAL PRIMARY KEY,
+    from_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    message TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined', 'cancelled')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS trades_to ON trades (to_id, status);
+CREATE INDEX IF NOT EXISTS trades_from ON trades (from_id, status);
+CREATE TABLE IF NOT EXISTS trade_items (
+    trade_id INT NOT NULL REFERENCES trades(id) ON DELETE CASCADE,
+    owner_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    card_id INT NOT NULL REFERENCES cards(id),
+    qty INT NOT NULL DEFAULT 1 CHECK (qty > 0),
+    PRIMARY KEY (trade_id, owner_id, card_id)
+);

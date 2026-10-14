@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Award, Gavel, Home, Layers, LogIn, LogOut, Menu, Package, Trophy, User, X } from 'lucide-react';
+import { Award, Gavel, Home, Layers, LogIn, LogOut, Menu, Package, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
@@ -10,12 +10,24 @@ export const NAV = [
     { to: '/collection', label: 'Collection', Icon: Layers },
     { to: '/booster', label: 'Booster', Icon: Package },
     { to: '/encheres', label: 'Enchères', Icon: Gavel },
+    { to: '/amis', label: 'Amis', Icon: Users },
     { to: '/defis', label: 'Défis', Icon: Trophy },
     { to: '/trophees', label: 'Trophées', Icon: Award },
     { to: '/profil', label: 'Profil', Icon: User },
 ];
 // The mobile tab bar has room for five: home and profile stay in the menu.
-const TABS = NAV.filter(({ to }) => !['/', '/profil'].includes(to));
+const TABS = NAV.filter(({ to }) => !['/', '/profil', '/trophees'].includes(to));
+
+// Pending friend requests + trade offers, shown as a red dot count on the Amis link.
+function useSocialCount() {
+    const { user } = useGame();
+    return (user?.social?.friendRequests || 0) + (user?.social?.tradeOffers || 0);
+}
+function NavBadge({ to, className = '' }) {
+    const n = useSocialCount();
+    if (to !== '/amis' || !n) return null;
+    return <span className={`min-w-[1.1rem] h-[1.1rem] px-1 inline-grid place-items-center rounded-full bg-[#ff6b6b] text-white text-[10px] font-bold leading-none ${className}`}>{n > 9 ? '9+' : n}</span>;
+}
 
 export function LeafLogo({ className = 'w-9 h-9' }) {
     return (
@@ -82,7 +94,7 @@ function MenuSheet({ onClose }) {
                 {NAV.map(({ to, label, Icon, end }) => (
                     <NavLink key={to} to={to} end={end} onClick={onClose}
                         className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6]' : 'text-white/80 hover:bg-white/5'}`}>
-                        <Icon className="w-5 h-5" />{label}
+                        <Icon className="w-5 h-5" />{label}<NavBadge to={to} className="ml-auto" />
                     </NavLink>
                 ))}
                 <div className="mt-auto">
@@ -107,8 +119,8 @@ function TabBar() {
             <div className="grid grid-cols-5 px-2 pt-2 pb-2">
                 {TABS.map(({ to, label, Icon, end }) => (
                     <NavLink key={to} to={to} end={end}
-                        className={({ isActive }) => `flex flex-col items-center gap-1 py-2 rounded-2xl text-[11px] font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/55'}`}>
-                        <Icon className="w-5 h-5" strokeWidth={1.8} />{label}
+                        className={({ isActive }) => `relative flex flex-col items-center gap-1 py-2 rounded-2xl text-[11px] font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/55'}`}>
+                        <Icon className="w-5 h-5" strokeWidth={1.8} />{label}<NavBadge to={to} className="absolute top-1 right-[calc(50%-1.4rem)]" />
                     </NavLink>
                 ))}
             </div>
@@ -131,8 +143,8 @@ export default function Layout() {
                     <nav className="hidden lg:flex items-center gap-0.5">
                         {NAV.map(({ to, label, end }) => (
                             <NavLink key={to} to={to} end={end}
-                                className={({ isActive }) => `px-3 py-2 rounded-full text-sm font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6] ring-1 ring-[#4fd18b]/25' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
-                                {label}
+                                className={({ isActive }) => `flex items-center gap-1 px-3 py-2 rounded-full text-sm font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/15 text-[#a8f0c6] ring-1 ring-[#4fd18b]/25' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
+                                {label}<NavBadge to={to} />
                             </NavLink>
                         ))}
                     </nav>

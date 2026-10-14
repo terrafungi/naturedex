@@ -125,8 +125,19 @@ async function publicUser(db, user) {
         dailyCoins: DAILY_COINS,
         nextDailyAt: nextDaily > Date.now() ? new Date(nextDaily).toISOString() : null,
         recycleValue: RECYCLE_VALUE,
+        social: await socialCounts(db, user.id),
         ...rows[0],
     };
+}
+
+// Friend requests and trade offers waiting for this player (badge in the navigation).
+async function socialCounts(db, userId) {
+    const { rows: [c] } = await db.query(
+        `SELECT (SELECT COUNT(*)::int FROM friendships WHERE addressee_id = $1 AND status = 'pending') AS "friendRequests",
+                (SELECT COUNT(*)::int FROM trades WHERE to_id = $1 AND status = 'pending') AS "tradeOffers"`,
+        [userId]
+    );
+    return c;
 }
 
 // ---------- booster draw ----------
@@ -263,6 +274,8 @@ const TROPHIES = [
         (g) => `Termine ${g} défi${g > 1 ? 's' : ''} du jour`),
     ...series('Enchères', 'gavel', 'sold', [[1, 'Première vente'], [10, 'Marchand'], [50, 'Négociant']], (g) => `Vends ${g} carte${g > 1 ? 's' : ''} aux enchères`),
     ...series('Enchères', 'cart', 'bought', [[1, 'Premier achat'], [10, 'Acheteur avisé'], [50, 'Grand collectionneur']], (g) => `Remporte ${g} enchère${g > 1 ? 's' : ''}`),
+    ...series('Amis', 'users', 'friends', [[1, 'Premier ami'], [5, 'Petite bande'], [20, 'Club des naturalistes']], (g) => `Aie ${g} ami${g > 1 ? 's' : ''}`),
+    ...series('Amis', 'swap', 'trades', [[1, 'Premier échange'], [10, 'Troqueur'], [50, 'Roi du troc']], (g) => `Réussis ${g} échange${g > 1 ? 's' : ''} de cartes`),
     ...series('Enchères', 'recycle', 'recycled', [[10, 'Tri sélectif'], [100, 'Recycleur'], [1000, 'Compost géant']], (g) => `Recycle ${n(g)} doublons`),
 ];
 
@@ -276,6 +289,8 @@ async function trophyList(db, userId) {
                     (SELECT COUNT(*)::int FROM challenge_claims WHERE user_id = $1) AS challenges,
                     (SELECT COUNT(*)::int FROM auctions WHERE seller_id = $1 AND status = 'sold') AS sold,
                     (SELECT COUNT(*)::int FROM auctions WHERE bidder_id = $1 AND status = 'sold') AS bought,
+                    (SELECT COUNT(*)::int FROM friendships WHERE status = 'accepted' AND $1 IN (requester_id, addressee_id)) AS friends,
+                    (SELECT COUNT(*)::int FROM trades WHERE status = 'accepted' AND $1 IN (from_id, to_id)) AS trades,
                     recycled FROM users WHERE id = $1`, [userId]),
         db.query(`SELECT c.type, c.rarity, COUNT(*)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
                   WHERE uc.user_id = $1 GROUP BY 1, 2`, [userId]),
@@ -388,6 +403,72 @@ async function fillExtract(db, card) {
 }
 
 // ---------- actions ----------
+
+// ---- Friends & trades ----
+const MAX_TRADE_ITEMS = 10;
+const MAX_PENDING_TRADES = 20;
+
+async function findUser(db, username) {
+    const { rows: [u] } = await db.query(`SELECT id, username FROM users WHERE lower(username) = lower($1)`, [String(username || '').trim()]);
+    if (!u) throw new HttpError(404, 'Aucun joueur avec ce pseudo');
+    return u;
+}
+
+async function relation(db, meId, otherId) {
+    const { rows: [f] } = await db.query(
+        `SELECT * FROM friendships WHERE (requester_id = $1 AND addressee_id = $2) OR (requester_id = $2 AND addressee_id = $1)`,
+        [meId, otherId]
+    );
+    return f || null;
+}
+
+async function requireFriend(db, meId, username) {
+    const other = await findUser(db, username);
+    const f = await relation(db, meId, other.id);
+    if (!f || f.status !== 'accepted') throw new HttpError(403, `${other.username} n'est pas (encore) ton ami`);
+    return other;
+}
+
+// Moves qty copies of a card between players; fails if the owner no longer has them.
+async function moveCard(client, fromId, toId, cardId, qty) {
+    const { rows: [left] } = await client.query(
+        `UPDATE user_cards SET count = count - $3 WHERE user_id = $1 AND card_id = $2 AND count >= $3 RETURNING count`,
+        [fromId, cardId, qty]
+    );
+    if (!left) return false;
+    if (left.count === 0) await client.query(`DELETE FROM user_cards WHERE user_id = $1 AND card_id = $2`, [fromId, cardId]);
+    await client.query(
+        `INSERT INTO user_cards (user_id, card_id, count) VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, card_id) DO UPDATE SET count = user_cards.count + $3`,
+        [toId, cardId, qty]
+    );
+    return true;
+}
+
+const TRADE_CARD = `json_build_object('id', c.id, 'num', c.num, 'name', c.name, 'sci_name', c.sci_name, 'type', c.type, 'rarity', c.rarity,
+                                      'views', c.views, 'thumb_url', c.thumb_url, 'hp', (c.stats->>'hp')::int)`;
+
+async function loadTrades(db, userId, where) {
+    const { rows } = await db.query(
+        `SELECT t.id, t.status, t.message, t.created_at, t.resolved_at, t.from_id = $1 AS mine,
+                f.username AS from_user, d.username AS to_user,
+                COALESCE((SELECT json_agg(json_build_object('fromSide', i.owner_id = t.from_id, 'qty', i.qty,
+                    'have', COALESCE((SELECT count FROM user_cards x WHERE x.user_id = i.owner_id AND x.card_id = i.card_id), 0),
+                    'mineCount', COALESCE((SELECT count FROM user_cards x WHERE x.user_id = $1 AND x.card_id = i.card_id), 0),
+                    'card', ${TRADE_CARD}))
+                    FROM trade_items i JOIN cards c ON c.id = i.card_id WHERE i.trade_id = t.id), '[]') AS items
+         FROM trades t JOIN users f ON f.id = t.from_id JOIN users d ON d.id = t.to_id
+         WHERE ${where} ORDER BY t.created_at DESC LIMIT 50`,
+        [userId]
+    );
+    // give / get are from the current player's point of view.
+    return rows.map(({ items, from_user, to_user, ...t }) => ({
+        ...t,
+        other: t.mine ? to_user : from_user,
+        give: items.filter((i) => i.fromSide === t.mine),
+        get: items.filter((i) => i.fromSide !== t.mine),
+    }));
+}
 
 const actions = {
     async register(db, body) {
@@ -758,6 +839,188 @@ const actions = {
             await giveCard(client, user.id, a.card_id);
             await client.query(`UPDATE auctions SET status = 'cancelled', settled_at = now() WHERE id = $1`, [a.id]);
         });
+        return { ok: true };
+    },
+
+    // ---- Friends ----
+    async friends(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows } = await db.query(
+            `SELECT u.username, f.status, f.requester_id = $1 AS outgoing, f.created_at, f.accepted_at,
+                    (SELECT COUNT(*)::int FROM user_cards WHERE user_id = u.id) AS discovered
+             FROM friendships f JOIN users u ON u.id = CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END
+             WHERE $1 IN (f.requester_id, f.addressee_id)
+             ORDER BY f.accepted_at DESC NULLS LAST, f.created_at DESC`,
+            [user.id]
+        );
+        return {
+            friends: rows.filter((r) => r.status === 'accepted'),
+            incoming: rows.filter((r) => r.status === 'pending' && !r.outgoing),
+            outgoing: rows.filter((r) => r.status === 'pending' && r.outgoing),
+        };
+    },
+
+    // Pseudo suggestions while typing, with the current relation to each player.
+    async searchPlayers(db, body, event) {
+        const user = await requireUser(db, event);
+        const q = String(body.query || '').trim();
+        if (q.length < 2) return { players: [] };
+        const { rows } = await db.query(
+            `SELECT u.username, f.status, f.requester_id = $1 AS outgoing
+             FROM users u LEFT JOIN friendships f
+               ON (f.requester_id = $1 AND f.addressee_id = u.id) OR (f.requester_id = u.id AND f.addressee_id = $1)
+             WHERE u.id <> $1 AND u.username ILIKE $2 || '%'
+             ORDER BY lower(u.username) = lower($2) DESC, length(u.username), u.username LIMIT 8`,
+            [user.id, q.replace(/[%_\\]/g, '\\$&')]
+        );
+        return { players: rows };
+    },
+
+    // Sending a request to someone who already asked you simply accepts theirs.
+    async friendRequest(db, body, event) {
+        const user = await requireUser(db, event);
+        const other = await findUser(db, body.username);
+        if (other.id === user.id) throw new HttpError(400, 'Tu ne peux pas t\'ajouter toi-même');
+        const f = await relation(db, user.id, other.id);
+        if (f?.status === 'accepted') throw new HttpError(409, `${other.username} est déjà ton ami`);
+        if (f && f.requester_id === user.id) throw new HttpError(409, `Demande déjà envoyée à ${other.username}`);
+        if (f) {
+            await db.query(`UPDATE friendships SET status = 'accepted', accepted_at = now() WHERE requester_id = $1 AND addressee_id = $2`, [other.id, user.id]);
+            return { status: 'accepted', username: other.username };
+        }
+        await db.query(`INSERT INTO friendships (requester_id, addressee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [user.id, other.id]);
+        return { status: 'pending', username: other.username };
+    },
+
+    async respondFriend(db, body, event) {
+        const user = await requireUser(db, event);
+        const other = await findUser(db, body.username);
+        const { rowCount } = body.accept
+            ? await db.query(`UPDATE friendships SET status = 'accepted', accepted_at = now() WHERE requester_id = $1 AND addressee_id = $2 AND status = 'pending'`, [other.id, user.id])
+            : await db.query(`DELETE FROM friendships WHERE requester_id = $1 AND addressee_id = $2 AND status = 'pending'`, [other.id, user.id]);
+        if (!rowCount) throw new HttpError(404, 'Demande introuvable');
+        return { ok: true, user: await publicUser(db, user) };
+    },
+
+    // Removes a friend, or withdraws a request. Pending trades between the two are cancelled.
+    async removeFriend(db, body, event) {
+        const user = await requireUser(db, event);
+        const other = await findUser(db, body.username);
+        await db.query(
+            `DELETE FROM friendships WHERE (requester_id = $1 AND addressee_id = $2) OR (requester_id = $2 AND addressee_id = $1)`,
+            [user.id, other.id]
+        );
+        await db.query(
+            `UPDATE trades SET status = 'cancelled', resolved_at = now()
+             WHERE status = 'pending' AND ((from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1))`,
+            [user.id, other.id]
+        );
+        return { ok: true };
+    },
+
+    // ---- Trades ----
+    // Cards to pick from when building a trade: mine, or a friend's (with how many I already have).
+    async tradeCards(db, body, event) {
+        const user = await requireUser(db, event);
+        const owner = body.username ? await requireFriend(db, user.id, body.username) : user;
+        const q = String(body.query || '').trim();
+        const { rows } = await db.query(
+            `SELECT ${LIGHT_FIELDS}, uc.count, COALESCE(mine.count, 0) AS have, COUNT(*) OVER()::int AS matches
+             FROM user_cards uc JOIN cards c ON c.id = uc.card_id
+             LEFT JOIN user_cards mine ON mine.user_id = $2 AND mine.card_id = uc.card_id
+             WHERE uc.user_id = $1 AND ($3::text IS NULL OR c.type = $3) AND ($4::text IS NULL OR c.rarity = $4)
+               AND ($5 = '' OR c.name ILIKE '%' || $5 || '%' OR c.sci_name ILIKE '%' || $5 || '%')
+             ORDER BY ${body.missing && owner.id !== user.id ? '(mine.count IS NULL) DESC, ' : ''}${RARITY_ORDER} DESC, c.views DESC
+             LIMIT 60 OFFSET $6`,
+            [owner.id, user.id, body.type || null, body.rarity || null, q, Math.max(Number(body.offset) || 0, 0)]
+        );
+        return { matches: rows[0]?.matches || 0, cards: rows.map(({ matches, ...c }) => c) };
+    },
+
+    async proposeTrade(db, body, event) {
+        const user = await requireUser(db, event);
+        const other = await requireFriend(db, user.id, body.username);
+        const clean = (list) => {
+            const map = new Map();
+            for (const it of Array.isArray(list) ? list : []) {
+                const id = Number(it.cardId), qty = Number(it.qty || 1);
+                if (!Number.isInteger(id) || !Number.isInteger(qty) || qty < 1) throw new HttpError(400, 'Carte invalide');
+                map.set(id, (map.get(id) || 0) + qty);
+            }
+            return [...map];
+        };
+        const give = clean(body.give), get = clean(body.get);
+        if (!give.length && !get.length) throw new HttpError(400, 'Choisis au moins une carte');
+        if (give.length > MAX_TRADE_ITEMS || get.length > MAX_TRADE_ITEMS) throw new HttpError(400, `${MAX_TRADE_ITEMS} cartes différentes au maximum de chaque côté`);
+        const check = async (ownerId, items, who) => {
+            if (!items.length) return;
+            const { rows } = await db.query(
+                `SELECT card_id, count FROM user_cards WHERE user_id = $1 AND card_id = ANY($2::int[])`, [ownerId, items.map(([id]) => id)]
+            );
+            const have = new Map(rows.map((r) => [r.card_id, r.count]));
+            for (const [id, qty] of items) if ((have.get(id) || 0) < qty) throw new HttpError(400, `${who} pas assez d'exemplaires d'une des cartes`);
+        };
+        await check(user.id, give, 'Tu n\'as');
+        await check(other.id, get, `${other.username} n'a`);
+        const { rows: [{ pending }] } = await db.query(`SELECT COUNT(*)::int AS pending FROM trades WHERE from_id = $1 AND status = 'pending'`, [user.id]);
+        if (pending >= MAX_PENDING_TRADES) throw new HttpError(429, `${MAX_PENDING_TRADES} propositions en attente au maximum`);
+        return inTransaction(db, async (client) => {
+            const { rows: [t] } = await client.query(
+                `INSERT INTO trades (from_id, to_id, message) VALUES ($1, $2, $3) RETURNING id`,
+                [user.id, other.id, String(body.message || '').trim().slice(0, 200) || null]
+            );
+            for (const [id, qty] of give) await client.query(`INSERT INTO trade_items (trade_id, owner_id, card_id, qty) VALUES ($1, $2, $3, $4)`, [t.id, user.id, id, qty]);
+            for (const [id, qty] of get) await client.query(`INSERT INTO trade_items (trade_id, owner_id, card_id, qty) VALUES ($1, $2, $3, $4)`, [t.id, other.id, id, qty]);
+            return { id: t.id };
+        });
+    },
+
+    async trades(db, body, event) {
+        const user = await requireUser(db, event);
+        const [pending, history] = await Promise.all([
+            loadTrades(db, user.id, `t.status = 'pending' AND $1 IN (t.from_id, t.to_id)`),
+            loadTrades(db, user.id, `t.status <> 'pending' AND $1 IN (t.from_id, t.to_id)`),
+        ]);
+        return { incoming: pending.filter((t) => !t.mine), outgoing: pending.filter((t) => t.mine), history };
+    },
+
+    // Accepting swaps every card in one transaction: either all cards move, or none.
+    async respondTrade(db, body, event) {
+        const user = await requireUser(db, event);
+        const result = await inTransaction(db, async (client) => {
+            const { rows: [t] } = await client.query(`SELECT * FROM trades WHERE id = $1 AND to_id = $2 FOR UPDATE`, [Number(body.id), user.id]);
+            if (!t || t.status !== 'pending') throw new HttpError(404, 'Proposition introuvable ou déjà traitée');
+            if (!body.accept) {
+                await client.query(`UPDATE trades SET status = 'declined', resolved_at = now() WHERE id = $1`, [t.id]);
+                return 'declined';
+            }
+            const f = await relation(client, t.from_id, t.to_id);
+            if (f?.status !== 'accepted') throw new HttpError(403, 'Vous n\'êtes plus amis');
+            // Lock both players' collections in a fixed order so two trades can't deadlock.
+            await client.query(`SELECT 1 FROM users WHERE id = ANY($1::int[]) ORDER BY id FOR UPDATE`, [[t.from_id, t.to_id]]);
+            const { rows: items } = await client.query(`SELECT * FROM trade_items WHERE trade_id = $1`, [t.id]);
+            for (const it of items) {
+                const to = it.owner_id === t.from_id ? t.to_id : t.from_id;
+                if (!(await moveCard(client, it.owner_id, to, it.card_id, it.qty))) {
+                    throw new HttpError(409, it.owner_id === user.id
+                        ? 'Tu n\'as plus toutes les cartes demandées (vendues ou échangées entre-temps)'
+                        : 'Ton ami n\'a plus toutes les cartes proposées : l\'échange ne peut pas se faire');
+                }
+            }
+            await client.query(`UPDATE trades SET status = 'accepted', resolved_at = now() WHERE id = $1`, [t.id]);
+            return 'accepted';
+        });
+        const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
+        return { status: result, user: await publicUser(db, fresh) };
+    },
+
+    async cancelTrade(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rowCount } = await db.query(
+            `UPDATE trades SET status = 'cancelled', resolved_at = now() WHERE id = $1 AND from_id = $2 AND status = 'pending'`,
+            [Number(body.id), user.id]
+        );
+        if (!rowCount) throw new HttpError(404, 'Proposition introuvable ou déjà traitée');
         return { ok: true };
     },
 
