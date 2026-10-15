@@ -19,7 +19,7 @@ import {
 import {
     ASSOCIATIONS, DONATION_SHARE, PACKS, createCheckout, donationOf, getCheckout, stripeReady, stripeTestMode, verifyWebhook,
 } from './shop.mjs';
-import { DAILY_BATTLES, DAILY_REWARDS, arenaActions, seasonRollover } from './arena.mjs';
+import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLabel, seasonRollover } from './arena.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -308,6 +308,12 @@ const TROPHIES = [
     ...series('Combat', 'swords', 'battleWins', [[1, 'Premier combat'], [10, 'Combattant'], [50, 'Gladiateur'], [200, 'Champion de l\'arène'], [500, 'Légende de l\'arène']],
         (g) => `Gagne ${n(g)} combat${g > 1 ? 's' : ''}`),
     ...series('Combat', 'map', 'campaign', [[5, 'Explorateur'], [10, 'Aventurier'], [15, 'Maître de la campagne']], (g) => `Termine l'étape ${g} de la campagne`),
+    ...series('Combat', 'medal', 'seasonTop10', [[1, 'Élite de la saison'], [3, 'Habitué du top 10'], [10, 'Pilier de l\'arène']],
+        (g) => g > 1 ? `Termine ${g} saisons d'arène dans le top 10` : 'Termine une saison d\'arène dans le top 10'),
+    ...series('Combat', 'podium', 'seasonPodium', [[1, 'Sur le podium'], [3, 'Abonné au podium'], [10, 'Médaillé perpétuel']],
+        (g) => g > 1 ? `Termine ${g} saisons d'arène sur le podium` : 'Termine une saison d\'arène sur le podium (top 3)'),
+    ...series('Combat', 'champion', 'seasonChampion', [[1, 'Champion de saison'], [3, 'Triple champion'], [6, 'Dynastie']],
+        (g) => g > 1 ? `Termine ${g} saisons d'arène à la 1re place` : 'Termine une saison d\'arène à la 1re place'),
     ...series('Enchères', 'recycle', 'recycled', [[10, 'Tri sélectif'], [100, 'Recycleur'], [1000, 'Compost géant']], (g) => `Recycle ${n(g)} doublons`),
 ];
 
@@ -324,6 +330,17 @@ const BOARDS = {
                      FROM user_cards uc JOIN cards c ON c.id = uc.card_id GROUP BY 1`,
     trophies: () => `SELECT user_id, COUNT(*)::int AS score, 0 AS extra FROM trophy_claims GROUP BY 1`,
     arena: () => `SELECT user_id, rating AS score, wins AS extra FROM arena WHERE wins + losses > 0`,
+};
+
+// Best final arena rank of a player (top 10, rated seasons only), shown as a badge next to the name.
+// `times` counts the seasons finished in the same tier: champion (1st), podium (2-3), top 10.
+const SEASON_BADGE = (userCol) => `(SELECT jsonb_build_object('rank', b.rank, 'season', b.season, 'times', b.times) FROM (
+        SELECT rank, season, COUNT(*) OVER (PARTITION BY CASE WHEN rank = 1 THEN 1 WHEN rank <= 3 THEN 2 ELSE 3 END)::int AS times
+        FROM season_results WHERE user_id = ${userCol} AND rank <= 10 AND rating >= ${SEASON_MIN_RATING}) b
+    ORDER BY b.rank, b.season DESC LIMIT 1) AS badge`;
+const withBadge = (row) => {
+    if (row.badge) row.badge.label = seasonLabel(row.badge.season);
+    return row;
 };
 
 async function findSponsor(db, code) {
@@ -386,6 +403,9 @@ async function trophyList(db, userId) {
                     (SELECT COUNT(*)::int FROM purchases WHERE user_id = $1 AND status = 'paid') AS patron,
                     (SELECT COUNT(*)::int FROM battles WHERE user_id = $1 AND status = 'won') AS "battleWins",
                     (SELECT COALESCE(MAX(campaign), 0)::int FROM arena WHERE user_id = $1) AS campaign,
+                    (SELECT COUNT(*) FILTER (WHERE rank <= 10)::int FROM season_results WHERE user_id = $1 AND rating >= ${SEASON_MIN_RATING}) AS "seasonTop10",
+                    (SELECT COUNT(*) FILTER (WHERE rank <= 3)::int FROM season_results WHERE user_id = $1 AND rating >= ${SEASON_MIN_RATING}) AS "seasonPodium",
+                    (SELECT COUNT(*) FILTER (WHERE rank = 1)::int FROM season_results WHERE user_id = $1 AND rating >= ${SEASON_MIN_RATING}) AS "seasonChampion",
                     recycled FROM users WHERE id = $1`, [userId]),
         db.query(`SELECT c.type, c.rarity, COUNT(*)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
                   WHERE uc.user_id = $1 GROUP BY 1, 2`, [userId]),
@@ -933,7 +953,7 @@ const actions = {
         const { rows } = await db.query(
             `WITH s AS (${BOARDS[board](week)}),
              r AS (
-                SELECT u.username, s.score, s.extra, u.id = $1 AS me,
+                SELECT u.username, s.score, s.extra, u.id = $1 AS me, ${SEASON_BADGE('u.id')},
                        RANK() OVER (ORDER BY s.score DESC, s.extra DESC)::int AS rank,
                        COUNT(*) OVER ()::int AS players
                 FROM s JOIN users u ON u.id = s.user_id
@@ -950,9 +970,34 @@ const actions = {
         return {
             board, period: week ? 'week' : 'all', scope: friends ? 'friends' : 'all',
             players: rows[0]?.players || 0,
-            top: rows.filter((r) => r.rank <= 50).slice(0, 50).map(({ players, ...r }) => r),
-            me: me && (({ players, ...r }) => r)(me),
+            top: rows.filter((r) => r.rank <= 50).slice(0, 50).map(({ players, ...r }) => withBadge(r)),
+            me: me && (({ players, ...r }) => withBadge(r))(me),
         };
+    },
+
+    // Public profile of a player: collection, arena, season badge and history.
+    async player(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows: [p] } = await db.query(
+            `SELECT u.id, u.username, u.created_at, u.id = $1 AS me,
+                    (SELECT COUNT(*)::int FROM user_cards WHERE user_id = u.id) AS discovered,
+                    (SELECT COALESCE(SUM(count), 0)::int FROM user_cards WHERE user_id = u.id) AS owned,
+                    (SELECT COUNT(*)::int FROM trophy_claims WHERE user_id = u.id) AS trophies,
+                    (SELECT COUNT(*)::int FROM battles WHERE user_id = u.id AND status = 'won') AS "battleWins",
+                    a.rating, a.wins, a.losses, COALESCE(a.campaign, 0) AS campaign,
+                    (SELECT f.status FROM friendships f WHERE (f.requester_id = $1 AND f.addressee_id = u.id)
+                        OR (f.requester_id = u.id AND f.addressee_id = $1)) AS friendship,
+                    ${SEASON_BADGE('u.id')}
+             FROM users u LEFT JOIN arena a ON a.user_id = u.id
+             WHERE lower(u.username) = lower($2)`,
+            [user.id, String(body.username || '').trim()]
+        );
+        if (!p) throw new HttpError(404, 'Joueur introuvable');
+        const { rows: seasons } = await db.query(
+            `SELECT season, rank, rating, wins, losses, rating >= $2 AS ranked FROM season_results
+             WHERE user_id = $1 ORDER BY season DESC LIMIT 24`, [p.id, SEASON_MIN_RATING]);
+        const { id, ...rest } = withBadge(p);
+        return { player: { ...rest, seasons: seasons.map((r) => ({ ...r, label: seasonLabel(r.season) })) } };
     },
 
     // Public: who sent this invite link (shown on the sign-up page).
@@ -1184,12 +1229,13 @@ const actions = {
         const user = await requireUser(db, event);
         const { rows } = await db.query(
             `SELECT u.username, f.status, f.requester_id = $1 AS outgoing, f.created_at, f.accepted_at,
-                    (SELECT COUNT(*)::int FROM user_cards WHERE user_id = u.id) AS discovered
+                    (SELECT COUNT(*)::int FROM user_cards WHERE user_id = u.id) AS discovered, ${SEASON_BADGE('u.id')}
              FROM friendships f JOIN users u ON u.id = CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END
              WHERE $1 IN (f.requester_id, f.addressee_id)
              ORDER BY f.accepted_at DESC NULLS LAST, f.created_at DESC`,
             [user.id]
         );
+        rows.forEach(withBadge);
         return {
             friends: rows.filter((r) => r.status === 'accepted'),
             incoming: rows.filter((r) => r.status === 'pending' && !r.outgoing),

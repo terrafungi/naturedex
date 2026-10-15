@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Award, Brain, Crown, Gem, Layers, Medal, Users, Globe2, Swords } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.jsx';
+import SeasonBadge from '../components/SeasonBadge.jsx';
+
+const profile = (name) => `/joueur/${encodeURIComponent(name)}`;
 
 const n = (v) => Number(v).toLocaleString('fr-FR');
 const plural = (v, word) => `${n(v)} ${word}${v > 1 ? 's' : ''}`;
@@ -46,7 +50,9 @@ function Podium({ rows, board }) {
                     className="flex flex-col items-center min-w-0">
                     {r.rank === 1 && <Crown className="w-6 h-6 text-[#e9c46a] mb-1" />}
                     <Avatar name={r.username} color={PODIUM[r.rank - 1] || PODIUM[2]} size={r.rank === 1 ? 'w-16 h-16 text-2xl' : 'w-12 h-12 text-lg'} />
-                    <p className={`mt-2 max-w-full truncate text-sm font-semibold ${r.me ? 'text-[#a8f0c6]' : 'text-white'}`}>{r.username}{r.me && ' (toi)'}</p>
+                    <Link to={profile(r.username)} className={`mt-2 max-w-full flex items-center gap-1 text-sm font-semibold hover:underline ${r.me ? 'text-[#a8f0c6]' : 'text-white'}`}>
+                        <span className="truncate">{r.username}{r.me && ' (toi)'}</span><SeasonBadge badge={r.badge} compact />
+                    </Link>
                     <p className="text-xs text-ink-soft tabular-nums">{n(r.score)} {board.unit}</p>
                     <div className={`mt-2 w-full ${heights[i]} rounded-t-2xl grid place-items-start justify-center pt-2 font-display text-2xl font-semibold text-[#10261a]`}
                         style={{ background: `linear-gradient(to bottom, ${PODIUM[r.rank - 1] || PODIUM[2]}, color-mix(in oklab, ${PODIUM[r.rank - 1] || PODIUM[2]} 30%, transparent))` }}>
@@ -65,7 +71,9 @@ function Row({ r, board }) {
             <span className="w-8 text-center font-display text-lg font-semibold tabular-nums text-white/60">{r.rank}</span>
             <Avatar name={r.username} color={r.me ? '#4fd18b' : '#8fb8a0'} size="w-9 h-9 text-sm" />
             <div className="min-w-0 flex-1">
-                <p className={`truncate font-semibold ${r.me ? 'text-[#a8f0c6]' : 'text-white'}`}>{r.username}{r.me && ' (toi)'}</p>
+                <Link to={profile(r.username)} className={`flex items-center gap-1.5 font-semibold hover:underline ${r.me ? 'text-[#a8f0c6]' : 'text-white'}`}>
+                    <span className="truncate">{r.username}{r.me && ' (toi)'}</span><SeasonBadge badge={r.badge} compact />
+                </Link>
                 {extra && <p className="text-xs text-ink-soft">{extra}</p>}
             </div>
             <span className="text-right">

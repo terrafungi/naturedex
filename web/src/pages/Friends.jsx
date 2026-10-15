@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeftRight, Check, Clock, MessageCircle, Minus, Plus, Search, Send, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react';
 import InviteBanner from '../components/InviteBanner.jsx';
+import SeasonBadge from '../components/SeasonBadge.jsx';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { RARITIES } from '../game.jsx';
@@ -378,7 +379,9 @@ export default function Friends() {
                             <li key={f.username} className="rounded-3xl nd-glass p-4 flex items-center gap-3">
                                 <Avatar name={f.username} />
                                 <div className="min-w-0 flex-1">
-                                    <div className="font-display text-lg text-white truncate">{f.username}</div>
+                                    <Link to={`/joueur/${encodeURIComponent(f.username)}`} className="flex items-center gap-1.5 font-display text-lg text-white hover:underline">
+                                        <span className="truncate">{f.username}</span><SeasonBadge badge={f.badge} compact />
+                                    </Link>
                                     <div className="text-xs text-white/55">{f.discovered.toLocaleString('fr-FR')} espèces découvertes</div>
                                 </div>
                                 <Link to={`/messages/${encodeURIComponent(f.username)}`} className="grid place-items-center w-9 h-9 rounded-full ring-1 ring-white/15 text-white/80 hover:bg-white/10" aria-label={`Écrire à ${f.username}`} title="Message"><MessageCircle className="w-4 h-4" /></Link>

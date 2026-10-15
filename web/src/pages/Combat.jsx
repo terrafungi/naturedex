@@ -163,7 +163,9 @@ function Season({ season }) {
             </div>
             <p className="mt-2 text-[11px] text-white/50">Classement final : au moins {season.minGames} combats classés. Les places récompensées demandent une cote d'au moins {season.minRating}.</p>
             {season.podium.length > 0 && (
-                <p className="mt-2 text-xs text-white/70">Podium de la saison passée : {season.podium.map((x) => `${x.rank}. ${x.username} (${x.rating})`).join(' · ')}</p>
+                <p className="mt-2 text-xs text-white/70">Podium de la saison passée : {season.podium.map((x, i) => (
+                    <span key={x.rank}>{i > 0 && ' · '}{x.rank}. <Link to={`/joueur/${encodeURIComponent(x.username)}`} className="font-semibold text-white hover:underline">{x.username}</Link> ({x.rating})</span>
+                ))}</p>
             )}
         </section>
     );

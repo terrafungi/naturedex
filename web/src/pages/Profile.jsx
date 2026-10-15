@@ -1,11 +1,15 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Award, Gavel, Layers, LogOut, Package } from 'lucide-react';
-import { useGame } from '../api.jsx';
+import { api, useGame } from '../api.jsx';
+import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
 import { LeafLogo } from '../components/Layout.jsx';
 import { RARITIES } from '../game.jsx';
 
 export default function Profile() {
     const { user, catalog, owned, ownedInfo, logout } = useGame();
+    const [me, setMe] = useState(null);
+    useEffect(() => { api('player', { username: user.username }).then((r) => setMe(r.player)).catch(() => {}); }, [user.username]);
     const total = catalog?.total || user.total;
     const discovered = Object.keys(owned).length;
     const copies = Object.values(owned).reduce((a, n) => a + n, 0);
@@ -28,6 +32,7 @@ export default function Profile() {
                 <div className="min-w-0">
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Naturaliste</p>
                     <h1 className="font-display text-4xl font-medium text-white truncate">{user.username}</h1>
+                    <SeasonBadge badge={me?.badge} className="mt-2" />
                 </div>
             </div>
 
@@ -54,6 +59,8 @@ export default function Profile() {
                     ))}
                 </ul>
             </div>
+
+            {me && <div className="mt-6"><SeasonHistory seasons={me.seasons} /></div>}
 
             <div className="mt-6 flex flex-wrap gap-3">
                 <Link to="/collection" className="nd-cta-glass inline-flex items-center gap-2 px-5 py-3 rounded-full font-semibold text-white"><Layers className="w-5 h-5 text-[#a8f0c6]" />Ma collection</Link>
