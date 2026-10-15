@@ -152,17 +152,6 @@ function SwipeCard({ children, onSwipe, draggedRef }) {
     );
 }
 
-// Opening lines of the species' Wikipedia intro, so every pull teaches something.
-function Fact({ card }) {
-    if (!card.fact) return null;
-    return (
-        <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
-            className="mt-3 mx-auto max-w-[var(--deal-w)] text-left text-[13px] leading-snug text-white/75 line-clamp-4">
-            {card.fact}
-        </motion.p>
-    );
-}
-
 function RarityBanner({ card, demo }) {
     const fx = fxOf(card);
     const r = RARITIES[card.rarity];
@@ -170,7 +159,6 @@ function RarityBanner({ card, demo }) {
         <motion.div initial={{ opacity: 0, scale: 2.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', damping: 9, stiffness: 120, delay: 0.25 }}>
             <div className="nd-secret-text font-display text-3xl sm:text-4xl font-black uppercase tracking-[0.08em]">✦ Carte secrète ✦</div>
             <div className="text-white/80 text-sm mt-1 [text-shadow:0_1px_8px_rgb(0_0_0/0.8)]">Environ 1 booster sur 500 en cache une. Touche ou glisse pour continuer</div>
-            <Fact card={card} />
             {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>
     );
@@ -181,8 +169,7 @@ function RarityBanner({ card, demo }) {
                 style={{ color: fx.level ? fx.color : '#e7ece8', textShadow: fx.level >= 2 ? `0 0 ${fx.level * 8}px ${fx.color}` : 'none' }}>
                 {r.symbol} {r.label}{fx.level >= 4 ? ' !' : ''}
             </div>
-            <Fact card={card} />
-            <div className="mt-2 text-white/50 text-xs">Touche ou glisse la carte pour continuer</div>
+            <div className="text-white/60 text-sm">Touche ou glisse la carte pour continuer</div>
             {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>
     );
@@ -218,8 +205,8 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
 
     return (
         <motion.div className="fixed inset-0 z-[60] bg-[#04100a]/95 backdrop-blur-sm overflow-y-auto overflow-x-hidden"
-            // card as big as the screen allows, leaving room for the banner and the species blurb
-            style={{ '--deal-w': 'clamp(220px, min(84vw, 360px, calc((100dvh - 330px) / 1.4)), 360px)' }}
+            // card as big as the screen allows, leaving room for the banner below
+            style={{ '--deal-w': 'clamp(220px, min(84vw, 360px, calc((100dvh - 260px) / 1.4)), 360px)' }}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {/* backdrop: dims while charging, then floods with the rarity colour */}
             <motion.div className="fixed inset-0 pointer-events-none"

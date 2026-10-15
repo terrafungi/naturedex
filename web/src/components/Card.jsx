@@ -50,6 +50,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
             ref={ref}
             className={`nd-card transition-transform duration-200 ease-out ${className}`}
             data-rarity={card.rarity}
+            data-fact={card.fact ? '' : undefined}
             style={{ '--type': t.color }}
             onPointerMove={onMove}
             onPointerLeave={onLeave}
@@ -81,6 +82,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                         <span className="flex items-center">{ab.cost}<Zap className="w-[4.2cqi] h-[4.2cqi] fill-current" /></span>
                     </div>
                 )}
+                {card.fact && <p className="nd-fact">{card.fact}</p>}
                 <div className="nd-foot">
                     <span className="flex items-center gap-[1cqi]" title="Lectures Wikipédia par an (estimation)">
                         {card.views != null && <><Eye className="w-[3.6cqi] h-[3.6cqi]" />{formatViews(Number(card.views))}</>}

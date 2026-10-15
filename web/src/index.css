@@ -138,6 +138,20 @@ body {
 .nd-card .nd-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4cqi; margin-top: 1.6cqi; }
 .nd-card .nd-stats span { display: flex; align-items: baseline; justify-content: center; gap: 1cqi; padding: 0.8cqi 0; border-radius: 1.6cqi; background: color-mix(in oklab, var(--type) 14%, transparent); font-family: var(--font-display); font-weight: 800; font-size: 4.6cqi; }
 .nd-card .nd-stats small { font-family: var(--font-sans, inherit); font-weight: 700; font-size: 2.8cqi; opacity: 0.65; letter-spacing: 0.04em; }
+/* species blurb (booster reveal): fills the space above the footer, fades out if too long;
+   the photo gets a little shorter to make room, and small cards in grids skip it */
+.nd-card .nd-fact {
+    flex: 1 1 0; min-height: 0; overflow: hidden; margin: 1.6cqi 0 1cqi;
+    font-size: 3.4cqi; line-height: 1.32; color: #3c4640;
+    mask-image: linear-gradient(to bottom, black calc(100% - 4.5cqi), transparent);
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 4.5cqi), transparent);
+}
+.nd-card[data-rarity="secret"] .nd-fact { color: inherit; opacity: 0.85; }
+.nd-card[data-fact] .nd-window { aspect-ratio: 16 / 10; }
+@container (max-width: 220px) {
+    .nd-card .nd-fact { display: none; }
+    .nd-card[data-fact] .nd-window { aspect-ratio: 4 / 3; }
+}
 .nd-card .nd-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; font-size: 3.2cqi; color: #5d6762; }
 
 .nd-type-icon {
