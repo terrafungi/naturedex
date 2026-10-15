@@ -305,7 +305,7 @@ export const BACKGROUNDS = {
             }
             // curtains of light: many thin vertical strokes along a wavy line, fading upwards
             ctx.globalCompositeOperation = 'lighter';
-            const bands = [['46,255,170', 0.28, 0.2], ['120,255,200', 0.42, 0.14], ['170,110,255', 0.16, 0.12]];
+            const bands = [['46,255,170', 0.3, 0.2], ['90,255,190', 0.5, 0.16], ['170,110,255', 0.18, 0.12], ['46,255,170', 0.72, 0.1]];
             bands.forEach(([rgb, base, amp], b) => {
                 const phase = rand() * 6, freq = 1.6 + rand() * 1.4;
                 for (let x = -20; x < W + 20; x += 3) {
@@ -314,14 +314,15 @@ export const BACKGROUNDS = {
                     const len = H * (0.16 + 0.1 * Math.sin(t * 13 + phase) ** 2);
                     const g = ctx.createLinearGradient(0, y - len, 0, y);
                     g.addColorStop(0, `rgba(${rgb},0)`);
-                    g.addColorStop(0.85, `rgba(${rgb},${0.05 + 0.05 * Math.sin(t * 40 + b) ** 2})`);
+                    g.addColorStop(0.6, `rgba(${rgb},${0.08 + 0.08 * Math.sin(t * 40 + b) ** 2})`);
+                    g.addColorStop(0.9, `rgba(${rgb},${0.3 + 0.25 * Math.sin(t * 23 + b) ** 2})`);
                     g.addColorStop(1, `rgba(${rgb},0)`);
                     ctx.fillStyle = g;
                     ctx.fillRect(x, y - len, 3, len);
                 }
             });
             ctx.globalCompositeOperation = 'source-over';
-            glow(ctx, W * 0.5, H * 0.3, W * 0.8, 'rgba(60,255,180,0.08)');
+            glow(ctx, W * 0.5, H * 0.3, W * 0.8, 'rgba(60,255,180,0.14)');
             ridge(ctx, W, H, H * 0.9, H * 0.08, '#081520', rand);
             // pine silhouettes on the ridge
             ctx.fillStyle = '#03090f';
@@ -350,6 +351,9 @@ export const BACKGROUNDS = {
             ctx.moveTo(-W * 0.1, H); ctx.lineTo(W * 0.38, H * 0.7); ctx.lineTo(W * 0.62, H * 0.7); ctx.lineTo(W * 1.1, H); ctx.fill();
             glow(ctx, W * 0.5, H * 0.7, W * 0.25, 'rgba(255,170,60,0.75)');
             ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.shadowColor = 'rgba(255,120,30,0.9)';
+            ctx.shadowBlur = 24;
             for (let i = 0; i < 7; i++) {
                 let x = W * (0.4 + rand() * 0.2), y = H * 0.71;
                 ctx.strokeStyle = `rgba(255,${110 + rand() * 90},30,${0.6 + rand() * 0.4})`;
@@ -359,6 +363,7 @@ export const BACKGROUNDS = {
                 while (y < H) { x += dir * (8 + rand() * 30) + (rand() - 0.5) * 30; y += 30 + rand() * 30; ctx.lineTo(x, y); }
                 ctx.stroke();
             }
+            ctx.shadowBlur = 0;
             // embers
             ctx.globalCompositeOperation = 'lighter';
             for (let i = 0; i < 120; i++) {
@@ -378,14 +383,14 @@ export const BACKGROUNDS = {
             ctx.globalCompositeOperation = 'lighter';
             // nebula clouds
             const hues = ['200,80,255', '80,120,255', '255,80,180', '60,220,255'];
-            for (let i = 0; i < 26; i++) glow(ctx, W * (0.1 + rand() * 0.8), H * (0.15 + rand() * 0.7), W * (0.15 + rand() * 0.3), `rgba(${hues[i % 4]},${0.06 + rand() * 0.08})`);
+            for (let i = 0; i < 26; i++) glow(ctx, W * (0.1 + rand() * 0.8), H * (0.15 + rand() * 0.7), W * (0.15 + rand() * 0.3), `rgba(${hues[i % 4]},${0.1 + rand() * 0.12})`);
             // spiral arms of stars
             ctx.save();
-            ctx.translate(W / 2, H * 0.48);
-            ctx.rotate(-0.5);
-            for (let i = 0; i < 1600; i++) {
+            ctx.translate(W * 0.72, Math.min(H * 0.2, W * 0.36));
+            ctx.rotate(-0.45);
+            for (let i = 0; i < 2600; i++) {
                 const arm = i % 2, t = rand();
-                const a = t * Math.PI * 3.2 + arm * Math.PI, r = t * W * 0.62;
+                const a = t * Math.PI * 3.2 + arm * Math.PI, r = t * W * 0.8;
                 const spread = (rand() - 0.5) * (18 + r * 0.22);
                 const x = Math.cos(a) * r + spread, y = (Math.sin(a) * r + spread) * 0.55;
                 ctx.fillStyle = `rgba(${220 + rand() * 35},${200 + rand() * 55},255,${(0.15 + rand() * 0.6) * (1 - t * 0.6)})`;
