@@ -8,7 +8,7 @@ import { api, useGame } from '../api.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
 
 const SEED_ORDER = ['radis', 'tournesol', 'chene', 'rose'];
-const SEED_TAGS = { radis: 'Rapide', rose: 'Meilleur rendement' };
+const SEED_TAGS = { radis: 'Dorée 1 sur 5', rose: 'Meilleur rendement' };
 const LAST_SEED = 'naturdex.lastSeed';
 
 // Colours of each species once grown: stem, leaves, and the flower / crown / root.
@@ -20,8 +20,9 @@ const LOOK = {
 };
 
 // Graines available once every pépite is converted (planting converts only what is missing).
-const budgetOf = (user) => user.coins + user.nuggets * (user.nuggetSeeds ?? 1);
-const nuggetsFor = (user, cost) => Math.max(0, Math.ceil((cost - user.coins) / (user.nuggetSeeds ?? 1)));
+const per = (user) => user.nuggetsPerSeed ?? 2;
+const budgetOf = (user) => user.coins + Math.floor(user.nuggets / per(user));
+const nuggetsFor = (user, cost) => Math.max(0, cost - user.coins) * per(user);
 
 const duration = (minutes) => (minutes < 60 ? `${minutes} min` : `${minutes / 60} h`);
 function left(ms) {
@@ -240,17 +241,19 @@ function LockedPlot({ price, next, canPay, onUnlock, busy }) {
 
 // The grainerie: pépites → graines in one tap, with the free and paid ways to get more pépites.
 function Converter({ user, busy, onConvert }) {
-    const rate = user.nuggetSeeds;
+    const rate = per(user);
     const bonus = user.convertBonus?.ready ? user.convertBonus : null;
-    const gives = (n) => n * rate + (bonus ? Math.min(bonus.max, Math.floor(n * rate * bonus.rate)) : 0);
-    const options = [...new Set([10, 50, 100].filter((n) => n < user.nuggets).concat(user.nuggets > 0 ? [user.nuggets] : []))];
+    const base = (n) => Math.floor(n / rate);
+    const gives = (n) => base(n) + (bonus ? Math.min(bonus.max, Math.floor(base(n) * bonus.rate)) : 0);
+    const all = user.nuggets - (user.nuggets % rate);
+    const options = [...new Set([20, 100, 200].filter((n) => n < all).concat(all > 0 ? [all] : []))];
     return (
         <div className="mt-6 p-4 rounded-[1.6rem] bg-gradient-to-br from-[#f4c25b]/12 to-white/[0.03] ring-1 ring-[#f4c25b]/25">
             <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1.5 font-display text-lg font-bold text-white">
                     <Nugget className="w-5 h-5" /><ArrowRight className="w-4 h-4 text-white/40" /><Seed className="w-5 h-5" />Grainerie
                 </span>
-                <span className="ml-auto text-xs font-semibold text-white/60">1 pépite = {rate} graine{rate > 1 ? 's' : ''}</span>
+                <span className="ml-auto text-xs font-semibold text-white/60">{rate} pépites = 1 graine</span>
             </div>
             {bonus ? (
                 <motion.p initial={{ scale: 0.96 }} animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 1.8, repeat: Infinity }}
@@ -260,17 +263,17 @@ function Converter({ user, busy, onConvert }) {
             ) : (
                 <p className="mt-2 text-xs text-white/50">Bonus du jour utilisé : il revient demain.</p>
             )}
-            {user.nuggets > 0 ? (
+            {all > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                     {options.map((n) => (
                         <button key={n} type="button" disabled={busy} onClick={() => onConvert(n)}
-                            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-bold tabular-nums disabled:opacity-50 ${n === user.nuggets ? 'bg-[#e9c46a] text-[#2a1c00] hover:brightness-110' : 'bg-black/25 ring-1 ring-[#f4c25b]/35 text-[#f8d98a] hover:bg-black/40'}`}>
-                            {n === user.nuggets && options.length > 1 ? 'Tout · ' : ''}<Nugget className="w-3.5 h-3.5" />{n.toLocaleString('fr-FR')}<ArrowRight className="w-3 h-3 opacity-60" /><Seed className="w-3.5 h-3.5" />{gives(n).toLocaleString('fr-FR')}
+                            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-bold tabular-nums disabled:opacity-50 ${n === all ? 'bg-[#e9c46a] text-[#2a1c00] hover:brightness-110' : 'bg-black/25 ring-1 ring-[#f4c25b]/35 text-[#f8d98a] hover:bg-black/40'}`}>
+                            {n === all && options.length > 1 ? 'Tout · ' : ''}<Nugget className="w-3.5 h-3.5" />{n.toLocaleString('fr-FR')}<ArrowRight className="w-3 h-3 opacity-60" /><Seed className="w-3.5 h-3.5" />{gives(n).toLocaleString('fr-FR')}
                         </button>
                     ))}
                 </div>
             ) : (
-                <p className="mt-2 text-sm text-ink-soft">Plus de pépites pour l'instant.</p>
+                <p className="mt-2 text-sm text-ink-soft">{user.nuggets ? `Il faut au moins ${rate} pépites pour une graine.` : "Plus de pépites pour l'instant."}</p>
             )}
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs font-semibold">
                 <Link to="/collection" className="inline-flex items-center gap-1 text-[#a8f0c6] hover:underline"><Recycle className="w-3.5 h-3.5" />Gratuit : recycle tes doublons</Link>
@@ -325,7 +328,7 @@ export default function Garden() {
         refreshBadges();
         if (res.converted) {
             const id = Date.now();
-            setToast({ id, text: `${res.converted} pépite${res.converted > 1 ? 's' : ''} → ${res.converted * user.nuggetSeeds} graines`, nugget: true });
+            setToast({ id, text: `${res.converted} pépite${res.converted > 1 ? 's' : ''} → ${res.converted / per(user)} graine${res.converted / per(user) > 1 ? 's' : ''}`, nugget: true });
             setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 2400);
         }
     }
@@ -424,10 +427,10 @@ export default function Garden() {
             {/* how it works */}
             <ol className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                 {[
-                    [Nugget, 'Convertis', `1 pépite = ${user.nuggetSeeds} graine${user.nuggetSeeds > 1 ? 's' : ''}, +50 % sur la première conversion du jour.`],
+                    [Nugget, 'Convertis', `${per(user)} pépites = 1 graine, +50 % sur la première conversion du jour.`],
                     [Seed, 'Plante', 'Choisis une graine. Plus elle pousse longtemps, plus elle rapporte.'],
                     [Droplets, 'Arrose', `Une fois par plante : ${Math.round(garden.waterCut * 100)} % de temps en moins.`],
-                    [Sparkles, 'Récolte', `1 chance sur 10 d'une récolte dorée ×2… et parfois un booster caché !`],
+                    [Sparkles, 'Récolte', `1 chance sur 10 d'une récolte dorée ×2 (1 sur 5 pour le radis)… et parfois un booster caché !`],
                 ].map(([Icon, title, text], i) => (
                     <li key={title} className="p-4 rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
                         <p className="flex items-center gap-2 font-display text-lg font-bold text-white"><span className="text-white/40 text-sm">{i + 1}</span><Icon className="w-5 h-5 text-[#8ee6a8] shrink-0" />{title}</p>

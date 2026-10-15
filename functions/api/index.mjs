@@ -144,7 +144,7 @@ async function publicUser(db, user) {
         plants: user.plants,
         boosterPlants: BOOSTER_PLANTS,
         plots: user.plots,
-        nuggetSeeds: NUGGET_SEEDS,
+        nuggetsPerSeed: NUGGETS_PER_SEED,
         convertBonus: { ready: convertBonusReady(user), rate: CONVERT_BONUS, max: CONVERT_BONUS_MAX },
         dailyCoins: DAILY_COINS,
         nextDailyAt: nextDaily > Date.now() ? new Date(nextDaily).toISOString() : null,
@@ -844,25 +844,26 @@ async function stripeWebhook(event) {
 // ---------- garden ----------
 
 // Graines planted in plots grow into « plantes »; BOOSTER_PLANTS of them open a booster.
-// The longer a seed grows, the better it pays: ~125 graines a booster for the radish,
-// ~50 for the moon rose, so coming back later is always worth it.
+// Every seed beats paying 100 graines directly, and the longer it grows the better it pays
+// (golden harvests included: ~69 graines a booster for the radish, ~45 for the moon rose).
+// The radish makes up for its small yield with golden harvests twice as often.
 const BOOSTER_PLANTS = 10;
 const SEEDS = {
-    radis: { name: 'Radis éclair', cost: 25, minutes: 3, plants: 2 },
-    tournesol: { name: 'Tournesol', cost: 50, minutes: 60, plants: 6 },
-    chene: { name: 'Chêne', cost: 100, minutes: 8 * 60, plants: 15 },
-    rose: { name: 'Rose de lune', cost: 200, minutes: 24 * 60, plants: 40 },
+    radis: { name: 'Radis éclair', cost: 25, minutes: 3, plants: 3, golden: 0.2 },
+    tournesol: { name: 'Tournesol', cost: 50, minutes: 60, plants: 7, golden: 0.1 },
+    chene: { name: 'Chêne', cost: 100, minutes: 8 * 60, plants: 16, golden: 0.1 },
+    rose: { name: 'Rose de lune', cost: 200, minutes: 24 * 60, plants: 40, golden: 0.1 },
 };
 const START_PLOTS = 3;
 const PLOT_PRICES = [300, 600, 1000, 1500, 2500, 4000]; // graines for plots 4 to 9
 const MAX_PLOTS = START_PLOTS + PLOT_PRICES.length;
 const WATER_CUT = 0.3; // one watering per plant takes 30 % off the time left
-const GOLDEN_CHANCE = 0.1; // harvest ×2
+const GOLDEN_CHANCE = 0.1; // harvest ×2 (unless the seed sets its own chance)
 const TREASURE_CHANCE = 0.01; // + one bonus booster
-// Pépites turn into graines one for one: pépites come easily (recycling, auctions, rewards),
+// Two pépites make one graine: pépites come easily (recycling, auctions, rewards),
 // so they help the garden without replacing graines.
-const NUGGET_SEEDS = 1;
-// First Grainerie conversion of the Paris day: +50 % graines, on up to 100 pépites (+50 max).
+const NUGGETS_PER_SEED = 2;
+// First Grainerie conversion of the Paris day: +50 % graines, on up to 200 pépites (+50 max).
 // Automatic conversions while planting never use it, so it is never wasted on a few pépites.
 const CONVERT_BONUS = 0.5;
 const CONVERT_BONUS_MAX = 50;
@@ -873,10 +874,10 @@ const convertBonusReady = (user) => !user.convert_bonus_at || parisDate(user.con
 async function coverWithNuggets(client, user, cost) {
     const missing = cost - user.coins;
     if (missing <= 0) return 0;
-    const nuggets = Math.ceil(missing / NUGGET_SEEDS);
+    const nuggets = missing * NUGGETS_PER_SEED;
     if (nuggets > user.nuggets) throw new HttpError(402, 'Pas assez de graines ni de pépites');
-    await client.query(`UPDATE users SET nuggets = nuggets - $2, coins = coins + $3 WHERE id = $1`, [user.id, nuggets, nuggets * NUGGET_SEEDS]);
-    user.coins += nuggets * NUGGET_SEEDS;
+    await client.query(`UPDATE users SET nuggets = nuggets - $2, coins = coins + $3 WHERE id = $1`, [user.id, nuggets, missing]);
+    user.coins += missing;
     user.nuggets -= nuggets;
     return nuggets;
 }
@@ -1086,13 +1087,14 @@ const actions = {
         return { garden: await gardenState(db, user), user: await publicUser(db, user) };
     },
 
-    // Pépites → graines, at NUGGET_SEEDS graines each.
+    // Pépites → graines, NUGGETS_PER_SEED pépites each (an odd pépite left over is kept).
     async convert(db, body, event) {
-        const nuggets = Number(body.nuggets);
-        if (!Number.isInteger(nuggets) || nuggets < 1) throw new HttpError(400, 'Montant invalide');
+        const asked = Number(body.nuggets);
+        if (!Number.isInteger(asked) || asked < NUGGETS_PER_SEED) throw new HttpError(400, 'Montant invalide');
+        const nuggets = asked - (asked % NUGGETS_PER_SEED);
         return withGarden(db, event, async (client, user) => {
             if (nuggets > user.nuggets) throw new HttpError(402, 'Pas assez de pépites');
-            const seeds = nuggets * NUGGET_SEEDS;
+            const seeds = nuggets / NUGGETS_PER_SEED;
             const bonus = convertBonusReady(user) ? Math.min(CONVERT_BONUS_MAX, Math.floor(seeds * CONVERT_BONUS)) : 0;
             await client.query(
                 `UPDATE users SET nuggets = nuggets - $2, coins = coins + $3, convert_bonus_at = CASE WHEN $4 THEN now() ELSE convert_bonus_at END WHERE id = $1`,
@@ -1108,7 +1110,7 @@ const actions = {
         const seed = SEEDS[body.kind];
         if (!seed) throw new HttpError(400, 'Graine inconnue');
         return withGarden(db, event, async (client, user) => {
-            const budget = user.coins + (body.convert ? user.nuggets * NUGGET_SEEDS : 0);
+            const budget = user.coins + (body.convert ? Math.floor(user.nuggets / NUGGETS_PER_SEED) : 0);
             const { rows } = await client.query(`SELECT slot FROM garden_plots WHERE user_id = $1`, [user.id]);
             const taken = new Set(rows.map((r) => r.slot));
             let slots;
@@ -1156,7 +1158,7 @@ const actions = {
             );
             if (!rows.length) throw new HttpError(409, 'Rien n\'est encore prêt à récolter');
             const harvest = rows.map(({ slot, kind }) => {
-                const golden = Math.random() < GOLDEN_CHANCE;
+                const golden = Math.random() < (SEEDS[kind]?.golden ?? GOLDEN_CHANCE);
                 const base = SEEDS[kind]?.plants || 1;
                 return { slot, kind, plants: golden ? base * 2 : base, golden, treasure: Math.random() < TREASURE_CHANCE };
             }).sort((a, b) => a.slot - b.slot);
