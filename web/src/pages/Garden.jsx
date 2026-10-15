@@ -20,8 +20,8 @@ const LOOK = {
 };
 
 // Graines available once every pépite is converted (planting converts only what is missing).
-const budgetOf = (user) => user.coins + user.nuggets * (user.nuggetSeeds || 3);
-const nuggetsFor = (user, cost) => Math.max(0, Math.ceil((cost - user.coins) / (user.nuggetSeeds || 3)));
+const budgetOf = (user) => user.coins + user.nuggets * (user.nuggetSeeds ?? 1);
+const nuggetsFor = (user, cost) => Math.max(0, Math.ceil((cost - user.coins) / (user.nuggetSeeds ?? 1)));
 
 const duration = (minutes) => (minutes < 60 ? `${minutes} min` : `${minutes / 60} h`);
 function left(ms) {
@@ -250,7 +250,7 @@ function Converter({ user, busy, onConvert }) {
                 <span className="flex items-center gap-1.5 font-display text-lg font-bold text-white">
                     <Nugget className="w-5 h-5" /><ArrowRight className="w-4 h-4 text-white/40" /><Seed className="w-5 h-5" />Grainerie
                 </span>
-                <span className="ml-auto text-xs font-semibold text-white/60">1 pépite = {rate} graines</span>
+                <span className="ml-auto text-xs font-semibold text-white/60">1 pépite = {rate} graine{rate > 1 ? 's' : ''}</span>
             </div>
             {bonus ? (
                 <motion.p initial={{ scale: 0.96 }} animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 1.8, repeat: Infinity }}
@@ -424,7 +424,7 @@ export default function Garden() {
             {/* how it works */}
             <ol className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                 {[
-                    [Nugget, 'Convertis', `1 pépite = ${user.nuggetSeeds} graines. Recycle tes doublons pour gagner des pépites.`],
+                    [Nugget, 'Convertis', `1 pépite = ${user.nuggetSeeds} graine${user.nuggetSeeds > 1 ? 's' : ''}, +50 % sur la première conversion du jour.`],
                     [Seed, 'Plante', 'Choisis une graine. Plus elle pousse longtemps, plus elle rapporte.'],
                     [Droplets, 'Arrose', `Une fois par plante : ${Math.round(garden.waterCut * 100)} % de temps en moins.`],
                     [Sparkles, 'Récolte', `1 chance sur 10 d'une récolte dorée ×2… et parfois un booster caché !`],

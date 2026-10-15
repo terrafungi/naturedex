@@ -859,13 +859,13 @@ const MAX_PLOTS = START_PLOTS + PLOT_PRICES.length;
 const WATER_CUT = 0.3; // one watering per plant takes 30 % off the time left
 const GOLDEN_CHANCE = 0.1; // harvest ×2
 const TREASURE_CHANCE = 0.01; // + one bonus booster
-// Pépites turn into graines at the shop's own € rate (500 pépites for 2,99 € ≈ 1 500 graines),
-// so buying either currency feeds the garden equally; free players get pépites by recycling.
-const NUGGET_SEEDS = 3;
-// First Grainerie conversion of the Paris day: +50 % graines, on up to 100 pépites (+150 max).
+// Pépites turn into graines one for one: pépites come easily (recycling, auctions, rewards),
+// so they help the garden without replacing graines.
+const NUGGET_SEEDS = 1;
+// First Grainerie conversion of the Paris day: +50 % graines, on up to 100 pépites (+50 max).
 // Automatic conversions while planting never use it, so it is never wasted on a few pépites.
 const CONVERT_BONUS = 0.5;
-const CONVERT_BONUS_MAX = 150;
+const CONVERT_BONUS_MAX = 50;
 const parisDate = (d) => new Date(d).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
 const convertBonusReady = (user) => !user.convert_bonus_at || parisDate(user.convert_bonus_at) !== parisDate(Date.now());
 
