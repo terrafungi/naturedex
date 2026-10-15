@@ -769,19 +769,43 @@ const SITE_ORIGINS = ['https://diuqx6knr7is6.cloudfront.net', 'https://naturedex
 
 // Credit a purchase once Stripe says it is paid. Idempotent: the webhook and the
 // return page may both call this, only the first one flips pending → paid.
+// The price is checked before tax and in the currency we asked for: Stripe adds VAT on top
+// (Managed Payments / Stripe Tax) and may charge in the buyer's currency (Adaptive Pricing).
+function chargedPrice(session) {
+    const cc = session.currency_conversion;
+    return cc ? { amount: cc.amount_subtotal, currency: cc.source_currency } : { amount: session.amount_subtotal, currency: session.currency };
+}
+
 async function grantPurchase(db, session) {
     const id = Number(session.metadata?.purchase_id || session.client_reference_id);
     if (!id || session.payment_status !== 'paid') return null;
+    const price = chargedPrice(session);
     return inTransaction(db, async (client) => {
         const { rows: [p] } = await client.query(
             `UPDATE purchases SET status = 'paid', paid_at = now(), stripe_payment = $3, livemode = $4
              WHERE id = $1 AND stripe_session = $2 AND status <> 'paid' AND amount_cents = $5 AND currency = $6 RETURNING *`,
-            [id, session.id, session.payment_intent, !!session.livemode, session.amount_total, session.currency]
+            [id, session.id, session.payment_intent, !!session.livemode, price.amount, String(price.currency || '').toLowerCase()]
         );
-        if (!p) return null;
+        if (!p) {
+            const { rows: [had] } = await client.query(`SELECT status, amount_cents, currency FROM purchases WHERE id = $1`, [id]);
+            if (had?.status !== 'paid') {
+                console.error('grantPurchase refused', JSON.stringify({ id, session: session.id, had, price,
+                    total: session.amount_total, subtotal: session.amount_subtotal, currency: session.currency }));
+            }
+            return null;
+        }
         if (p.user_id) await client.query(`UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1`, [p.user_id, p.coins, p.nuggets]);
         return p;
     });
+}
+
+// Scheduled safety net: credit paid purchases even if the webhook was missed and the
+// player never came back to the shop.
+async function refreshPendingPurchases(db) {
+    const { rows } = await db.query(
+        `SELECT * FROM purchases WHERE status = 'pending' AND stripe_session IS NOT NULL
+         AND created_at BETWEEN now() - interval '2 days' AND now() - interval '1 minute' ORDER BY id DESC LIMIT 20`);
+    for (const p of rows) await refreshPurchase(db, p).catch((err) => console.error('refresh', p.id, err.message));
 }
 
 // A purchase left pending (closed tab, missed webhook): ask Stripe again.
@@ -1758,6 +1782,7 @@ export const handler = async (event) => {
     if (event.source === 'schedule') {
         await settleAuctions(getPool());
         await seasonRollover(getPool(), inTransaction);
+        if (stripeReady() && new Date().getUTCMinutes() % 5 === 0) await refreshPendingPurchases(getPool());
         return { ok: true };
     }
     if (event.requestContext?.http?.method === 'OPTIONS') {
