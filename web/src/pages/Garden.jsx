@@ -243,7 +243,7 @@ function Converter({ user, busy, onConvert }) {
     const rate = user.nuggetSeeds;
     const options = [...new Set([10, 50, 200].filter((n) => n < user.nuggets).concat(user.nuggets > 0 ? [user.nuggets] : []))];
     return (
-        <div className="mt-4 p-4 rounded-[1.6rem] bg-gradient-to-br from-[#f4c25b]/12 to-white/[0.03] ring-1 ring-[#f4c25b]/25">
+        <div className="mt-6 p-4 rounded-[1.6rem] bg-gradient-to-br from-[#f4c25b]/12 to-white/[0.03] ring-1 ring-[#f4c25b]/25">
             <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1.5 font-display text-lg font-bold text-white">
                     <Nugget className="w-5 h-5" /><ArrowRight className="w-4 h-4 text-white/40" /><Seed className="w-5 h-5" />Grainerie
@@ -378,8 +378,6 @@ export default function Garden() {
                 </div>
             </div>
 
-            <Converter user={user} busy={busy} onConvert={convert} />
-
             {/* quick actions */}
             <div className="mt-6 flex flex-wrap gap-2">
                 {readyCount > 0 && (
@@ -408,6 +406,8 @@ export default function Garden() {
                         onUnlock={() => window.confirm(`Débloquer une nouvelle parcelle pour ${garden.nextPlotPrice} graines ?`) && run('unlockPlot')} />
                 ))}
             </div>
+
+            <Converter user={user} busy={busy} onConvert={convert} />
 
             {/* how it works */}
             <ol className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
