@@ -991,7 +991,14 @@ async function addToBinder(db, userId, binderId, cardId) {
 // Showcase ("vitrine"): up to 10 owned cards arranged on a background, shown on the profile
 // and exported as an image by the browser.
 const SHOWCASE_MAX = 10;
-const SHOWCASE_BACKGROUNDS = ['foret', 'ocean', 'nuit', 'herbier', 'or', 'aube', 'jungle', 'givre'];
+// Premium backgrounds, unlocked for good with pépites (price each).
+const SHOWCASE_PREMIUM = { aurore: 250, volcan: 400, galaxie: 600 };
+const SHOWCASE_BACKGROUNDS = ['foret', 'ocean', 'nuit', 'herbier', 'or', 'aube', 'jungle', 'givre', ...Object.keys(SHOWCASE_PREMIUM)];
+
+async function ownedBackgrounds(db, userId) {
+    const { rows } = await db.query(`SELECT background FROM showcase_backgrounds WHERE user_id = $1`, [userId]);
+    return rows.map((r) => r.background);
+}
 const SHOWCASE_LAYOUTS = ['grille', 'eventail', 'vedette'];
 const SHOWCASE_FORMATS = ['story', 'carre'];
 
@@ -1448,7 +1455,23 @@ const actions = {
 
     async showcase(db, body, event) {
         const user = await requireUser(db, event);
-        return { showcase: await loadShowcase(db, user.id) };
+        return { showcase: await loadShowcase(db, user.id), owned: await ownedBackgrounds(db, user.id), premium: SHOWCASE_PREMIUM };
+    },
+
+    async buyBackground(db, body, event) {
+        const user = await requireUser(db, event);
+        const price = SHOWCASE_PREMIUM[body.background];
+        if (!price) throw new HttpError(400, 'Fond inconnu');
+        const updated = await inTransaction(db, async (client) => {
+            const { rows: [u] } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+            const { rowCount } = await client.query(
+                `INSERT INTO showcase_backgrounds (user_id, background) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [u.id, body.background]);
+            if (!rowCount) throw new HttpError(409, 'Tu as déjà ce fond');
+            if (u.nuggets < price) throw new HttpError(402, `Il te faut ${price} pépites`);
+            const { rows: [after] } = await client.query(`UPDATE users SET nuggets = nuggets - $2 WHERE id = $1 RETURNING *`, [u.id, price]);
+            return after;
+        });
+        return { owned: await ownedBackgrounds(db, user.id), user: await publicUser(db, updated) };
     },
 
     async saveShowcase(db, body, event) {
@@ -1460,6 +1483,9 @@ const actions = {
             `SELECT COUNT(*)::int AS n FROM user_cards WHERE user_id = $1 AND card_id = ANY($2::int[])`, [user.id, ids]);
         if (n !== ids.length) throw new HttpError(400, 'Tu ne peux exposer que tes propres cartes');
         const pick = (value, list) => (list.includes(value) ? value : list[0]);
+        if (SHOWCASE_PREMIUM[body.background] && !(await ownedBackgrounds(db, user.id)).includes(body.background)) {
+            throw new HttpError(403, 'Débloque ce fond pour l\'utiliser');
+        }
         await db.query(
             `INSERT INTO showcases (user_id, title, background, layout, format, card_ids, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, now())

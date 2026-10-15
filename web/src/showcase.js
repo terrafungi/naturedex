@@ -294,6 +294,114 @@ export const BACKGROUNDS = {
             ridge(ctx, W, H, H * 0.95, H * 0.04, 'rgba(255,255,255,0.85)', rand);
         },
     },
+    // Premium: unlocked with pépites (prices come from the server).
+    aurore: {
+        label: 'Aurore boréale', ink: '#effff8', accent: '#7cf5c4', premium: true,
+        paint(ctx, W, H, rand) {
+            vertical(ctx, W, H, ['#020812', '#06182a', '#0b2236', '#0a1a24']);
+            for (let i = 0; i < 220; i++) {
+                ctx.fillStyle = `rgba(255,255,255,${0.2 + rand() * 0.7})`;
+                ctx.beginPath(); ctx.arc(rand() * W, rand() * H * 0.8, rand() * 2.2 + 0.5, 0, Math.PI * 2); ctx.fill();
+            }
+            // curtains of light: many thin vertical strokes along a wavy line, fading upwards
+            ctx.globalCompositeOperation = 'lighter';
+            const bands = [['46,255,170', 0.28, 0.2], ['120,255,200', 0.42, 0.14], ['170,110,255', 0.16, 0.12]];
+            bands.forEach(([rgb, base, amp], b) => {
+                const phase = rand() * 6, freq = 1.6 + rand() * 1.4;
+                for (let x = -20; x < W + 20; x += 3) {
+                    const t = x / W;
+                    const y = H * (base + Math.sin(t * Math.PI * freq + phase) * amp * 0.5 + Math.sin(t * 9 + b) * 0.015);
+                    const len = H * (0.16 + 0.1 * Math.sin(t * 13 + phase) ** 2);
+                    const g = ctx.createLinearGradient(0, y - len, 0, y);
+                    g.addColorStop(0, `rgba(${rgb},0)`);
+                    g.addColorStop(0.85, `rgba(${rgb},${0.05 + 0.05 * Math.sin(t * 40 + b) ** 2})`);
+                    g.addColorStop(1, `rgba(${rgb},0)`);
+                    ctx.fillStyle = g;
+                    ctx.fillRect(x, y - len, 3, len);
+                }
+            });
+            ctx.globalCompositeOperation = 'source-over';
+            glow(ctx, W * 0.5, H * 0.3, W * 0.8, 'rgba(60,255,180,0.08)');
+            ridge(ctx, W, H, H * 0.9, H * 0.08, '#081520', rand);
+            // pine silhouettes on the ridge
+            ctx.fillStyle = '#03090f';
+            for (let i = 0; i < 26; i++) {
+                const x = rand() * W, h = H * (0.04 + rand() * 0.06), base = H * (0.94 + rand() * 0.03), w = h * 0.32;
+                ctx.beginPath();
+                for (let k = 0; k < 4; k++) {
+                    const y = base - (h * k) / 4;
+                    ctx.moveTo(x, y - h * 0.4); ctx.lineTo(x + w * (1 - k * 0.2), y); ctx.lineTo(x - w * (1 - k * 0.2), y); ctx.closePath();
+                }
+                ctx.fill();
+            }
+            ctx.fillRect(0, H * 0.965, W, H);
+        },
+    },
+    volcan: {
+        label: 'Volcan', ink: '#fff1e2', accent: '#ffb35c', premium: true,
+        paint(ctx, W, H, rand) {
+            vertical(ctx, W, H, ['#140405', '#2a0807', '#4a0f08', '#250605']);
+            glow(ctx, W * 0.5, H * 0.62, W * 0.95, 'rgba(255,90,20,0.30)');
+            // smoke
+            for (let i = 0; i < 30; i++) glow(ctx, W * (0.2 + rand() * 0.6), H * (0.05 + rand() * 0.4), W * (0.12 + rand() * 0.2), 'rgba(60,30,30,0.35)');
+            // the cone, with lava rivers
+            ctx.fillStyle = '#1a0605';
+            ctx.beginPath();
+            ctx.moveTo(-W * 0.1, H); ctx.lineTo(W * 0.38, H * 0.7); ctx.lineTo(W * 0.62, H * 0.7); ctx.lineTo(W * 1.1, H); ctx.fill();
+            glow(ctx, W * 0.5, H * 0.7, W * 0.25, 'rgba(255,170,60,0.75)');
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 7; i++) {
+                let x = W * (0.4 + rand() * 0.2), y = H * 0.71;
+                ctx.strokeStyle = `rgba(255,${110 + rand() * 90},30,${0.6 + rand() * 0.4})`;
+                ctx.lineWidth = 4 + rand() * 7;
+                ctx.beginPath(); ctx.moveTo(x, y);
+                const dir = x < W / 2 ? -1 : 1;
+                while (y < H) { x += dir * (8 + rand() * 30) + (rand() - 0.5) * 30; y += 30 + rand() * 30; ctx.lineTo(x, y); }
+                ctx.stroke();
+            }
+            // embers
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < 120; i++) {
+                const x = W * (0.5 + (rand() - 0.5) * rand() * 1.4), y = H * (0.72 - rand() * 0.68), r = 1.5 + rand() * 4;
+                glow(ctx, x, y, r * 4, `rgba(255,${120 + rand() * 100},40,${0.25 + rand() * 0.5})`);
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = 'rgba(255,150,70,0.45)';
+            ctx.lineWidth = 3;
+            rrect(ctx, 30, 30, W - 60, H - 60, 22); ctx.stroke();
+        },
+    },
+    galaxie: {
+        label: 'Galaxie', ink: '#fbf5ff', accent: '#f0a6ff', premium: true,
+        paint(ctx, W, H, rand) {
+            vertical(ctx, W, H, ['#05020f', '#0d0624', '#120a33', '#05020f']);
+            ctx.globalCompositeOperation = 'lighter';
+            // nebula clouds
+            const hues = ['200,80,255', '80,120,255', '255,80,180', '60,220,255'];
+            for (let i = 0; i < 26; i++) glow(ctx, W * (0.1 + rand() * 0.8), H * (0.15 + rand() * 0.7), W * (0.15 + rand() * 0.3), `rgba(${hues[i % 4]},${0.06 + rand() * 0.08})`);
+            // spiral arms of stars
+            ctx.save();
+            ctx.translate(W / 2, H * 0.48);
+            ctx.rotate(-0.5);
+            for (let i = 0; i < 1600; i++) {
+                const arm = i % 2, t = rand();
+                const a = t * Math.PI * 3.2 + arm * Math.PI, r = t * W * 0.62;
+                const spread = (rand() - 0.5) * (18 + r * 0.22);
+                const x = Math.cos(a) * r + spread, y = (Math.sin(a) * r + spread) * 0.55;
+                ctx.fillStyle = `rgba(${220 + rand() * 35},${200 + rand() * 55},255,${(0.15 + rand() * 0.6) * (1 - t * 0.6)})`;
+                ctx.fillRect(x, y, 2 + rand() * 1.6, 2 + rand() * 1.6);
+            }
+            glow(ctx, 0, 0, W * 0.2, 'rgba(255,235,255,0.6)');
+            glow(ctx, 0, 0, W * 0.06, 'rgba(255,255,255,0.9)');
+            ctx.restore();
+            ctx.globalCompositeOperation = 'source-over';
+            for (let i = 0; i < 260; i++) {
+                ctx.fillStyle = `rgba(255,255,255,${0.2 + rand() * 0.8})`;
+                ctx.beginPath(); ctx.arc(rand() * W, rand() * H, rand() * 2 + 0.4, 0, Math.PI * 2); ctx.fill();
+            }
+            for (let i = 0; i < 12; i++) sparkle(ctx, rand() * W, rand() * H, 8 + rand() * 16, 'rgba(255,240,255,0.85)');
+        },
+    },
 };
 
 const RARITY_FRAMES = {

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Download, EyeOff, LayoutGrid, Save, Share2, Square, Star, Smartphone, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Crown, Download, EyeOff, LayoutGrid, Lock, Save, Share2, Square, Star, Smartphone, X } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import ShowcaseCanvas, { shareShowcase } from '../components/Showcase.jsx';
 import { BACKGROUNDS, FORMATS, LAYOUTS, SHOWCASE_MAX } from '../showcase.js';
 import { RARITIES } from '../game.jsx';
+import { Nugget } from '../components/Currency.jsx';
 
 const DEFAULTS = { title: '', background: 'foret', layout: 'grille', format: 'story', cards: [] };
 // phones open their share sheet (Instagram, WhatsApp…); computers download the file
@@ -12,7 +13,7 @@ const canShareFiles = (() => {
     try { return !!navigator.canShare?.({ files: [new File([''], 'vitrine.jpg', { type: 'image/jpeg' })] }); } catch { return false; }
 })();
 
-function Swatch({ id, active, onClick }) {
+function Swatch({ id, active, locked, onClick }) {
     const ref = useRef(null);
     useEffect(() => {
         const ctx = ref.current.getContext('2d');
@@ -22,10 +23,17 @@ function Swatch({ id, active, onClick }) {
         ctx.restore();
     }, [id]);
     return (
-        <button type="button" onClick={onClick} className="flex flex-col items-center gap-1.5 shrink-0" aria-pressed={active}>
-            <canvas ref={ref} width={135} height={240}
-                className={`w-14 h-[6.2rem] rounded-xl transition ${active ? 'ring-[3px] ring-[#e9c46a] scale-105' : 'ring-1 ring-white/15 opacity-80 hover:opacity-100'}`} />
-            <span className={`text-[11px] font-semibold ${active ? 'text-[#f4d88f]' : 'text-white/60'}`}>{BACKGROUNDS[id].label}</span>
+        <button type="button" onClick={onClick} className="flex flex-col items-center gap-1.5 shrink-0 w-16" aria-pressed={active}>
+            <span className="relative">
+                <canvas ref={ref} width={135} height={240}
+                    className={`block w-14 h-[6.2rem] rounded-xl transition ${active ? 'ring-[3px] ring-[#e9c46a] scale-105' : 'ring-1 ring-white/15 opacity-80 hover:opacity-100'}`} />
+                {BACKGROUNDS[id].premium && (
+                    <span className={`absolute -top-1.5 -right-1.5 grid place-items-center w-6 h-6 rounded-full shadow ${locked ? 'bg-black/80 text-[#f4c25b] ring-1 ring-[#f4c25b]/60' : 'bg-[#f4c25b] text-[#2a1c00]'}`}>
+                        {locked ? <Lock className="w-3 h-3" /> : <Crown className="w-3.5 h-3.5" />}
+                    </span>
+                )}
+            </span>
+            <span className={`text-[11px] leading-tight text-center font-semibold ${active ? 'text-[#f4d88f]' : 'text-white/60'}`}>{BACKGROUNDS[id].label}</span>
         </button>
     );
 }
@@ -56,7 +64,7 @@ function Section({ title, aside, children }) {
 }
 
 export default function ShowcaseEditor() {
-    const { user, favs } = useGame();
+    const { user, setUser, favs } = useGame();
     const [params] = useSearchParams();
     const fromParam = params.get('classeur');
     const [source, setSource] = useState(fromParam === 'all' || !fromParam ? 'all' : Number(fromParam));
@@ -65,11 +73,13 @@ export default function ShowcaseEditor() {
     const [saved, setSaved] = useState(undefined); // undefined = loading, null = none
     const [busy, setBusy] = useState('');
     const [note, setNote] = useState('');
+    const [owned, setOwned] = useState([]);
+    const [premium, setPremium] = useState({});
 
     const binderName = (id) => (id === 'all' ? 'Mes favoris' : favs.binders.find((b) => b.id === id)?.name || 'Ma vitrine');
 
     useEffect(() => {
-        api('showcase').then((r) => setSaved(r.showcase)).catch(() => setSaved(null));
+        api('showcase').then((r) => { setSaved(r.showcase); setOwned(r.owned || []); setPremium(r.premium || {}); }).catch(() => setSaved(null));
     }, []);
 
     useEffect(() => {
@@ -110,6 +120,15 @@ export default function ShowcaseEditor() {
             setNote('Vitrine enregistrée : elle s\'affiche sur ton profil.');
         } catch (e) { setNote(e.message); } finally { setBusy(''); }
     }
+    async function unlock() {
+        setBusy('unlock');
+        try {
+            const r = await api('buyBackground', { background: draft.background });
+            setOwned(r.owned);
+            setUser(r.user);
+            setNote(`Fond « ${BACKGROUNDS[draft.background].label} » débloqué pour toujours !`);
+        } catch (e) { setNote(e.message); } finally { setBusy(''); }
+    }
     async function unpublish() {
         if (!window.confirm('Retirer la vitrine de ton profil ?')) return;
         setBusy('delete');
@@ -131,6 +150,9 @@ export default function ShowcaseEditor() {
 
     const story = draft.format === 'story';
     const empty = !draft.cards.length;
+    // premium backgrounds can be tried freely, but saving or sharing needs them unlocked
+    const locked = !!BACKGROUNDS[draft.background]?.premium && !owned.includes(draft.background);
+    const price = premium[draft.background] || 0;
     const unchanged = saved && JSON.stringify({ ...saved, cards: saved.cards.map((c) => c.id), updatedAt: 0 })
         === JSON.stringify({ ...saved, ...draft, cards: draft.cards.map((c) => c.id), updatedAt: 0 });
 
@@ -150,17 +172,18 @@ export default function ShowcaseEditor() {
                             : <ShowcaseCanvas showcase={draft} username={user.username} />}
                     </div>
                     <div className="mt-5 flex flex-wrap justify-center gap-2">
-                        <button onClick={share} disabled={empty || !!busy}
+                        <button onClick={share} disabled={empty || !!busy || locked}
                             className="nd-cta-gold inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold disabled:opacity-50">
                             {canShareFiles ? <Share2 className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                             {busy === 'share' ? 'Préparation…' : canShareFiles ? 'Partager l\'image' : 'Télécharger l\'image'}
                         </button>
-                        <button onClick={save} disabled={empty || !!busy || unchanged}
+                        <button onClick={save} disabled={empty || !!busy || unchanged || locked}
                             className="nd-cta-glass inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white disabled:opacity-50">
                             {unchanged ? <Check className="w-4 h-4 text-[#a8f0c6]" /> : <Save className="w-4 h-4 text-[#a8f0c6]" />}
                             {busy === 'save' ? 'Enregistrement…' : unchanged ? 'Sur ton profil' : saved ? 'Mettre à jour mon profil' : 'Afficher sur mon profil'}
                         </button>
                     </div>
+                    {locked && <p className="mt-3 text-center text-xs text-[#f4d88f]"><Lock className="inline w-3 h-3 -mt-0.5" /> Débloque ce fond premium pour enregistrer ou partager ton image.</p>}
                     {note && <p className="mt-3 text-center text-sm font-semibold text-[#a8f0c6]" role="status">{note}</p>}
                     {saved && (
                         <p className="mt-3 text-center text-xs text-white/50">
@@ -178,8 +201,22 @@ export default function ShowcaseEditor() {
                     </Section>
                     <Section title="Fond">
                         <div className="-mx-1 px-1 pb-1 flex gap-3 overflow-x-auto">
-                            {Object.keys(BACKGROUNDS).map((id) => <Swatch key={id} id={id} active={draft.background === id} onClick={() => set({ background: id })} />)}
+                            {Object.keys(BACKGROUNDS).map((id) => <Swatch key={id} id={id} active={draft.background === id}
+                                locked={!!BACKGROUNDS[id].premium && !owned.includes(id)} onClick={() => set({ background: id })} />)}
                         </div>
+                        {locked && price > 0 && (
+                            <div className="mt-3 flex flex-wrap items-center gap-3 p-3 rounded-2xl bg-[#f4c25b]/10 ring-1 ring-[#f4c25b]/30">
+                                <Crown className="w-5 h-5 text-[#f4c25b] shrink-0" />
+                                <div className="flex-1 min-w-[10rem] text-sm">
+                                    <p className="font-semibold text-white">Fond premium « {BACKGROUNDS[draft.background].label} »</p>
+                                    <p className="text-xs text-white/60">{user.nuggets >= price ? 'Débloqué pour toujours, pour toutes tes vitrines.' : `Il te manque ${price - user.nuggets} pépites. Recycle des doublons ou vends aux enchères pour en gagner.`}</p>
+                                </div>
+                                <button onClick={unlock} disabled={!!busy || user.nuggets < price}
+                                    className="nd-cta-gold inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold disabled:opacity-50">
+                                    {busy === 'unlock' ? 'Achat…' : <>Débloquer <Nugget className="w-4 h-4" />{price}</>}
+                                </button>
+                            </div>
+                        )}
                     </Section>
                     <Section title="Disposition">
                         <Segmented value={draft.layout} onChange={(layout) => set({ layout })}
