@@ -9,10 +9,10 @@ import { ARENA, BOOSTER, RARITY_STEP, SCENES } from './timeline.js';
 const W = 1080, H = 1920;
 const byId = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 const WALL = CARDS.filter((c) => c.role === 'wall');
-const FAN = [1412, 1690, 1436, 618, 1006].map((id) => byId[id]);
-const PACK = [45053, 33389, 35372, 55469, 1542, 1411].map((id) => byId[id]); // last one = Lion, ✦ secret
-const LADDER = [33389, 55469, 41542, 1412, 1690, 1916].map((id) => byId[id]);
-const DUEL = [byId[2112], byId[1436]];
+const FAN = [25043, 10174, 618, 619, 23945].map((id) => byId[id]); // Monstera, Phyllobates, Amanite (center), Cèpe, Dionée
+const PACK = [16934, 21839, 713, 24145, 662, 618].map((id) => byId[id]); // last one = Amanite tue-mouches, ✦ secret
+const LADDER = [30056, 17383, 10164, 25043, 619, 1916].map((id) => byId[id]); // common→secret
+const DUEL = [byId[10174], byId[1411]]; // Phyllobates terribilis vs Lion
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const prog = (t, a, b) => clamp((t - a) / (b - a));
@@ -394,7 +394,7 @@ function Cta({ t }) {
         <>
             <Rays t={t} opacity={0.6} cy={760} size={2000} />
             <Sparkles t={t} n={30} color="#f4d88f" seed={11} />
-            {[byId[1411], byId[1690], byId[1916]].map((c, i) => {
+            {[byId[25043], byId[618], byId[10270]].map((c, i) => {
                 const d = i - 1;
                 const p = out(prog(t, 0.9 + i * 0.08, 1.5 + i * 0.08));
                 return <PCard key={c.id} card={c} w={300} cx={W / 2 + d * 230} cy={lerp(2200, 1450 + Math.abs(d) * 40, p)} rot={d * 12} z={2 - Math.abs(d)} opacity={0.95} />;
