@@ -857,10 +857,16 @@ async function addToBinder(db, userId, binderId, cardId) {
     }
 }
 
-async function binderState(db, userId) {
+// previews: add the thumbnails of the binder's 3 rarest cards (public profile)
+async function binderState(db, userId, previews = false) {
     const { rows: binders } = await db.query(
         // a card traded or sold away stays in the binder but is neither counted nor shown
-        `SELECT b.id, b.name, COUNT(uc.card_id)::int AS count FROM binders b
+        `SELECT b.id, b.name, COUNT(uc.card_id)::int AS count${previews ? `,
+                (SELECT COALESCE(json_agg(t.thumb_url), '[]') FROM (
+                    SELECT c.thumb_url FROM binder_cards bc2 JOIN cards c ON c.id = bc2.card_id
+                    JOIN user_cards uc2 ON uc2.card_id = c.id AND uc2.user_id = b.user_id
+                    WHERE bc2.binder_id = b.id ORDER BY ${RARITY_ORDER} DESC, c.num LIMIT 3) t) AS thumbs` : ''}
+         FROM binders b
          LEFT JOIN binder_cards bc ON bc.binder_id = b.id
          LEFT JOIN user_cards uc ON uc.card_id = bc.card_id AND uc.user_id = b.user_id
          WHERE b.user_id = $1 GROUP BY b.id ORDER BY lower(b.name), b.id`,
@@ -1176,8 +1182,38 @@ const actions = {
         const { rows: seasons } = await db.query(
             `SELECT season, rank, rating, wins, losses, rating >= $2 AS ranked FROM season_results
              WHERE user_id = $1 ORDER BY season DESC LIMIT 24`, [p.id, SEASON_MIN_RATING]);
+        // Binders are shown to the player and their friends; others only learn how many there are.
+        const shared = p.me || p.friendship === 'accepted';
+        const { binders } = await binderState(db, p.id, shared);
         const { id, ...rest } = withBadge(p);
-        return { player: { ...rest, seasons: seasons.map((r) => ({ ...r, label: seasonLabel(r.season) })) } };
+        return { player: {
+            ...rest,
+            seasons: seasons.map((r) => ({ ...r, label: seasonLabel(r.season) })),
+            binders: shared ? binders.filter((b) => b.count) : null,
+            binderCount: binders.filter((b) => b.count).length,
+        } };
+    },
+
+    // One page of a friend's (or one's own) binder, with how many copies the viewer has of each card.
+    async playerBinder(db, body, event) {
+        const user = await requireUser(db, event);
+        const other = await findUser(db, body.username);
+        if (other.id !== user.id) await requireFriend(db, user.id, other.username);
+        const { rows: [binder] } = await db.query(`SELECT id, name FROM binders WHERE id = $1 AND user_id = $2`, [Number(body.id), other.id]);
+        if (!binder) throw new HttpError(404, 'Classeur introuvable');
+        const limit = Math.min(Number(body.limit) || 60, 120);
+        const offset = Math.max(Number(body.offset) || 0, 0);
+        const { rows } = await db.query(
+            `SELECT ${LIGHT_FIELDS}, uc.count, COALESCE(mine.count, 0) AS mine, COUNT(*) OVER()::int AS matches
+             FROM binder_cards bc JOIN cards c ON c.id = bc.card_id
+             JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $2
+             LEFT JOIN user_cards mine ON mine.card_id = c.id AND mine.user_id = $3
+             WHERE bc.binder_id = $1
+             ORDER BY ${RARITY_ORDER} DESC, c.num
+             LIMIT $4 OFFSET $5`,
+            [binder.id, other.id, user.id, limit, offset]
+        );
+        return { binder, matches: rows[0]?.matches || 0, cards: rows.map(({ matches, ...c }) => c) };
     },
 
     // Public: who sent this invite link (shown on the sign-up page).

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, MessageCircle, UserPlus } from 'lucide-react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Lock, MessageCircle, Star, UserPlus } from 'lucide-react';
 import { api } from '../api.jsx';
+import { Card } from '../components/Card.jsx';
 import { LeafLogo } from '../components/Layout.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
 
@@ -75,7 +76,110 @@ export default function Player() {
                 {player.campaign > 0 && <> · campagne : étape {player.campaign}</>}
             </p>
 
+            <Binders player={player} />
+
             <div className="mt-6"><SeasonHistory seasons={player.seasons} /></div>
+        </div>
+    );
+}
+
+const PAGE = 60;
+
+// Favourite binders: tiles to pick one (?classeur=id, so "back" closes it), then its cards.
+function Binders({ player }) {
+    const [params, setParams] = useSearchParams();
+    const open = player.binders?.find((b) => String(b.id) === params.get('classeur'));
+
+    if (!player.binders) {
+        if (!player.binderCount) return null;
+        return (
+            <section className="mt-10 flex items-center gap-3 p-4 rounded-2xl nd-glass text-sm text-white/75">
+                <Lock className="w-5 h-5 shrink-0 text-[#e9c46a]" />
+                <span>{player.username} a {player.binderCount} classeur{player.binderCount > 1 ? 's' : ''} de favoris. Deviens son ami pour {player.binderCount > 1 ? 'les' : 'le'} parcourir.</span>
+            </section>
+        );
+    }
+    if (!player.binders.length) {
+        return player.me ? (
+            <section className="mt-10 p-4 rounded-2xl nd-glass text-sm text-white/75">
+                Tes classeurs de favoris s'afficheront ici pour tes amis. Touche l'étoile <Star className="inline w-4 h-4 -mt-1 text-[#e9c46a]" /> d'une carte pour en créer un.
+            </section>
+        ) : null;
+    }
+    return (
+        <section className="mt-10">
+            <h2 className="flex items-center gap-2 font-display text-2xl text-white"><Star className="w-5 h-5 text-[#e9c46a] fill-current" />Classeurs</h2>
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {player.binders.map((b) => {
+                    const active = open?.id === b.id;
+                    return (
+                        <button key={b.id} onClick={() => setParams(active ? {} : { classeur: b.id }, { replace: !!open })}
+                            className={`group text-left rounded-2xl p-3 ring-1 transition-colors ${active ? 'bg-[#e9c46a]/15 ring-[#e9c46a]/70' : 'nd-glass ring-white/10 hover:ring-white/30'}`}>
+                            <div className="relative h-24 mx-auto w-28">
+                                {b.thumbs.map((src, i) => (
+                                    <img key={i} src={src} alt="" loading="lazy" draggable="false"
+                                        className="absolute top-1 left-1/2 w-16 h-[5.6rem] object-cover rounded-lg ring-2 ring-[#f8f2e2] shadow-lg transition-transform group-hover:-translate-y-0.5"
+                                        style={{ transform: `translateX(calc(-50% + ${(i - (b.thumbs.length - 1) / 2) * 22}px)) rotate(${(i - (b.thumbs.length - 1) / 2) * 9}deg)`, zIndex: i === 1 ? 2 : 1 }} />
+                                ))}
+                            </div>
+                            <div className="mt-2 font-semibold text-white truncate">{b.name}</div>
+                            <div className="text-xs text-white/55">{b.count} carte{b.count > 1 ? 's' : ''}</div>
+                        </button>
+                    );
+                })}
+            </div>
+            {open && <BinderCards key={open.id} player={player} binder={open} />}
+        </section>
+    );
+}
+
+function BinderCards({ player, binder }) {
+    const [page, setPage] = useState(null);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    async function load(offset) {
+        setLoading(true);
+        try {
+            const res = await api('playerBinder', { username: player.username, id: binder.id, offset, limit: PAGE });
+            setPage((prev) => ({ matches: res.matches, cards: [...(offset ? prev.cards : []), ...res.cards] }));
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+    useEffect(() => { load(0); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    if (error) return <p className="mt-6 text-rust font-semibold">{error}</p>;
+    if (!page) return <p className="mt-6 text-ink-soft">Chargement…</p>;
+    const missing = player.me ? 0 : page.cards.filter((c) => !c.mine).length;
+    return (
+        <div className="mt-6">
+            <p className="text-sm text-white/70">
+                <b className="text-white">{binder.name}</b> · {page.matches} carte{page.matches > 1 ? 's' : ''}
+                {missing > 0 && <> · <span className="text-[#ffb4a2]">{missing} te manque{missing > 1 ? 'nt' : ''}</span></>}
+            </p>
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {page.cards.map((c) => (
+                    <div key={c.id} className="relative">
+                        <Card card={c} number={c.num} />
+                        {!player.me && !c.mine && (
+                            <span className="absolute -top-2 -left-2 px-2 py-0.5 rounded-full bg-[#e76f51] text-white text-[10px] font-black uppercase shadow-lg">Il te manque</span>
+                        )}
+                        {c.count > 1 && (
+                            <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#04150d] text-xs font-bold">×{c.count}</span>
+                        )}
+                    </div>
+                ))}
+            </div>
+            {page.matches > page.cards.length && (
+                <div className="mt-8 text-center">
+                    <button onClick={() => load(page.cards.length)} disabled={loading} className="px-6 py-3 rounded-full border border-white/10 text-white font-semibold hover:bg-white/10 disabled:opacity-60">
+                        {loading ? 'Chargement…' : `Afficher plus (${page.matches - page.cards.length} restantes)`}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
