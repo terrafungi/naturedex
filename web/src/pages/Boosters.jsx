@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Gift, Zap } from 'lucide-react';
-import { Amount, Seed } from '../components/Currency.jsx';
+import { Gift, Sprout, Zap } from 'lucide-react';
+import { Amount, Plant, Seed } from '../components/Currency.jsx';
 import { api, useGame } from '../api.jsx';
 import { Pack } from '../components/Pack.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
@@ -49,8 +49,8 @@ export default function Boosters() {
     const countdown = useCountdown(user.nextDailyAt);
     const refresh = () => api('me').then((res) => setUser(res.user)).catch(() => {});
     const nextCharge = useCountdown(user.nextChargeAt, refresh);
-    // What the next opening costs: a free charge, a bonus booster, or graines.
-    const payWith = user.charges > 0 ? 'charge' : user.boosters > 0 ? 'booster' : 'coins';
+    // What the next opening costs: a free charge, a bonus booster, garden plants, or graines.
+    const payWith = user.charges > 0 ? 'charge' : user.boosters > 0 ? 'booster' : user.plants >= user.boosterPlants ? 'plants' : 'coins';
     const canOpen = payWith !== 'coins' || user.coins >= user.boosterPrice;
 
     async function run(action, after, params) {
@@ -67,7 +67,7 @@ export default function Boosters() {
         }
     }
 
-    const open = () => run('openBooster', (res) => { addCards(res.cards); setOpening(res.cards); }, { pay: payWith === 'coins' });
+    const open = () => run('openBooster', (res) => { addCards(res.cards); setOpening(res.cards); }, { pay: payWith === 'plants' ? 'plants' : payWith === 'coins' });
     const daily = () => run('claimDaily');
 
     const total = catalog?.total || user.total;
@@ -120,10 +120,15 @@ export default function Boosters() {
                         onClick={open}
                         className="relative mt-6 w-full max-w-xs py-3.5 rounded-full nd-btn font-bold text-lg disabled:opacity-40 flex items-center justify-center gap-2"
                     >
-                        {payWith === 'charge' ? 'Ouvrir un booster' : payWith === 'booster' ? `Ouvrir un booster bonus (${user.boosters})` : <>Ouvrir pour <Seed className="w-5 h-5" />{user.boosterPrice}</>}
+                        {payWith === 'charge' ? 'Ouvrir un booster' : payWith === 'booster' ? `Ouvrir un booster bonus (${user.boosters})` : payWith === 'plants' ? <>Ouvrir pour <Plant className="w-5 h-5" />{user.boosterPlants}</> : <>Ouvrir pour <Seed className="w-5 h-5" />{user.boosterPrice}</>}
                     </button>
                     {payWith === 'coins' && !canOpen && (
                         <p className="relative mt-3 text-sm text-white/70 text-center max-w-xs">Plus de charge ni de graines : attends la prochaine charge, ou gagne des graines avec les défis, le quiz et les trophées.</p>
+                    )}
+                    {payWith === 'coins' && (
+                        <Link to="/jardin" className="relative mt-3 w-full max-w-xs py-2.5 rounded-full bg-[#c7ef7a]/15 ring-1 ring-[#c7ef7a]/40 text-[#dcf7a6] font-bold text-sm text-center flex items-center justify-center gap-1.5 hover:bg-[#c7ef7a]/25">
+                            <Sprout className="w-4 h-4" />Plante tes graines : plus de boosters
+                        </Link>
                     )}
                     {payWith !== 'charge' && (
                         <Link to="/boutique" className="relative mt-3 w-full max-w-xs py-2.5 rounded-full nd-cta-gold font-bold text-sm text-center">
@@ -145,15 +150,17 @@ export default function Boosters() {
                                 {countdown ? `Revient dans ${countdown}` : 'Récupérer'}
                             </button>
                         </div>
-                        <div className="p-5 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur">
-                            <Seed className="w-6 h-6" />
-                            <h2 className="mt-2 font-display text-xl font-bold">Graines</h2>
+                        <Link to="/jardin" className="group p-5 rounded-3xl border border-[#c7ef7a]/25 bg-gradient-to-br from-[#c7ef7a]/10 to-white/[0.03] backdrop-blur hover:border-[#c7ef7a]/50 transition-colors">
+                            <Sprout className="w-6 h-6 text-[#8ee6a8]" />
+                            <h2 className="mt-2 font-display text-xl font-bold">Le jardin</h2>
                             <p className="text-sm text-ink-soft">
-                                Tu as <Amount seeds={user.coins} />. Elles servent uniquement à ouvrir des boosters
-                                ({user.boosterPrice} l'ouverture) une fois tes charges épuisées. Gagne-en avec le bonus du jour, les défis et les trophées.
+                                Plante tes <Amount seeds={user.coins} /> graines : elles deviennent des plantes, et {user.boosterPlants} plantes ouvrent un booster.
+                                Jusqu'à 2× plus de boosters qu'en payant directement ({user.boosterPrice} graines).
                             </p>
-                            <Link to="/boutique" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#f4d88f] hover:underline">Recharger en boutique →</Link>
-                        </div>
+                            <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[#dcf7a6] group-hover:underline">
+                                <Plant />{user.plants} plante{user.plants > 1 ? 's' : ''} · Aller au jardin →
+                            </span>
+                        </Link>
                     </div>
 
                     {/* progress by type */}

@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, Brain, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Swords, Trophy, User, Users, X } from 'lucide-react';
-import { Nugget, Seed } from './Currency.jsx';
+import { Award, Brain, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
+import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 
 export const NAV = [
     { to: '/', label: 'Accueil', Icon: Home, end: true },
     { to: '/collection', label: 'Collection', Icon: Layers },
     { to: '/booster', label: 'Booster', Icon: Package },
+    { to: '/jardin', label: 'Jardin', Icon: Sprout },
     { to: '/combat', label: 'Combat', Icon: Swords },
     { to: '/quiz', label: 'Quiz', Icon: Brain },
     { to: '/classement', label: 'Classement', Icon: Medal },
@@ -54,12 +55,12 @@ export function LeafLogo({ className = 'w-9 h-9' }) {
 }
 
 // `compact` (logged in, wallet shown): no tagline on phones and a slightly smaller
-// wordmark, so the wallet never overlaps the name; below 340 px only the leaf stays.
+// wordmark, so the wallet never overlaps the name; below 430 px (three currencies) only the leaf stays.
 function Brand({ compact }) {
     return (
         <Link to="/" className="group flex items-center gap-2 sm:gap-2.5 mr-auto min-w-0" aria-label="NatureDex, accueil">
             <LeafLogo className={`${'w-9 h-9'} sm:w-10 sm:h-10 shrink-0 drop-shadow-[0_0_12px_rgba(79,209,139,0.45)] transition-transform group-hover:-rotate-12`} />
-            <span className={`leading-none min-w-0 ${compact ? 'max-[339px]:hidden' : ''}`}>
+            <span className={`leading-none min-w-0 ${compact ? 'max-[429px]:hidden' : ''}`}>
                 <span className={`block font-display ${compact ? 'text-[1.45rem]' : 'text-[1.6rem]'} sm:text-[1.8rem] font-semibold text-white truncate`}>NatureDex</span>
                 <span className={`${compact ? 'hidden sm:block' : 'block'} mt-1 text-[8.5px] sm:text-[9.5px] font-semibold uppercase tracking-[0.2em] text-white/55 truncate`}>Des cartes pour un monde plus vivant</span>
             </span>
@@ -78,6 +79,10 @@ function Wallet({ user }) {
                 <Seed />{short(user.coins)}
             </Link>
             <span className="w-px h-4 bg-white/15" />
+            <Link to="/jardin" className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 text-[#c7ef7a]" title="Plantes : récoltées au jardin, 10 ouvrent un booster">
+                <Plant />{short(user.plants ?? 0)}
+            </Link>
+            <span className="w-px h-4 bg-white/15" />
             <Link to="/encheres" className="flex items-center gap-1 pl-1.5 sm:pl-2 pr-2 sm:pr-2.5 py-1.5 text-[#f4c25b]" title="Pépites : pour les enchères">
                 <Nugget />{short(user.nuggets)}
             </Link>
@@ -89,7 +94,7 @@ function Wallet({ user }) {
 }
 // Floating bottom bar = the whole navigation. On phones and tablets it shows the
 // main pages plus a "Plus" button that opens the rest; on large screens all fit.
-const PRIMARY = 4;
+const PRIMARY = 5;
 
 function TabItem({ to, label, short, Icon, end, className = '' }) {
     return (

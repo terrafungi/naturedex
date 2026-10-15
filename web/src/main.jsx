@@ -7,6 +7,7 @@ import Layout from './components/Layout.jsx';
 import Landing from './pages/Landing.jsx';
 import Auth from './pages/Auth.jsx';
 import Boosters from './pages/Boosters.jsx';
+import Garden from './pages/Garden.jsx';
 import Collection from './pages/Collection.jsx';
 import CardPage from './pages/CardPage.jsx';
 import Challenges from './pages/Challenges.jsx';
@@ -42,6 +43,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/" element={<Private><Landing /></Private>} />
                         <Route path="/connexion" element={<Auth />} />
                         <Route path="/booster" element={<Private><Boosters /></Private>} />
+                        <Route path="/jardin" element={<Private><Garden /></Private>} />
                         <Route path="/defis" element={<Private><Challenges /></Private>} />
                         <Route path="/trophees" element={<Private><Trophies /></Private>} />
                         <Route path="/classement" element={<Private><Leaderboard /></Private>} />

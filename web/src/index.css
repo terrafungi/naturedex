@@ -444,3 +444,12 @@ body {
     animation: nd-hue 3s linear infinite;
 }
 .nd-secret-glow .nd-card, .nd-secret-glow .nd-mystery { box-shadow: 0 0 60px 10px rgb(255 95 210 / 0.45), 0 0 120px 20px rgb(110 200 255 / 0.25); }
+
+/* Garden plot: tilled soil with furrows and a soft light from above. */
+.nd-soil {
+    background:
+        radial-gradient(120% 70% at 50% 0%, rgb(143 230 168 / 0.10), transparent 60%),
+        repeating-linear-gradient(-8deg, transparent 0 13px, rgb(0 0 0 / 0.18) 13px 15px, transparent 15px 22px),
+        radial-gradient(circle at 30% 70%, #5a3820, transparent 60%),
+        linear-gradient(180deg, #3d2615, #2a1a0e);
+}

@@ -1,11 +1,17 @@
-import { Sprout } from 'lucide-react';
+import { Leaf, Sprout } from 'lucide-react';
 
 // Two currencies: graines open boosters, pépites buy and sell cards at the auction house.
 export const SEED_COLOR = '#8ee6a8';
 export const NUGGET_COLOR = '#f4c25b';
+// « plantes » are harvested in the garden from planted graines; 10 open a booster.
+export const PLANT_COLOR = '#c7ef7a';
 
 export function Seed({ className = 'w-4 h-4' }) {
     return <Sprout className={className} style={{ color: SEED_COLOR }} aria-label="graines" />;
+}
+
+export function Plant({ className = 'w-4 h-4' }) {
+    return <Leaf className={className} style={{ color: PLANT_COLOR }} fill={`${PLANT_COLOR}55`} aria-label="plantes" />;
 }
 
 export function Nugget({ className = 'w-4 h-4' }) {
@@ -20,12 +26,12 @@ export function Nugget({ className = 'w-4 h-4' }) {
 
 const fmt = (n) => Number(n).toLocaleString('fr-FR');
 
-/** Inline amount: <Amount seeds={100} /> or <Amount nuggets={40} sign />. */
-export function Amount({ seeds, nuggets, sign = false, className = '' }) {
-    const value = seeds ?? nuggets;
+/** Inline amount: <Amount seeds={100} />, <Amount plants={10} /> or <Amount nuggets={40} sign />. */
+export function Amount({ seeds, plants, nuggets, sign = false, className = '' }) {
+    const [value, color, Icon] = seeds != null ? [seeds, SEED_COLOR, Seed] : plants != null ? [plants, PLANT_COLOR, Plant] : [nuggets, NUGGET_COLOR, Nugget];
     return (
-        <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${className}`} style={{ color: seeds != null ? SEED_COLOR : NUGGET_COLOR }}>
-            {seeds != null ? <Seed /> : <Nugget />}{sign ? '+' : ''}{fmt(value)}
+        <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${className}`} style={{ color }}>
+            <Icon />{sign ? '+' : ''}{fmt(value)}
         </span>
     );
 }
