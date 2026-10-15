@@ -276,3 +276,16 @@ CREATE TABLE IF NOT EXISTS binder_cards (
     added_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (binder_id, card_id)
 );
+
+-- Garden: graines are planted in plots and harvested as « plantes » (10 open a booster).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plants INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plots INTEGER NOT NULL DEFAULT 3;
+CREATE TABLE IF NOT EXISTS garden_plots (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    slot       SMALLINT NOT NULL,
+    kind       TEXT NOT NULL,
+    planted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ready_at   TIMESTAMPTZ NOT NULL,
+    watered    BOOLEAN NOT NULL DEFAULT false,
+    PRIMARY KEY (user_id, slot)
+);

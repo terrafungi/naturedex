@@ -141,6 +141,9 @@ async function publicUser(db, user) {
         chargeMinutes: CHARGE_MS / 60000,
         nextChargeAt: charge.nextAt && new Date(charge.nextAt).toISOString(),
         boosterPrice: BOOSTER_PRICE,
+        plants: user.plants,
+        boosterPlants: BOOSTER_PLANTS,
+        plots: user.plots,
         dailyCoins: DAILY_COINS,
         nextDailyAt: nextDaily > Date.now() ? new Date(nextDaily).toISOString() : null,
         recycleValue: RECYCLE_VALUE,
@@ -492,7 +495,7 @@ async function trophyList(db, userId) {
 
 // What is waiting for the player, per page (red counters on the navigation icons).
 async function badgeCounts(db, user, pub) {
-    const [trophies, { challenges }, { rows: [inv] }, { rows: [fight] }] = await Promise.all([
+    const [trophies, { challenges }, { rows: [inv] }, { rows: [fight] }, { rows: [garden] }] = await Promise.all([
         trophyList(db, user.id),
         dailyChallenges(db, user.id),
         db.query(`SELECT COUNT(*) FILTER (WHERE invite_rewarded_at IS NOT NULL)::int AS rewarded,
@@ -506,10 +509,12 @@ async function badgeCounts(db, user, pub) {
                          (SELECT COUNT(*)::int FROM battles WHERE user_id = $1 AND NOT paid
                             AND (created_at AT TIME ZONE 'Europe/Paris')::date = ${PARIS_DAY}) AS started,
                          (SELECT COUNT(*)::int FROM season_results WHERE user_id = $1 AND claimed_at IS NULL) AS seasons`, [user.id]),
+        db.query(`SELECT COUNT(*)::int AS ready FROM garden_plots WHERE user_id = $1 AND ready_at <= now()`, [user.id]),
     ]);
     const s = pub.social;
     return {
         '/booster': (pub.nextDailyAt ? 0 : 1) + (pub.charges >= pub.maxCharges ? 1 : 0),
+        '/jardin': garden.ready,
         '/quiz': Math.max(0, QUIZ_PER_DAY - s.quizPlayed),
         '/defis': challenges.filter((c) => !c.claimed && c.progress >= c.goal).length,
         '/trophees': trophies.filter((t) => !t.claimed && t.progress >= t.goal).length,
@@ -834,6 +839,62 @@ async function stripeWebhook(event) {
     return json({ received: true });
 }
 
+// ---------- garden ----------
+
+// Graines planted in plots grow into « plantes »; BOOSTER_PLANTS of them open a booster.
+// The longer a seed grows, the better it pays: ~125 graines a booster for the radish,
+// ~50 for the moon rose, so coming back later is always worth it.
+const BOOSTER_PLANTS = 10;
+const SEEDS = {
+    radis: { name: 'Radis éclair', cost: 25, minutes: 3, plants: 2 },
+    tournesol: { name: 'Tournesol', cost: 50, minutes: 60, plants: 6 },
+    chene: { name: 'Chêne', cost: 100, minutes: 8 * 60, plants: 15 },
+    rose: { name: 'Rose de lune', cost: 200, minutes: 24 * 60, plants: 40 },
+};
+const START_PLOTS = 3;
+const PLOT_PRICES = [300, 600, 1000, 1500, 2500, 4000]; // graines for plots 4 to 9
+const MAX_PLOTS = START_PLOTS + PLOT_PRICES.length;
+const WATER_CUT = 0.3; // one watering per plant takes 30 % off the time left
+const GOLDEN_CHANCE = 0.1; // harvest ×2
+const TREASURE_CHANCE = 0.01; // + one bonus booster
+
+async function gardenState(db, user) {
+    const { rows } = await db.query(
+        `SELECT slot, kind, planted_at AS "plantedAt", ready_at AS "readyAt", watered FROM garden_plots WHERE user_id = $1`,
+        [user.id]
+    );
+    const bySlot = Object.fromEntries(rows.map((r) => [r.slot, r]));
+    return {
+        plots: Array.from({ length: user.plots }, (_, slot) => bySlot[slot] || null),
+        maxPlots: MAX_PLOTS,
+        nextPlotPrice: PLOT_PRICES[user.plots - START_PLOTS] ?? null,
+        seeds: SEEDS,
+        waterCut: WATER_CUT,
+        now: new Date().toISOString(),
+    };
+}
+
+// Runs `fn(client, lockedUser)` in a transaction holding the player's row, then returns
+// the fresh garden and wallet with whatever `fn` returned.
+async function withGarden(db, event, fn) {
+    const user = await requireUser(db, event);
+    const client = await db.connect();
+    let extra;
+    try {
+        await client.query('BEGIN');
+        const { rows: [locked] } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+        extra = await fn(client, locked);
+        await client.query('COMMIT');
+    } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+    } finally {
+        client.release();
+    }
+    const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
+    return { ...extra, garden: await gardenState(db, fresh), user: await publicUser(db, fresh) };
+}
+
 const MAX_BINDERS = 50;
 
 function binderName(raw) {
@@ -949,10 +1010,13 @@ const actions = {
                 [update, params, paidWith] = [`charges = $2, charges_at = $3`, [charge.charges - 1, new Date(since)], 'charge'];
             } else if (current.boosters > 0) {
                 [update, params, paidWith] = [`boosters = boosters - 1`, [], 'booster'];
-            } else if (body.pay && current.coins >= BOOSTER_PRICE) {
+            } else if (body.pay === 'plants' && current.plants >= BOOSTER_PLANTS) {
+                [update, params, paidWith] = [`plants = plants - $2`, [BOOSTER_PLANTS], 'plants'];
+            } else if (body.pay && body.pay !== 'plants' && current.coins >= BOOSTER_PRICE) {
                 [update, params, paidWith] = [`coins = coins - $2`, [BOOSTER_PRICE], 'coins'];
             } else {
-                throw new HttpError(402, body.pay ? 'Pas assez de graines' : 'Plus de charge : attends la prochaine ou paie en graines');
+                throw new HttpError(402, body.pay === 'plants' ? 'Pas assez de plantes : récolte ton jardin'
+                    : body.pay ? 'Pas assez de graines' : 'Plus de charge : attends la prochaine ou paie en graines');
             }
             const { rows: [locked] } = await client.query(`UPDATE users SET ${update} WHERE id = $1 RETURNING *`, [user.id, ...params]);
 
@@ -992,6 +1056,82 @@ const actions = {
         } finally {
             client.release();
         }
+    },
+
+    async garden(db, body, event) {
+        const user = await requireUser(db, event);
+        return { garden: await gardenState(db, user), user: await publicUser(db, user) };
+    },
+
+    // One plot (`slot`), or every empty plot the graines can pay for (« Replanter »).
+    async plant(db, body, event) {
+        const seed = SEEDS[body.kind];
+        if (!seed) throw new HttpError(400, 'Graine inconnue');
+        return withGarden(db, event, async (client, user) => {
+            const { rows } = await client.query(`SELECT slot FROM garden_plots WHERE user_id = $1`, [user.id]);
+            const taken = new Set(rows.map((r) => r.slot));
+            let slots;
+            if (body.slot != null) {
+                const slot = Number(body.slot);
+                if (!Number.isInteger(slot) || slot < 0 || slot >= user.plots) throw new HttpError(400, 'Parcelle introuvable');
+                if (taken.has(slot)) throw new HttpError(409, 'Cette parcelle est déjà plantée');
+                slots = [slot];
+            } else {
+                slots = Array.from({ length: user.plots }, (_, i) => i).filter((i) => !taken.has(i))
+                    .slice(0, Math.floor(user.coins / seed.cost));
+                if (!slots.length && taken.size >= user.plots) throw new HttpError(409, 'Toutes les parcelles sont plantées');
+            }
+            const cost = slots.length * seed.cost;
+            if (!slots.length || user.coins < cost) throw new HttpError(402, 'Pas assez de graines');
+            await client.query(`UPDATE users SET coins = coins - $2 WHERE id = $1`, [user.id, cost]);
+            await client.query(
+                `INSERT INTO garden_plots (user_id, slot, kind, ready_at)
+                 SELECT $1, s, $3, now() + make_interval(mins => $4) FROM unnest($2::smallint[]) s`,
+                [user.id, slots, body.kind, seed.minutes]
+            );
+            return { planted: slots.length };
+        });
+    },
+
+    async water(db, body, event) {
+        return withGarden(db, event, async (client, user) => {
+            const { rowCount } = await client.query(
+                `UPDATE garden_plots SET watered = true, ready_at = now() + (ready_at - now()) * $3
+                 WHERE user_id = $1 AND slot = $2 AND NOT watered AND ready_at > now()`,
+                [user.id, Number(body.slot), 1 - WATER_CUT]
+            );
+            if (!rowCount) throw new HttpError(409, 'Rien à arroser ici');
+        });
+    },
+
+    // Every ready plot (or just `slot`); each one may turn golden (×2) or hide a booster.
+    async harvest(db, body, event) {
+        return withGarden(db, event, async (client, user) => {
+            const { rows } = await client.query(
+                `DELETE FROM garden_plots WHERE user_id = $1 AND ready_at <= now() AND ($2::int IS NULL OR slot = $2)
+                 RETURNING slot, kind`,
+                [user.id, body.slot == null ? null : Number(body.slot)]
+            );
+            if (!rows.length) throw new HttpError(409, 'Rien n\'est encore prêt à récolter');
+            const harvest = rows.map(({ slot, kind }) => {
+                const golden = Math.random() < GOLDEN_CHANCE;
+                const base = SEEDS[kind]?.plants || 1;
+                return { slot, kind, plants: golden ? base * 2 : base, golden, treasure: Math.random() < TREASURE_CHANCE };
+            }).sort((a, b) => a.slot - b.slot);
+            const plants = harvest.reduce((n, h) => n + h.plants, 0);
+            const boosters = harvest.filter((h) => h.treasure).length;
+            await client.query(`UPDATE users SET plants = plants + $2, boosters = boosters + $3 WHERE id = $1`, [user.id, plants, boosters]);
+            return { harvest };
+        });
+    },
+
+    async unlockPlot(db, body, event) {
+        return withGarden(db, event, async (client, user) => {
+            const price = PLOT_PRICES[user.plots - START_PLOTS];
+            if (price == null) throw new HttpError(409, `${MAX_PLOTS} parcelles maximum`);
+            if (user.coins < price) throw new HttpError(402, 'Pas assez de graines');
+            await client.query(`UPDATE users SET coins = coins - $2, plots = plots + 1 WHERE id = $1`, [user.id, price]);
+        });
     },
 
     // Catalogue overview (tens of thousands of cards: never sent whole): counts per type
