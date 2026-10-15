@@ -123,13 +123,20 @@ function FlipCard({ card, revealed, charging, onClick }) {
 }
 
 // Drag the card sideways to move on, like a tap. Each card gets its own motion value so the
-// leaving card and the arriving one never share a position.
-const SWIPE_EXIT = { exit: (dir) => ({ x: dir * 320, y: -20, rotate: dir * 16, opacity: 0, transition: { duration: 0.3 } }) };
+// leaving card and the arriving one never share a position. Like a real hand of cards: the top
+// one is tossed aside on an arc and the next is already waiting underneath, face down.
+const STACK = [{ y: 0, scale: 1, rotate: 0 }, { y: 10, scale: 0.95, rotate: -2.5 }, { y: 20, scale: 0.9, rotate: 2 }];
+const SWIPE_EXIT = {
+    exit: (dir) => ({
+        x: dir * 560, y: 70, rotate: dir * 32, opacity: [1, 1, 0], zIndex: 30,
+        transition: { duration: 0.5, ease: [0.25, 0.7, 0.45, 1], opacity: { duration: 0.5, times: [0, 0.7, 1] } },
+    }),
+};
 function SwipeCard({ children, onSwipe, draggedRef }) {
     const x = useMotionValue(0);
     const rotate = useTransform(x, [-220, 220], [-14, 14]);
     return (
-        <motion.div style={{ x, rotate }} className="touch-pan-y"
+        <motion.div style={{ x, rotate }} className="absolute inset-0 z-10 touch-pan-y"
             drag="x" dragSnapToOrigin dragElastic={0.7} dragConstraints={{ left: 0, right: 0 }}
             onDragStart={() => { draggedRef.current = true; }}
             onDragEnd={(_, info) => {
@@ -137,8 +144,8 @@ function SwipeCard({ children, onSwipe, draggedRef }) {
                 if (Math.abs(dx) > 80 || Math.abs(info.velocity.x) > 500) onSwipe(Math.sign(dx || info.velocity.x));
                 setTimeout(() => { draggedRef.current = false; }, 0);
             }}
-            initial={{ y: 40, opacity: 0, scale: 0.9 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
+            initial={STACK[1]}
+            animate={{ ...STACK[0], transition: { type: 'spring', stiffness: 260, damping: 24 } }}
             variants={SWIPE_EXIT} exit="exit">
             {children}
         </motion.div>
@@ -249,11 +256,25 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                     <span key={i} className={`h-1.5 w-6 rounded-full transition-colors ${i < index ? 'bg-[#e9c46a]' : i === index ? 'bg-white' : 'bg-white/20'}`} />
                                 ))}
                             </div>
-                            <AnimatePresence mode="popLayout" custom={dir}>
-                                <SwipeCard key={index} onSwipe={next} draggedRef={dragged}>
-                                    <FlipCard card={current} revealed={revealed} charging={charging} onClick={() => !dragged.current && next()} />
-                                </SwipeCard>
-                            </AnimatePresence>
+                            <div className="relative w-[250px] sm:w-[290px] aspect-[5/7]">
+                                {/* face-down cards still to come, peeking out under the current one */}
+                                <AnimatePresence>
+                                    {cards.slice(index + 1, index + 3).map((_, i) => (
+                                        <motion.div key={index + 1 + i} className="absolute inset-0 pointer-events-none"
+                                            initial={{ ...STACK[i + 2] || STACK[2], opacity: 0 }}
+                                            animate={{ ...STACK[i + 1], opacity: 1 }}
+                                            exit={{ opacity: 0, transition: { duration: 0 } }}
+                                            transition={{ type: 'spring', stiffness: 260, damping: 24 }}>
+                                            <CardBack />
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
+                                <AnimatePresence custom={dir}>
+                                    <SwipeCard key={index} onSwipe={next} draggedRef={dragged}>
+                                        <FlipCard card={current} revealed={revealed} charging={charging} onClick={() => !dragged.current && next()} />
+                                    </SwipeCard>
+                                </AnimatePresence>
+                            </div>
                             <div className="relative z-10 min-h-16 text-center">
                                 {revealed ? <RarityBanner key={index} card={current} demo={demo} /> : charging && (
                                     <motion.p className="font-display italic text-lg" style={{ color: fx.color }}
