@@ -161,7 +161,8 @@ async function socialCounts(db, userId) {
         `SELECT (SELECT COUNT(*)::int FROM friendships WHERE addressee_id = $1 AND status = 'pending') AS "friendRequests",
                 (SELECT COUNT(*)::int FROM trades WHERE to_id = $1 AND status = 'pending') AS "tradeOffers",
                 (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND day = (now() AT TIME ZONE 'Europe/Paris')::date) AS "quizPlayed",
-                (SELECT COUNT(*)::int FROM messages WHERE to_id = $1 AND read_at IS NULL) AS "unreadMessages"`,
+                (SELECT COUNT(*)::int FROM messages WHERE to_id = $1 AND read_at IS NULL) AS "unreadMessages",
+                (SELECT COUNT(*)::int FROM gifts WHERE to_id = $1 AND seen_at IS NULL) AS "newGifts"`,
         [userId]
     );
     return c;
@@ -521,7 +522,7 @@ async function badgeCounts(db, user, pub) {
         '/defis': challenges.filter((c) => !c.claimed && c.progress >= c.goal).length,
         '/trophees': trophies.filter((t) => !t.claimed && t.progress >= t.goal).length,
         '/inviter': Math.min(inv.ready, Math.max(0, INVITE_CAP - inv.rewarded)),
-        '/amis': s.friendRequests + s.tradeOffers,
+        '/amis': s.friendRequests + s.tradeOffers + s.newGifts,
         '/messages': s.unreadMessages,
         // rewarded wins are only worth showing while free battles remain to play them
         '/combat': fight.active ? 1 : fight.seasons + (fight.started < DAILY_BATTLES ? Math.min(DAILY_BATTLES - fight.started, Math.max(0, DAILY_REWARDS - fight.rewarded)) : 0),
@@ -563,6 +564,17 @@ async function giftAllowance(db, meId, friendId) {
         allowance[key] = { max: c.max, sent: r.sent, left: Math.max(0, Math.min(c.max - r.sent, c.max - r.received)), friendFull: r.received >= c.max };
     }
     return allowance;
+}
+
+// Gifts received and not yet shown, oldest first, for the pop-up at the next visit.
+async function unseenGifts(db, userId) {
+    const { rows } = await db.query(
+        `SELECT g.id, u.username AS "from", g.currency, g.amount, g.note, g.created_at
+         FROM gifts g JOIN users u ON u.id = g.from_id
+         WHERE g.to_id = $1 AND g.seen_at IS NULL ORDER BY g.id LIMIT 20`,
+        [userId]
+    );
+    return rows;
 }
 
 function giftReadyAt(friendship) {
@@ -1739,7 +1751,20 @@ const actions = {
     async badges(db, body, event) {
         const user = await requireUser(db, event);
         const pub = await publicUser(db, user);
-        return { user: pub, badges: await badgeCounts(db, user, pub) };
+        const [badges, gifts] = await Promise.all([
+            badgeCounts(db, user, pub),
+            pub.social.newGifts ? unseenGifts(db, user.id) : [],
+        ]);
+        return { user: pub, badges, gifts };
+    },
+
+    // Closes the « cadeau reçu » pop-up: every gift up to `upTo` is marked as seen.
+    async seenGifts(db, body, event) {
+        const user = await requireUser(db, event);
+        const upTo = Number(body.upTo);
+        if (!Number.isInteger(upTo)) throw new HttpError(400, 'Cadeau invalide');
+        await db.query(`UPDATE gifts SET seen_at = now() WHERE to_id = $1 AND id <= $2 AND seen_at IS NULL`, [user.id, upTo]);
+        return { ok: true };
     },
 
     // One row per correspondent (last message, unread count), plus friends not written to yet.
@@ -1847,7 +1872,7 @@ const actions = {
             if (me.balance < amount) throw new HttpError(402, `Pas assez de ${currency.many}`);
             await client.query(`UPDATE users SET ${currency.column} = ${currency.column} - $2 WHERE id = $1`, [user.id, amount]);
             await client.query(`UPDATE users SET ${currency.column} = ${currency.column} + $2 WHERE id = $1`, [other.id, amount]);
-            await client.query(`INSERT INTO gifts (from_id, to_id, currency, amount) VALUES ($1, $2, $3, $4)`, [user.id, other.id, body.currency, amount]);
+            await client.query(`INSERT INTO gifts (from_id, to_id, currency, amount, note) VALUES ($1, $2, $3, $4, $5)`, [user.id, other.id, body.currency, amount, note || null]);
             const text = `🎁 Cadeau : ${amount.toLocaleString('fr-FR')} ${amount > 1 ? currency.many : currency.one}${note ? `\n${note}` : ''}`;
             ({ rows: [message] } = await client.query(
                 `INSERT INTO messages (from_id, to_id, body, gift) VALUES ($1, $2, $3, true) RETURNING id, body, gift, created_at, read_at, true AS mine`,

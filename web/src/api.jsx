@@ -51,9 +51,10 @@ export function GameProvider({ children }) {
     // Counters per page (`/defis`: 2…) for the navigation badges, refreshed every 30 s,
     // on page change and shortly after any action that returns a new user.
     const [badges, setBadges] = useState({});
+    const [gifts, setGifts] = useState([]); // gifts received and not yet shown (pop-up)
     const refreshBadges = useCallback(() => {
         if (!localStorage.getItem(TOKEN_KEY)) return;
-        api('badges').then(({ user, badges }) => { setUserRaw(user); setBadges(badges); }).catch(() => {});
+        api('badges').then(({ user, badges, gifts }) => { setUserRaw(user); setBadges(badges); setGifts(gifts || []); }).catch(() => {});
     }, []);
     const loggedIn = !!user;
     useEffect(() => {
@@ -84,6 +85,7 @@ export function GameProvider({ children }) {
         localStorage.setItem('naturdex.returning', '1'); // next visit shows log-in, not sign-up
         setUserRaw(null);
         setBadges({});
+        setGifts([]);
         setOwned({});
         setOwnedInfo({});
         setFavs(NO_FAVS);
@@ -104,7 +106,7 @@ export function GameProvider({ children }) {
     }, []);
 
     return (
-        <GameContext.Provider value={{ user, setUser, ready, badges, refreshBadges, catalog, owned, ownedInfo, setOwned, favs, setFavs, refreshCollection, authenticate, logout, addCards }}>
+        <GameContext.Provider value={{ user, setUser, ready, badges, refreshBadges, gifts, setGifts, catalog, owned, ownedInfo, setOwned, favs, setFavs, refreshCollection, authenticate, logout, addCards }}>
             {children}
         </GameContext.Provider>
     );

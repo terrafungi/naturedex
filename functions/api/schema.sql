@@ -305,3 +305,8 @@ CREATE TABLE IF NOT EXISTS gifts (
 CREATE INDEX IF NOT EXISTS gifts_from_idx ON gifts (from_id, created_at);
 CREATE INDEX IF NOT EXISTS gifts_to_idx ON gifts (to_id, created_at);
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS gift BOOLEAN NOT NULL DEFAULT false;
+
+-- Gift notices: the receiver sees a pop-up for each gift until seen_at is set.
+ALTER TABLE gifts ADD COLUMN IF NOT EXISTS note TEXT;
+ALTER TABLE gifts ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS gifts_unseen_idx ON gifts (to_id) WHERE seen_at IS NULL;

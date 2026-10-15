@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Award, Brain, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
+import GiftNotice from './GiftNotice.jsx';
 
 export const NAV = [
     { to: '/', label: 'Accueil', Icon: Home, end: true },
@@ -178,6 +179,7 @@ export default function Layout() {
                 NatureDex · Images et textes : <a className="underline hover:text-white" href="https://fr.wikipedia.org" target="_blank" rel="noreferrer">Wikipédia</a> & Wikimedia Commons (licences libres) · Données : Wikidata
             </footer>
             {user && <TabBar />}
+            {user && <GiftNotice />}
         </div>
     );
 }
