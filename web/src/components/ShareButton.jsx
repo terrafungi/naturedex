@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useGame } from '../api.jsx';
 
 // Rarities worth showing off: the button only appears on these cards.
@@ -17,9 +18,19 @@ function FacebookIcon({ className }) {
     );
 }
 
+// The share page renders the card's preview image on first visit (a few seconds): warm it up as soon
+// as the button shows, so it is cached by the time Facebook's crawler asks for it.
+const warmed = new Set();
+
 export default function ShareButton({ card, compact = false, className = '' }) {
     const { user } = useGame();
-    if (!card || !SHAREABLE.has(card.rarity)) return null;
+    const shareable = card && SHAREABLE.has(card.rarity);
+    useEffect(() => {
+        if (!shareable || warmed.has(card.id)) return;
+        warmed.add(card.id);
+        fetch(shareUrl(card), { mode: 'no-cors' }).catch(() => warmed.delete(card.id));
+    }, [shareable, card?.id]);
+    if (!shareable) return null;
     function share(e) {
         e.preventDefault();
         e.stopPropagation(); // inside clickable cards (booster reveal, links)
