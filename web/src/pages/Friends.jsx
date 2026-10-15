@@ -204,11 +204,11 @@ function TradeBuilder({ friend, total, onClose, onSent }) {
     const sum = (m) => [...m.values()].reduce((s, i) => s + i.qty, 0);
     const empty = give.size === 0 && get.size === 0;
     return (
-        <motion.div className="fixed inset-0 z-[100] grid place-items-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="fixed inset-0 z-[100] flex justify-center sm:items-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
-            <motion.div className="relative w-full max-w-4xl h-full sm:h-auto sm:max-h-[94vh] flex flex-col sm:rounded-[2rem] bg-[#081a11] ring-1 ring-white/10"
+            <motion.div className="relative w-full max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[94vh] flex flex-col overflow-hidden sm:rounded-[2rem] bg-[#081a11] ring-1 ring-white/10"
                 initial={{ y: 30 }} animate={{ y: 0 }} exit={{ y: 30 }}>
-                <div className="flex items-center gap-3 p-4 sm:p-6 pb-3 border-b border-white/5">
+                <div className="shrink-0 flex items-center gap-3 p-4 sm:p-6 pb-3 border-b border-white/5">
                     <ArrowLeftRight className="w-6 h-6 text-[#e9c46a] shrink-0" />
                     <div className="min-w-0">
                         <h2 className="font-display text-xl sm:text-2xl text-white truncate">Échange avec {friend}</h2>
@@ -216,19 +216,19 @@ function TradeBuilder({ friend, total, onClose, onSent }) {
                     </div>
                     <button type="button" onClick={onClose} className="ml-auto grid place-items-center w-9 h-9 rounded-full nd-cta-glass shrink-0" aria-label="Fermer"><X className="w-4 h-4" /></button>
                 </div>
-                <div className="px-4 sm:px-6 pt-3">
+                <div className="shrink-0 px-4 sm:px-6 pt-3">
                     <div className="grid grid-cols-2 gap-1 p-1 rounded-full bg-white/5 ring-1 ring-white/10">
                         <button type="button" onClick={() => setSide('get')} className={`py-2 rounded-full text-sm font-bold ${side === 'get' ? 'bg-[#e9c46a] text-[#05130d]' : 'text-white/75'}`}>Tu demandes{get.size ? ` (${sum(get)})` : ''}</button>
                         <button type="button" onClick={() => setSide('give')} className={`py-2 rounded-full text-sm font-bold ${side === 'give' ? 'bg-[#e9c46a] text-[#05130d]' : 'text-white/75'}`}>Tu donnes{give.size ? ` (${sum(give)})` : ''}</button>
                     </div>
                     <p className="mt-2 text-xs text-white/50">{side === 'get' ? `La collection de ${friend} : celles qui te manquent apparaissent en premier.` : 'Ta collection. Donner ton dernier exemplaire retire la carte de ta collection.'}</p>
                 </div>
-                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3">
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3">
                     {side === 'get'
                         ? <Picker key="get" username={friend} selected={get} onToggle={toggler(setGet)} onQty={qtyer(setGet)} total={total} />
                         : <Picker key="give" selected={give} onToggle={toggler(setGive)} onQty={qtyer(setGive)} total={total} />}
                 </div>
-                <div className="border-t border-white/10 p-4 sm:p-5 space-y-3 bg-black/20 sm:rounded-b-[2rem]">
+                <div className="shrink-0 border-t border-white/10 p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3 bg-black/20 sm:rounded-b-[2rem]">
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm">
                         <div className="min-w-0">
                             <div className="text-[11px] uppercase tracking-wider text-white/50">Tu donnes</div>
