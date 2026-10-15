@@ -367,8 +367,10 @@ async function inviteCode(db, user) {
 
 const PARIS_DAY = `(now() AT TIME ZONE 'Europe/Paris')::date`;
 
-// Facebook share page (GET /api/partage/:cardId?u=username): Open Graph tags for the preview,
-// then a redirect to the site carrying the sharer's invite code.
+// Facebook share page (GET /api/partage/:cardId?v=2&u=username): Open Graph tags for the preview,
+// then a JS redirect to the site carrying the sharer's invite code. No <meta refresh>: Facebook's
+// crawler follows it and would read the site's generic tags instead. `v` busts Facebook's scrape
+// cache of links shared before that fix.
 const SITE = 'https://naturedex.fr';
 const SHARE_RARITIES = { rare: 'Rare', epic: 'Épique', legendary: 'Légendaire', secret: 'Secrète' };
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -406,7 +408,7 @@ async function sharePage(db, cardId, username) {
     const description = `${extract} Collectionne ${card ? 'toi aussi ' : ''}60 000 espèces du vivant sur NatureDex.`.trim();
     const custom = card && await shareImage(card).catch((e) => (console.error('share image', card.id, e), null));
     const image = custom || card?.image_url || `${SITE}/og.png`;
-    const self = `${SITE}/api/partage/${card?.id ?? cardId}${sharer ? `?u=${encodeURIComponent(sharer.username)}` : ''}`;
+    const self = `${SITE}/api/partage/${card?.id ?? cardId}?v=2${sharer ? `&u=${encodeURIComponent(sharer.username)}` : ''}`;
     const body = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <title>${esc(title)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -423,7 +425,6 @@ async function sharePage(db, cardId, username) {
 <meta property="og:image:height" content="630">` : ''}
 <meta property="og:image:alt" content="${esc(card?.name || 'NatureDex')}">
 <meta name="twitter:card" content="summary_large_image">
-<meta http-equiv="refresh" content="0; url=${esc(target)}">
 </head><body style="background:#04100a;color:#e7ece8;font-family:sans-serif;text-align:center;padding:3em">
 <p><a style="color:#a8f0c6" href="${esc(target)}">Ouvrir NatureDex</a></p>
 <script>location.replace(${JSON.stringify(target).replace(/</g, '\\u003c')})</script>

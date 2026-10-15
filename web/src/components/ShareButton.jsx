@@ -7,7 +7,7 @@ export const SHAREABLE = new Set(['rare', 'epic', 'legendary', 'secret']);
 // The link points at the share page of the API (Open Graph preview with the card's image),
 // which then sends visitors to the site with the sharer's invite code.
 export function shareUrl(card, username) {
-    return `https://naturedex.fr/api/partage/${card.id}${username ? `?u=${encodeURIComponent(username)}` : ''}`;
+    return `https://naturedex.fr/api/partage/${card.id}?v=2${username ? `&u=${encodeURIComponent(username)}` : ''}`;
 }
 
 function FacebookIcon({ className }) {
