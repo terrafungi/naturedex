@@ -141,8 +141,8 @@ export default function ShowcaseEditor() {
             <h1 className="font-display text-4xl font-semibold text-white mt-1">Compose ta plus belle image</h1>
             <p className="mt-2 text-sm text-ink-soft max-w-xl">Choisis jusqu'à {SHOWCASE_MAX} cartes, un fond et une disposition. Enregistre-la sur ton profil ou partage l'image.</p>
 
-            <div className="mt-8 grid lg:grid-cols-[minmax(0,26rem)_1fr] gap-8 items-start">
-                <div className="lg:sticky lg:top-24">
+            <div className="mt-8 grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] gap-8 items-start">
+                <div className="min-w-0 lg:sticky lg:top-24">
                     <div className="mx-auto rounded-[1.4rem] overflow-hidden ring-1 ring-white/15 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] bg-black/30"
                         style={{ maxWidth: story ? 'min(100%, calc(62vh * 9 / 16))' : 'min(100%, 62vh)' }}>
                         {empty
