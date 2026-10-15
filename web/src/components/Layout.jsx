@@ -83,7 +83,7 @@ function Wallet({ user }) {
                 <Plant />{short(user.plants ?? 0)}
             </Link>
             <span className="w-px h-4 bg-white/15" />
-            <Link to="/encheres" className="flex items-center gap-1 pl-1.5 sm:pl-2 pr-2 sm:pr-2.5 py-1.5 text-[#f4c25b]" title="Pépites : pour les enchères">
+            <Link to="/encheres" className="flex items-center gap-1 pl-1.5 sm:pl-2 pr-2 sm:pr-2.5 py-1.5 text-[#f4c25b]" title="Pépites : pour les enchères, ou à convertir en graines au jardin">
                 <Nugget />{short(user.nuggets)}
             </Link>
             <Link to="/boutique" className="grid place-items-center w-6 h-6 mr-1 rounded-full bg-[#e9c46a] text-[#2a1c00] hover:brightness-110" title="Boutique solidaire : acheter des crédits">

@@ -127,7 +127,7 @@ export default function Boosters() {
                     )}
                     {payWith === 'coins' && (
                         <Link to="/jardin" className="relative mt-3 w-full max-w-xs py-2.5 rounded-full bg-[#c7ef7a]/15 ring-1 ring-[#c7ef7a]/40 text-[#dcf7a6] font-bold text-sm text-center flex items-center justify-center gap-1.5 hover:bg-[#c7ef7a]/25">
-                            <Sprout className="w-4 h-4" />Plante tes graines : plus de boosters
+                            <Sprout className="w-4 h-4" />Plante tes graines et pépites : plus de boosters
                         </Link>
                     )}
                     {payWith !== 'charge' && (
@@ -154,7 +154,7 @@ export default function Boosters() {
                             <Sprout className="w-6 h-6 text-[#8ee6a8]" />
                             <h2 className="mt-2 font-display text-xl font-bold">Le jardin</h2>
                             <p className="text-sm text-ink-soft">
-                                Plante tes <Amount seeds={user.coins} /> graines : elles deviennent des plantes, et {user.boosterPlants} plantes ouvrent un booster.
+                                Convertis tes pépites en graines, plante-les : elles deviennent des plantes, et {user.boosterPlants} plantes ouvrent un booster.
                                 Jusqu'à 2× plus de boosters qu'en payant directement ({user.boosterPrice} graines).
                             </p>
                             <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[#dcf7a6] group-hover:underline">

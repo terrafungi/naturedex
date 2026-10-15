@@ -144,6 +144,7 @@ async function publicUser(db, user) {
         plants: user.plants,
         boosterPlants: BOOSTER_PLANTS,
         plots: user.plots,
+        nuggetSeeds: NUGGET_SEEDS,
         dailyCoins: DAILY_COINS,
         nextDailyAt: nextDaily > Date.now() ? new Date(nextDaily).toISOString() : null,
         recycleValue: RECYCLE_VALUE,
@@ -857,6 +858,21 @@ const MAX_PLOTS = START_PLOTS + PLOT_PRICES.length;
 const WATER_CUT = 0.3; // one watering per plant takes 30 % off the time left
 const GOLDEN_CHANCE = 0.1; // harvest ×2
 const TREASURE_CHANCE = 0.01; // + one bonus booster
+// Pépites turn into graines at the shop's own € rate (500 pépites for 2,99 € ≈ 1 500 graines),
+// so buying either currency feeds the garden equally; free players get pépites by recycling.
+const NUGGET_SEEDS = 3;
+
+// Converts just enough pépites to cover `cost` graines (inside a withGarden transaction).
+async function coverWithNuggets(client, user, cost) {
+    const missing = cost - user.coins;
+    if (missing <= 0) return 0;
+    const nuggets = Math.ceil(missing / NUGGET_SEEDS);
+    if (nuggets > user.nuggets) throw new HttpError(402, 'Pas assez de graines ni de pépites');
+    await client.query(`UPDATE users SET nuggets = nuggets - $2, coins = coins + $3 WHERE id = $1`, [user.id, nuggets, nuggets * NUGGET_SEEDS]);
+    user.coins += nuggets * NUGGET_SEEDS;
+    user.nuggets -= nuggets;
+    return nuggets;
+}
 
 async function gardenState(db, user) {
     const { rows } = await db.query(
@@ -1063,11 +1079,24 @@ const actions = {
         return { garden: await gardenState(db, user), user: await publicUser(db, user) };
     },
 
+    // Pépites → graines, at NUGGET_SEEDS graines each.
+    async convert(db, body, event) {
+        const nuggets = Number(body.nuggets);
+        if (!Number.isInteger(nuggets) || nuggets < 1) throw new HttpError(400, 'Montant invalide');
+        return withGarden(db, event, async (client, user) => {
+            if (nuggets > user.nuggets) throw new HttpError(402, 'Pas assez de pépites');
+            await client.query(`UPDATE users SET nuggets = nuggets - $2, coins = coins + $3 WHERE id = $1`, [user.id, nuggets, nuggets * NUGGET_SEEDS]);
+            return { converted: nuggets, seeds: nuggets * NUGGET_SEEDS };
+        });
+    },
+
     // One plot (`slot`), or every empty plot the graines can pay for (« Replanter »).
+    // With `convert`, missing graines are made from pépites on the fly.
     async plant(db, body, event) {
         const seed = SEEDS[body.kind];
         if (!seed) throw new HttpError(400, 'Graine inconnue');
         return withGarden(db, event, async (client, user) => {
+            const budget = user.coins + (body.convert ? user.nuggets * NUGGET_SEEDS : 0);
             const { rows } = await client.query(`SELECT slot FROM garden_plots WHERE user_id = $1`, [user.id]);
             const taken = new Set(rows.map((r) => r.slot));
             let slots;
@@ -1078,18 +1107,19 @@ const actions = {
                 slots = [slot];
             } else {
                 slots = Array.from({ length: user.plots }, (_, i) => i).filter((i) => !taken.has(i))
-                    .slice(0, Math.floor(user.coins / seed.cost));
+                    .slice(0, Math.floor(budget / seed.cost));
                 if (!slots.length && taken.size >= user.plots) throw new HttpError(409, 'Toutes les parcelles sont plantées');
             }
             const cost = slots.length * seed.cost;
-            if (!slots.length || user.coins < cost) throw new HttpError(402, 'Pas assez de graines');
+            if (!slots.length || budget < cost) throw new HttpError(402, body.convert ? 'Pas assez de graines ni de pépites' : 'Pas assez de graines');
+            const converted = body.convert ? await coverWithNuggets(client, user, cost) : 0;
             await client.query(`UPDATE users SET coins = coins - $2 WHERE id = $1`, [user.id, cost]);
             await client.query(
                 `INSERT INTO garden_plots (user_id, slot, kind, ready_at)
                  SELECT $1, s, $3, now() + make_interval(mins => $4) FROM unnest($2::smallint[]) s`,
                 [user.id, slots, body.kind, seed.minutes]
             );
-            return { planted: slots.length };
+            return { planted: slots.length, converted };
         });
     },
 

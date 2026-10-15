@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Clock, Droplets, Lock, Package, Plus, Sparkles, Sprout, X } from 'lucide-react';
-import { Amount, Plant, Seed } from '../components/Currency.jsx';
+import { ArrowRight, Clock, Droplets, Lock, Package, Plus, Recycle, Sparkles, Sprout, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Amount, Nugget, Plant, Seed } from '../components/Currency.jsx';
 import { api, useGame } from '../api.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
 
@@ -17,6 +18,10 @@ const LOOK = {
     chene: { leaf: '#3f9e4f', head: '#2f8a43', headHi: '#7cc96a' },
     rose: { leaf: '#46b07a', head: '#b98cff', headHi: '#f0e3ff' },
 };
+
+// Graines available once every pépite is converted (planting converts only what is missing).
+const budgetOf = (user) => user.coins + user.nuggets * (user.nuggetSeeds || 3);
+const nuggetsFor = (user, cost) => Math.max(0, Math.ceil((cost - user.coins) / (user.nuggetSeeds || 3)));
 
 const duration = (minutes) => (minutes < 60 ? `${minutes} min` : `${minutes / 60} h`);
 function left(ms) {
@@ -107,11 +112,13 @@ function SeedPicker({ user, garden, emptyCount, onPlant, onClose, busy }) {
                 initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}>
                 <button type="button" onClick={onClose} className="absolute top-4 right-4 grid place-items-center w-9 h-9 rounded-full nd-cta-glass" aria-label="Fermer"><X className="w-4 h-4" /></button>
                 <h2 className="font-display text-2xl text-white pr-10 flex items-center gap-2"><Sprout className="w-6 h-6 text-[#8ee6a8]" />Que veux-tu planter ?</h2>
-                <p className="mt-1 text-sm text-ink-soft">Tu as <Amount seeds={user.coins} />. Plus une graine pousse longtemps, plus elle rapporte.</p>
+                <p className="mt-1 text-sm text-ink-soft">Tu as <Amount seeds={user.coins} /> et <Amount nuggets={user.nuggets} />. S'il manque des graines, tes pépites sont converties.</p>
                 <ul className="mt-5 space-y-2.5">
                     {SEED_ORDER.map((kind) => {
                         const s = garden.seeds[kind];
-                        const poor = user.coins < s.cost;
+                        const poor = budgetOf(user) < s.cost;
+                        const needNuggets = nuggetsFor(user, s.cost);
+                        const many = Math.min(emptyCount, Math.floor(budgetOf(user) / s.cost));
                         const perBooster = Math.round((s.cost * user.boosterPlants) / s.plants);
                         return (
                             <li key={kind}>
@@ -130,13 +137,14 @@ function SeedPicker({ user, garden, emptyCount, onPlant, onClose, busy }) {
                                             <span>→ <Amount plants={s.plants} /></span>
                                         </span>
                                         <span className="block mt-0.5 text-[11px] text-white/45">≈ {perBooster} graines par booster</span>
+                                        {!poor && needNuggets > 0 && <span className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#f4c25b]"><Nugget className="w-3 h-3" />{needNuggets} pépite{needNuggets > 1 ? 's' : ''} converties</span>}
                                     </span>
                                     <span className="shrink-0 px-3 py-1.5 rounded-full bg-black/30 ring-1 ring-white/10"><Amount seeds={s.cost} /></span>
                                 </button>
-                                {emptyCount > 1 && !poor && (
+                                {many > 1 && (
                                     <button type="button" disabled={busy} onClick={() => onPlant(kind, true)}
                                         className="mt-1 ml-[4.75rem] text-xs font-semibold text-[#a8f0c6] hover:underline disabled:opacity-50">
-                                        Planter dans les {Math.min(emptyCount, Math.floor(user.coins / s.cost))} parcelles vides ({Math.min(emptyCount, Math.floor(user.coins / s.cost)) * s.cost} graines)
+                                        Planter dans {many} parcelles vides ({many * s.cost} graines{nuggetsFor(user, many * s.cost) ? `, dont ${nuggetsFor(user, many * s.cost)} pépites` : ''})
                                     </button>
                                 )}
                             </li>
@@ -230,6 +238,38 @@ function LockedPlot({ price, next, canPay, onUnlock, busy }) {
     );
 }
 
+// The grainerie: pépites → graines in one tap, with the free and paid ways to get more pépites.
+function Converter({ user, busy, onConvert }) {
+    const rate = user.nuggetSeeds;
+    const options = [...new Set([10, 50, 200].filter((n) => n < user.nuggets).concat(user.nuggets > 0 ? [user.nuggets] : []))];
+    return (
+        <div className="mt-4 p-4 rounded-[1.6rem] bg-gradient-to-br from-[#f4c25b]/12 to-white/[0.03] ring-1 ring-[#f4c25b]/25">
+            <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5 font-display text-lg font-bold text-white">
+                    <Nugget className="w-5 h-5" /><ArrowRight className="w-4 h-4 text-white/40" /><Seed className="w-5 h-5" />Grainerie
+                </span>
+                <span className="ml-auto text-xs font-semibold text-white/60">1 pépite = {rate} graines</span>
+            </div>
+            {user.nuggets > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                    {options.map((n) => (
+                        <button key={n} type="button" disabled={busy} onClick={() => onConvert(n)}
+                            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-bold tabular-nums disabled:opacity-50 ${n === user.nuggets ? 'bg-[#e9c46a] text-[#2a1c00] hover:brightness-110' : 'bg-black/25 ring-1 ring-[#f4c25b]/35 text-[#f8d98a] hover:bg-black/40'}`}>
+                            {n === user.nuggets && options.length > 1 ? 'Tout · ' : ''}<Nugget className="w-3.5 h-3.5" />{n.toLocaleString('fr-FR')}<ArrowRight className="w-3 h-3 opacity-60" /><Seed className="w-3.5 h-3.5" />{(n * rate).toLocaleString('fr-FR')}
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <p className="mt-2 text-sm text-ink-soft">Plus de pépites pour l'instant.</p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs font-semibold">
+                <Link to="/collection" className="inline-flex items-center gap-1 text-[#a8f0c6] hover:underline"><Recycle className="w-3.5 h-3.5" />Gratuit : recycle tes doublons</Link>
+                <Link to="/boutique" className="inline-flex items-center gap-1 text-[#f4c25b] hover:underline"><Plus className="w-3.5 h-3.5" />Plus de pépites</Link>
+            </div>
+        </div>
+    );
+}
+
 export default function Garden() {
     const { user, setUser, addCards, refreshBadges } = useGame();
     const [garden, setGarden] = useState(null);
@@ -269,8 +309,15 @@ export default function Garden() {
 
     async function plant(kind, everywhere, slot = picker) {
         localStorage.setItem(LAST_SEED, kind);
-        const res = await run('plant', everywhere ? { kind } : { kind, slot });
-        if (res) { setPicker(null); refreshBadges(); }
+        const res = await run('plant', everywhere ? { kind, convert: true } : { kind, slot, convert: true });
+        if (!res) return;
+        setPicker(null);
+        refreshBadges();
+        if (res.converted) {
+            const id = Date.now();
+            setToast({ id, text: `${res.converted} pépite${res.converted > 1 ? 's' : ''} → ${res.converted * user.nuggetSeeds} graines`, nugget: true });
+            setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 2400);
+        }
     }
     async function harvest(slot) {
         const res = await run('harvest', slot == null ? {} : { slot });
@@ -286,6 +333,13 @@ export default function Garden() {
         else setToast({ id, text: `+${res.harvest.reduce((n, h) => n + h.plants, 0)} plantes récoltées` });
         setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 2600);
     }
+    async function convert(nuggets) {
+        const res = await run('convert', { nuggets });
+        if (!res) return;
+        const id = Date.now();
+        setToast({ id, text: `+${res.seeds} graines`, nugget: true });
+        setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 2000);
+    }
     async function openBooster() {
         const res = await run('openBooster', { pay: 'plants' });
         if (res) { addCards(res.cards); setOpening(res.cards); }
@@ -295,7 +349,7 @@ export default function Garden() {
         <div className="max-w-3xl mx-auto px-4 py-8 sm:py-10">
             <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Jardin de {user.username}</p>
             <h1 className="font-display text-4xl sm:text-5xl font-semibold text-white mt-1">Plante, récolte, ouvre.</h1>
-            <p className="mt-2 text-ink-soft">Tes graines deviennent des plantes. <b className="text-white">{user.boosterPlants} plantes = 1 booster.</b></p>
+            <p className="mt-2 text-ink-soft">Tes pépites deviennent des graines, tes graines des plantes. <b className="text-white">{user.boosterPlants} plantes = 1 booster.</b></p>
 
             {/* harvest → booster */}
             <div className="mt-6 relative p-5 rounded-[1.8rem] nd-glass nd-ring overflow-hidden">
@@ -324,6 +378,8 @@ export default function Garden() {
                 </div>
             </div>
 
+            <Converter user={user} busy={busy} onConvert={convert} />
+
             {/* quick actions */}
             <div className="mt-6 flex flex-wrap gap-2">
                 {readyCount > 0 && (
@@ -333,7 +389,7 @@ export default function Garden() {
                     </motion.button>
                 )}
                 {emptyCount > 0 && (
-                    <button type="button" disabled={busy || user.coins < garden.seeds[lastSeed].cost} onClick={() => plant(lastSeed, true)}
+                    <button type="button" disabled={busy || budgetOf(user) < garden.seeds[lastSeed].cost} onClick={() => plant(lastSeed, true)}
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-white/10 ring-1 ring-white/15 text-white font-semibold hover:bg-white/15 disabled:opacity-40">
                         <Seed className="w-5 h-5" />{plots.some(Boolean) ? 'Replanter' : 'Tout planter'} · {garden.seeds[lastSeed].name}
                     </button>
@@ -354,14 +410,15 @@ export default function Garden() {
             </div>
 
             {/* how it works */}
-            <ol className="mt-8 grid sm:grid-cols-3 gap-3 text-sm">
+            <ol className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                 {[
+                    [Nugget, 'Convertis', `1 pépite = ${user.nuggetSeeds} graines. Recycle tes doublons pour gagner des pépites.`],
                     [Seed, 'Plante', 'Choisis une graine. Plus elle pousse longtemps, plus elle rapporte.'],
                     [Droplets, 'Arrose', `Une fois par plante : ${Math.round(garden.waterCut * 100)} % de temps en moins.`],
                     [Sparkles, 'Récolte', `1 chance sur 10 d'une récolte dorée ×2… et parfois un booster caché !`],
                 ].map(([Icon, title, text], i) => (
                     <li key={title} className="p-4 rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
-                        <p className="flex items-center gap-2 font-display text-lg font-bold text-white"><span className="text-white/40 text-sm">{i + 1}</span><Icon className="w-5 h-5 text-[#8ee6a8]" />{title}</p>
+                        <p className="flex items-center gap-2 font-display text-lg font-bold text-white"><span className="text-white/40 text-sm">{i + 1}</span><Icon className="w-5 h-5 text-[#8ee6a8] shrink-0" />{title}</p>
                         <p className="mt-1 text-ink-soft">{text}</p>
                     </li>
                 ))}
@@ -372,7 +429,7 @@ export default function Garden() {
                     <motion.div key={toast.id} className="fixed z-[60] left-1/2 top-24 -translate-x-1/2 pointer-events-none"
                         initial={{ opacity: 0, y: -16, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -16 }}>
                         <div className={`flex items-center gap-2 px-5 py-3 rounded-full font-bold shadow-2xl whitespace-nowrap ${toast.gold ? 'bg-[#e9c46a] text-[#3b2a05]' : 'bg-[#0b2117] text-[#c7ef7a] ring-1 ring-[#c7ef7a]/40'}`}>
-                            {toast.gold ? <Sparkles className="w-5 h-5" /> : <Plant className="w-5 h-5" />}{toast.text}
+                            {toast.gold ? <Sparkles className="w-5 h-5" /> : toast.nugget ? <Seed className="w-5 h-5" /> : <Plant className="w-5 h-5" />}{toast.text}
                         </div>
                     </motion.div>
                 )}
