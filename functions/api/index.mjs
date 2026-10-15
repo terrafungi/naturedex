@@ -365,6 +365,48 @@ async function inviteCode(db, user) {
 
 const PARIS_DAY = `(now() AT TIME ZONE 'Europe/Paris')::date`;
 
+// Facebook share page (GET /api/partage/:cardId?u=username): Open Graph tags for the preview,
+// then a redirect to the site carrying the sharer's invite code.
+const SITE = 'https://naturedex.fr';
+const SHARE_RARITIES = { rare: 'Rare', epic: 'Épique', legendary: 'Légendaire', secret: 'Secrète' };
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+async function sharePage(db, cardId, username) {
+    const { rows: [card] } = await db.query(
+        `SELECT id, name, sci_name, rarity, image_url, extract FROM cards WHERE id = $1`, [cardId]);
+    const { rows: [sharer] } = username
+        ? await db.query(`SELECT id, username, invite_code FROM users WHERE lower(username) = lower($1)`, [username])
+        : { rows: [] };
+    const code = sharer && await inviteCode(db, sharer);
+    const target = card ? `${SITE}/carte/${card.id}${code ? `?parrain=${code}` : ''}` : `${SITE}/${code ? `?parrain=${code}` : ''}`;
+    const rarity = card && (SHARE_RARITIES[card.rarity] || 'nouvelle');
+    const title = card
+        ? `${sharer ? `${sharer.username} a découvert` : 'Découverte :'} ${card.name}, carte ${rarity}${card.rarity === 'secret' ? ' ✦' : ' !'}`
+        : 'NatureDex : collectionne le vivant';
+    const extract = card?.extract ? (card.extract.length > 180 ? `${card.extract.slice(0, 177).trimEnd()}…` : card.extract) : '';
+    const description = `${extract} Collectionne ${card ? 'toi aussi ' : ''}60 000 espèces du vivant sur NatureDex.`.trim();
+    const image = card?.image_url || `${SITE}/og.png`;
+    const self = `${SITE}/api/partage/${card?.id ?? cardId}${sharer ? `?u=${encodeURIComponent(sharer.username)}` : ''}`;
+    const body = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<title>${esc(title)}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NatureDex">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:url" content="${esc(self)}">
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(description)}">
+<meta property="og:image" content="${esc(image)}">
+<meta property="og:image:alt" content="${esc(card?.name || 'NatureDex')}">
+<meta name="twitter:card" content="summary_large_image">
+<meta http-equiv="refresh" content="0; url=${esc(target)}">
+</head><body style="background:#04100a;color:#e7ece8;font-family:sans-serif;text-align:center;padding:3em">
+<p><a style="color:#a8f0c6" href="${esc(target)}">Ouvrir NatureDex</a></p>
+<script>location.replace(${JSON.stringify(target).replace(/</g, '\\u003c')})</script>
+</body></html>`;
+    return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' }, body };
+}
+
 async function inviteState(db, user) {
     const code = await inviteCode(db, user);
     const { rows: invitees } = await db.query(
@@ -1695,6 +1737,15 @@ export const handler = async (event) => {
     }
     if (event.requestContext?.http?.method === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
+    }
+    const share = event.requestContext?.http?.method === 'GET' && /\/partage\/(\d+)\/?$/.exec(event.rawPath || '');
+    if (share) {
+        try {
+            return await sharePage(getPool(), Number(share[1]), event.queryStringParameters?.u);
+        } catch (error) {
+            console.error('share', error);
+            return { statusCode: 302, headers: { Location: SITE }, body: '' };
+        }
     }
     if (event.rawPath === '/stripe-webhook') {
         try {

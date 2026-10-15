@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Eye, Gavel, Recycle, Ruler, Weight } from 'luc
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
 import { IUCN, RARITIES, TYPES, formatViews } from '../game.jsx';
+import ShareButton from '../components/ShareButton.jsx';
 
 function formatMeasure(value, unit) {
     if (value == null) return null;
@@ -100,6 +101,7 @@ export default function CardPage() {
                         <Link to={`/encheres?vendre=${card.id}`} className="nd-cta-gold flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold">
                             <Gavel className="w-4 h-4" />Mettre aux enchères
                         </Link>
+                        <ShareButton card={card} />
                     </div>
                 </div>
             </div>

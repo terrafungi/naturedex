@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { Card, CardBack } from './Card.jsx';
 import { RARITIES } from '../game.jsx';
 import { Pack } from './Pack.jsx';
+import ShareButton from './ShareButton.jsx';
 
 // Each rarity step adds an effect: halo → shockwave + sparks → light rays + tinted backdrop →
 // flash + screen shake → rainbow everything. `charge` is the suspense before the card flips.
@@ -121,13 +122,14 @@ function FlipCard({ card, revealed, charging, onClick }) {
     );
 }
 
-function RarityBanner({ card }) {
+function RarityBanner({ card, demo }) {
     const fx = fxOf(card);
     const r = RARITIES[card.rarity];
     if (fx.level === 5) return (
         <motion.div initial={{ opacity: 0, scale: 2.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', damping: 9, stiffness: 120, delay: 0.25 }}>
             <div className="nd-secret-text font-display text-3xl sm:text-4xl font-black uppercase tracking-[0.08em]">✦ Carte secrète ✦</div>
             <div className="text-white/80 text-sm mt-1 [text-shadow:0_1px_8px_rgb(0_0_0/0.8)]">Environ 1 booster sur 500 en cache une. Touche pour continuer</div>
+            {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>
     );
     return (
@@ -138,6 +140,7 @@ function RarityBanner({ card }) {
                 {r.symbol} {r.label}{fx.level >= 4 ? ' !' : ''}
             </div>
             <div className="text-white/60 text-sm">Touche la carte pour continuer</div>
+            {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>
     );
 }
@@ -229,7 +232,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                 </motion.div>
                             </AnimatePresence>
                             <div className="relative z-10 min-h-16 text-center">
-                                {revealed ? <RarityBanner key={index} card={current} /> : charging && (
+                                {revealed ? <RarityBanner key={index} card={current} demo={demo} /> : charging && (
                                     <motion.p className="font-display italic text-lg" style={{ color: fx.color }}
                                         animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 0.8, repeat: Infinity }}>
                                         {fx.level >= 4 ? 'Quelque chose d\'incroyable arrive…' : 'Oh… cette carte brille !'}
@@ -250,6 +253,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                     <motion.div key={i} className={`relative ${card.rarity === 'secret' ? 'nd-secret-glow' : card.rarity === 'legendary' ? 'nd-legend-glow' : card.rarity === 'epic' ? 'nd-epic-glow' : ''}`} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
                                         {demo ? <Card card={card} /> : <Link to={`/carte/${card.id}`}><Card card={card} /></Link>}
                                         {card.isNew && <span className="absolute -top-2 -left-2 px-2 py-0.5 rounded-full bg-rust text-paper text-[10px] font-black uppercase">Nouveau</span>}
+                                        {!demo && <ShareButton card={card} compact className="absolute -bottom-2 -right-2 z-10" />}
                                     </motion.div>
                                 ))}
                             </div>
