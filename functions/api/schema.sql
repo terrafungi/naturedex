@@ -261,3 +261,18 @@ CREATE TABLE IF NOT EXISTS season_results (
     PRIMARY KEY (season, user_id)
 );
 CREATE INDEX IF NOT EXISTS season_results_user ON season_results (user_id) WHERE claimed_at IS NULL;
+
+-- Favourites: player-named binders ("Plantes", "Mes requins"…); a card can sit in several.
+CREATE TABLE IF NOT EXISTS binders (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS binders_user ON binders (user_id);
+CREATE TABLE IF NOT EXISTS binder_cards (
+    binder_id INTEGER NOT NULL REFERENCES binders(id) ON DELETE CASCADE,
+    card_id   INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    added_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (binder_id, card_id)
+);

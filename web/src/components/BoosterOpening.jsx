@@ -6,6 +6,7 @@ import { Card, CardBack } from './Card.jsx';
 import { RARITIES } from '../game.jsx';
 import { Pack } from './Pack.jsx';
 import ShareButton from './ShareButton.jsx';
+import { FavoriteStar } from './Favorite.jsx';
 
 // Each rarity step adds an effect: halo → shockwave + sparks → light rays + tinted backdrop →
 // flash + screen shake → rainbow everything. `charge` is the suspense before the card flips.
@@ -87,7 +88,7 @@ function Burst({ fx }) {
     );
 }
 
-function FlipCard({ card, revealed, charging, onClick }) {
+function FlipCard({ card, revealed, charging, onClick, demo }) {
     const fx = fxOf(card);
     const amp = fx.level >= 3 ? fx.level - 1.5 : 0;
     return (
@@ -117,6 +118,11 @@ function FlipCard({ card, revealed, charging, onClick }) {
                     className="absolute -top-3 -left-3 z-10 px-3 py-1 rounded-full bg-[#e76f51] text-white text-xs font-black uppercase tracking-wider shadow-lg">
                     Nouveau !
                 </motion.span>
+            )}
+            {revealed && !demo && (
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.45, type: 'spring' }} className="absolute -bottom-3 -left-3 z-10">
+                    <FavoriteStar card={card} />
+                </motion.div>
             )}
         </div>
     );
@@ -273,7 +279,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                 </AnimatePresence>
                                 <AnimatePresence custom={dir}>
                                     <SwipeCard key={index} onSwipe={next} draggedRef={dragged}>
-                                        <FlipCard card={current} revealed={revealed} charging={charging} onClick={() => !dragged.current && next()} />
+                                        <FlipCard card={current} revealed={revealed} charging={charging} demo={demo} onClick={() => !dragged.current && next()} />
                                     </SwipeCard>
                                 </AnimatePresence>
                             </div>
@@ -300,6 +306,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                         {demo ? <Card card={card} /> : <Link to={`/carte/${card.id}`}><Card card={card} /></Link>}
                                         {card.isNew && <span className="absolute -top-2 -left-2 px-2 py-0.5 rounded-full bg-rust text-paper text-[10px] font-black uppercase">Nouveau</span>}
                                         {!demo && <ShareButton card={card} compact className="absolute -bottom-2 -right-2 z-10" />}
+                                        {!demo && <FavoriteStar card={card} className="absolute -bottom-2 -left-2 z-10 !w-9 !h-9" />}
                                     </motion.div>
                                 ))}
                             </div>

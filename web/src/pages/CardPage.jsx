@@ -5,6 +5,7 @@ import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
 import { IUCN, RARITIES, TYPES, formatViews } from '../game.jsx';
 import ShareButton from '../components/ShareButton.jsx';
+import { FavoriteStar } from '../components/Favorite.jsx';
 
 function formatMeasure(value, unit) {
     if (value == null) return null;
@@ -62,7 +63,10 @@ export default function CardPage() {
         <div className="max-w-6xl mx-auto px-4 py-10">
             <Link to="/collection" className="inline-flex items-center gap-2 text-sm font-semibold text-white"><ArrowLeft className="w-4 h-4" />Collection</Link>
             <div className="mt-6 grid md:grid-cols-[minmax(0,380px)_1fr] gap-10 lg:gap-16 items-start">
-                <div className="w-full max-w-[380px] mx-auto"><Card card={card} number={number} total={catalog?.total} tilt /></div>
+                <div className="relative w-full max-w-[380px] mx-auto">
+                    <Card card={card} number={number} total={catalog?.total} tilt />
+                    <FavoriteStar card={card} className="absolute -bottom-3 -left-3 z-10 !w-12 !h-12" />
+                </div>
                 <div>
                     <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider">
                         <span className="px-2.5 py-1 rounded-full text-paper" style={{ background: t.color }}>{t.label}</span>

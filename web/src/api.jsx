@@ -21,6 +21,7 @@ export async function api(action, params = {}) {
 }
 
 const GameContext = createContext(null);
+const NO_FAVS = { binders: [], cards: {} };
 
 export function GameProvider({ children }) {
     const [user, setUserRaw] = useState(null);
@@ -28,11 +29,13 @@ export function GameProvider({ children }) {
     const [catalog, setCatalog] = useState(null);
     const [owned, setOwned] = useState({}); // { cardId: count }
     const [ownedInfo, setOwnedInfo] = useState({}); // { cardId: [type, rarity] }
+    const [favs, setFavs] = useState(NO_FAVS); // { binders: [{ id, name, count }], cards: { cardId: [binderId…] } }
 
     const refreshCollection = useCallback(async () => {
-        const { owned, info } = await api('collection');
+        const [{ owned, info }, favs] = await Promise.all([api('collection'), api('binders')]);
         setOwned(owned);
         setOwnedInfo(info);
+        setFavs(favs);
     }, []);
 
     useEffect(() => {
@@ -83,6 +86,7 @@ export function GameProvider({ children }) {
         setBadges({});
         setOwned({});
         setOwnedInfo({});
+        setFavs(NO_FAVS);
     }, []);
 
     // Merge newly opened cards into the local collection without a refetch.
@@ -100,7 +104,7 @@ export function GameProvider({ children }) {
     }, []);
 
     return (
-        <GameContext.Provider value={{ user, setUser, ready, badges, refreshBadges, catalog, owned, ownedInfo, setOwned, refreshCollection, authenticate, logout, addCards }}>
+        <GameContext.Provider value={{ user, setUser, ready, badges, refreshBadges, catalog, owned, ownedInfo, setOwned, favs, setFavs, refreshCollection, authenticate, logout, addCards }}>
             {children}
         </GameContext.Provider>
     );

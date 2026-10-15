@@ -834,6 +834,46 @@ async function stripeWebhook(event) {
     return json({ received: true });
 }
 
+const MAX_BINDERS = 50;
+
+function binderName(raw) {
+    const name = String(raw || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+    if (!name) throw new HttpError(400, 'Donne un nom au classeur');
+    return name;
+}
+
+// Only cards the player owns go in their own binders.
+async function addToBinder(db, userId, binderId, cardId) {
+    const { rowCount } = await db.query(
+        `INSERT INTO binder_cards (binder_id, card_id)
+         SELECT b.id, uc.card_id FROM binders b JOIN user_cards uc ON uc.user_id = b.user_id AND uc.card_id = $3
+         WHERE b.id = $2 AND b.user_id = $1
+         ON CONFLICT DO NOTHING`,
+        [userId, binderId, cardId]
+    );
+    if (!rowCount) {
+        const { rows } = await db.query(`SELECT 1 FROM binder_cards bc JOIN binders b ON b.id = bc.binder_id WHERE b.id = $1 AND b.user_id = $2 AND bc.card_id = $3`, [binderId, userId, cardId]);
+        if (!rows.length) throw new HttpError(404, 'Classeur ou carte introuvable');
+    }
+}
+
+async function binderState(db, userId) {
+    const { rows: binders } = await db.query(
+        // a card traded or sold away stays in the binder but is neither counted nor shown
+        `SELECT b.id, b.name, COUNT(uc.card_id)::int AS count FROM binders b
+         LEFT JOIN binder_cards bc ON bc.binder_id = b.id
+         LEFT JOIN user_cards uc ON uc.card_id = bc.card_id AND uc.user_id = b.user_id
+         WHERE b.user_id = $1 GROUP BY b.id ORDER BY lower(b.name), b.id`,
+        [userId]
+    );
+    const { rows } = await db.query(
+        `SELECT bc.card_id, array_agg(bc.binder_id ORDER BY bc.binder_id) AS ids FROM binder_cards bc JOIN binders b ON b.id = bc.binder_id
+         WHERE b.user_id = $1 GROUP BY bc.card_id`,
+        [userId]
+    );
+    return { binders, cards: Object.fromEntries(rows.map((r) => [r.card_id, r.ids])) };
+}
+
 const actions = {
     async register(db, body) {
         const username = String(body.username || '').trim();
@@ -973,15 +1013,19 @@ const actions = {
         const limit = Math.min(Number(body.limit) || 60, 120);
         const offset = Math.max(Number(body.offset) || 0, 0);
         const q = String(body.query || '').trim();
+        // binder: a binder id, 'all' = any of the player's binders, null = no binder filter
+        const binder = body.binder === 'all' ? 0 : body.binder ? Number(body.binder) : null;
         const { rows } = await db.query(
             `SELECT ${LIGHT_FIELDS}, uc.count, COUNT(*) OVER()::int AS matches
              FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1
              WHERE ($2::text IS NULL OR c.type = $2) AND ($3::text IS NULL OR c.rarity = $3)
                AND (NOT $4 OR uc.count IS NOT NULL)
                AND ($5 = '' OR (uc.count IS NOT NULL AND (c.name ILIKE '%' || $5 || '%' OR c.sci_name ILIKE '%' || $5 || '%')))
+               AND ($8::int IS NULL OR EXISTS (SELECT 1 FROM binder_cards bc JOIN binders b ON b.id = bc.binder_id
+                    WHERE bc.card_id = c.id AND b.user_id = $1 AND ($8 = 0 OR b.id = $8)))
              ORDER BY uc.count IS NULL, ${RARITY_ORDER} DESC, c.num
              LIMIT $6 OFFSET $7`,
-            [user.id, body.type || null, body.rarity || null, Boolean(body.onlyOwned || q), q, limit, offset]
+            [user.id, body.type || null, body.rarity || null, Boolean(body.onlyOwned || q || binder != null), q, limit, offset, binder]
         );
         return {
             matches: rows[0]?.matches || 0,
@@ -999,6 +1043,46 @@ const actions = {
             owned: Object.fromEntries(rows.map((r) => [r.card_id, r.count])),
             info: Object.fromEntries(rows.map((r) => [r.card_id, [r.type, r.rarity]])),
         };
+    },
+
+    // Favourites: { binders: [{ id, name, count }], cards: { cardId: [binderId…] } }
+    async binders(db, body, event) {
+        const user = await requireUser(db, event);
+        return binderState(db, user.id);
+    },
+
+    async createBinder(db, body, event) {
+        const user = await requireUser(db, event);
+        const name = binderName(body.name);
+        const { rows: [{ n }] } = await db.query(`SELECT COUNT(*)::int AS n FROM binders WHERE user_id = $1`, [user.id]);
+        if (n >= MAX_BINDERS) throw new HttpError(400, `${MAX_BINDERS} classeurs maximum`);
+        const { rows: [b] } = await db.query(`INSERT INTO binders (user_id, name) VALUES ($1, $2) RETURNING id`, [user.id, name]);
+        if (body.cardId) await addToBinder(db, user.id, b.id, Number(body.cardId));
+        return { ...(await binderState(db, user.id)), id: b.id };
+    },
+
+    async renameBinder(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rowCount } = await db.query(`UPDATE binders SET name = $3 WHERE id = $1 AND user_id = $2`, [Number(body.id), user.id, binderName(body.name)]);
+        if (!rowCount) throw new HttpError(404, 'Classeur introuvable');
+        return binderState(db, user.id);
+    },
+
+    async deleteBinder(db, body, event) {
+        const user = await requireUser(db, event);
+        await db.query(`DELETE FROM binders WHERE id = $1 AND user_id = $2`, [Number(body.id), user.id]);
+        return binderState(db, user.id);
+    },
+
+    async binderCard(db, body, event) {
+        const user = await requireUser(db, event);
+        const binderId = Number(body.binderId), cardId = Number(body.cardId);
+        if (body.on) await addToBinder(db, user.id, binderId, cardId);
+        else await db.query(
+            `DELETE FROM binder_cards bc USING binders b WHERE bc.binder_id = b.id AND b.id = $1 AND b.user_id = $2 AND bc.card_id = $3`,
+            [binderId, user.id, cardId]
+        );
+        return binderState(db, user.id);
     },
 
     async card(db, body, event) {

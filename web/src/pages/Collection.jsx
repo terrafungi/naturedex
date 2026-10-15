@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Recycle, Search } from 'lucide-react';
+import { FolderPlus, Pencil, Recycle, Search, Star, Trash2 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
+import { FavoriteStar } from '../components/Favorite.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
 
 const PAGE = 60;
@@ -20,7 +21,8 @@ function Chip({ active, onClick, children, color }) {
 }
 
 export default function Collection() {
-    const { catalog, owned, ownedInfo, user, setUser, refreshCollection } = useGame();
+    const { catalog, owned, ownedInfo, user, setUser, favs, setFavs, refreshCollection } = useGame();
+    const [binder, setBinder] = useState(null); // null = whole collection, 'all' = every favourite, or a binder id
     const [type, setType] = useState(null);
     const [rarity, setRarity] = useState(null);
     const [query, setQuery] = useState('');
@@ -36,7 +38,9 @@ export default function Collection() {
 
     // The catalogue is far too big for the browser: the server sorts and filters, we fetch pages.
     // Only the player's own cards are listed; undiscovered ones stay hidden.
-    const filters = useMemo(() => ({ type, rarity, onlyOwned: true, query: debounced }), [type, rarity, debounced]);
+    const filters = useMemo(() => ({ binder, type, rarity, onlyOwned: true, query: debounced }), [binder, type, rarity, debounced]);
+    // inside a binder, starring or unstarring a card changes the list
+    const favKey = binder ? favs.cards : null;
     useEffect(() => {
         let alive = true;
         setPage(null);
@@ -44,7 +48,7 @@ export default function Collection() {
             .then((res) => alive && setPage(res))
             .catch(() => alive && setPage({ cards: [], matches: 0 }));
         return () => { alive = false; };
-    }, [filters, owned]);
+    }, [filters, owned, favKey]);
 
     async function loadMore() {
         setLoadingMore(true);
@@ -65,6 +69,31 @@ export default function Collection() {
         }
         return { count, coins };
     }, [owned, ownedInfo, user.recycleValue]);
+
+    const favCount = useMemo(() => Object.keys(favs.cards).filter((id) => owned[id]).length, [favs.cards, owned]);
+    const current = favs.binders.find((b) => b.id === binder);
+    useEffect(() => { if (typeof binder === 'number' && !current) setBinder(null); }, [binder, current]);
+
+    async function binderAction(action, params) {
+        try {
+            const { id, ...state } = await api(action, params);
+            setFavs(state);
+            return id;
+        } catch (err) {
+            setMessage(err.message);
+        }
+    }
+    async function newBinder() {
+        const name = window.prompt('Nom du nouveau classeur (ex. Plantes, Mes requins…)');
+        if (name?.trim()) { const id = await binderAction('createBinder', { name }); if (id) setBinder(id); }
+    }
+    async function renameBinder() {
+        const name = window.prompt('Nouveau nom du classeur', current.name);
+        if (name?.trim() && name.trim() !== current.name) await binderAction('renameBinder', { id: current.id, name });
+    }
+    async function deleteBinder() {
+        if (window.confirm(`Supprimer le classeur « ${current.name} » ? Les cartes restent dans ta collection.`)) await binderAction('deleteBinder', { id: current.id });
+    }
 
     async function recycleAll() {
         const res = await api('recycle');
@@ -93,6 +122,22 @@ export default function Collection() {
             {message && <p className="mt-3 text-sm font-semibold text-white">{message}</p>}
 
             <div className="mt-8 space-y-3">
+                <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-white/10">
+                    <Chip active={binder === null} onClick={() => setBinder(null)}>Toute la collection</Chip>
+                    <Chip active={binder === 'all'} color="#c9a227" onClick={() => setBinder('all')}><Star className="w-3.5 h-3.5 fill-current" />Favoris · {favCount}</Chip>
+                    {favs.binders.map((b) => (
+                        <Chip key={b.id} active={binder === b.id} color="#c9a227" onClick={() => setBinder(binder === b.id ? null : b.id)}>{b.name} · {b.count}</Chip>
+                    ))}
+                    <button onClick={newBinder} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-white/25 text-white/80 hover:bg-white/10">
+                        <FolderPlus className="w-3.5 h-3.5" />Nouveau classeur
+                    </button>
+                    {current && (
+                        <span className="ml-auto flex gap-1">
+                            <button onClick={renameBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title="Renommer le classeur" aria-label="Renommer le classeur"><Pencil className="w-4 h-4" /></button>
+                            <button onClick={deleteBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title="Supprimer le classeur" aria-label="Supprimer le classeur"><Trash2 className="w-4 h-4" /></button>
+                        </span>
+                    )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                     <Chip active={!type} onClick={() => setType(null)}>Tous les types</Chip>
                     {Object.entries(TYPES).map(([key, t]) => (
@@ -125,11 +170,16 @@ export default function Collection() {
                             {c.count > 1 && (
                                 <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#04150d] text-xs font-bold shadow-lg shadow-emerald-500/30">×{c.count}</span>
                             )}
+                            <FavoriteStar card={c} className="absolute -bottom-2 -left-2 z-10 !w-8 !h-8" />
                         </Link>
                     ))}
                 </div>
             )}
-            {page?.matches === 0 && (Object.keys(owned).length ? (
+            {page?.matches === 0 && (binder ? (
+                <p className="py-20 text-center text-ink-soft">{binder === 'all' && !favs.binders.length
+                    ? <>Aucun favori pour l'instant. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour la ranger dans un classeur.</>
+                    : <>Aucune carte ici{type || rarity || debounced ? ' avec ces filtres' : ''}. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour l'ajouter.</>}</p>
+            ) : Object.keys(owned).length ? (
                 <p className="py-20 text-center text-ink-soft">Aucune de tes cartes ne correspond à ces filtres.</p>
             ) : (
                 <div className="py-20 text-center">
