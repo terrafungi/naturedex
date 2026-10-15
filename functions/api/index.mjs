@@ -20,6 +20,8 @@ import {
     ASSOCIATIONS, DONATION_SHARE, PACKS, createCheckout, donationOf, getCheckout, stripeReady, stripeTestMode, verifyWebhook,
 } from './shop.mjs';
 import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLabel, seasonRollover } from './arena.mjs';
+import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -371,9 +373,26 @@ const SITE = 'https://naturedex.fr';
 const SHARE_RARITIES = { rare: 'Rare', epic: 'Épique', legendary: 'Légendaire', secret: 'Secrète' };
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+// Custom 1200×630 preview, rendered once per card and cached in storage (served by CloudFront under /media).
+const SHARE_IMAGE_KEY = (id) => `media/share/v1/${id}.png`;
+let s3;
+async function shareImage(card) {
+    if (!RARITY_STYLE[card.rarity] || !process.env.STORAGE_BUCKET) return null;
+    const Bucket = process.env.STORAGE_BUCKET, Key = SHARE_IMAGE_KEY(card.id);
+    s3 ??= new S3Client({});
+    try {
+        await s3.send(new HeadObjectCommand({ Bucket, Key }));
+    } catch (e) {
+        if (e?.$metadata?.httpStatusCode !== 404 && e?.name !== 'NotFound') throw e;
+        const Body = await renderShareImage(card);
+        await s3.send(new PutObjectCommand({ Bucket, Key, Body, ContentType: 'image/png', CacheControl: 'public, max-age=31536000, immutable' }));
+    }
+    return `${SITE}/${Key}`;
+}
+
 async function sharePage(db, cardId, username) {
     const { rows: [card] } = await db.query(
-        `SELECT id, name, sci_name, rarity, image_url, extract FROM cards WHERE id = $1`, [cardId]);
+        `SELECT id, name, sci_name, type, rarity, image_url, thumb_url, extract FROM cards WHERE id = $1`, [cardId]);
     const { rows: [sharer] } = username
         ? await db.query(`SELECT id, username, invite_code FROM users WHERE lower(username) = lower($1)`, [username])
         : { rows: [] };
@@ -385,7 +404,8 @@ async function sharePage(db, cardId, username) {
         : 'NatureDex : collectionne le vivant';
     const extract = card?.extract ? (card.extract.length > 180 ? `${card.extract.slice(0, 177).trimEnd()}…` : card.extract) : '';
     const description = `${extract} Collectionne ${card ? 'toi aussi ' : ''}60 000 espèces du vivant sur NatureDex.`.trim();
-    const image = card?.image_url || `${SITE}/og.png`;
+    const custom = card && await shareImage(card).catch((e) => (console.error('share image', card.id, e), null));
+    const image = custom || card?.image_url || `${SITE}/og.png`;
     const self = `${SITE}/api/partage/${card?.id ?? cardId}${sharer ? `?u=${encodeURIComponent(sharer.username)}` : ''}`;
     const body = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <title>${esc(title)}</title>
@@ -397,6 +417,10 @@ async function sharePage(db, cardId, username) {
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:image" content="${esc(image)}">
+<meta property="og:image:secure_url" content="${esc(image)}">${custom ? `
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">` : ''}
 <meta property="og:image:alt" content="${esc(card?.name || 'NatureDex')}">
 <meta name="twitter:card" content="summary_large_image">
 <meta http-equiv="refresh" content="0; url=${esc(target)}">
