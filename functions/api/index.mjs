@@ -866,8 +866,8 @@ const NUGGET_SEEDS = 3;
 // Automatic conversions while planting never use it, so it is never wasted on a few pépites.
 const CONVERT_BONUS = 0.5;
 const CONVERT_BONUS_MAX = 150;
-const parisDay = (d) => new Date(d).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
-const convertBonusReady = (user) => !user.convert_bonus_at || parisDay(user.convert_bonus_at) !== parisDay(Date.now());
+const parisDate = (d) => new Date(d).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+const convertBonusReady = (user) => !user.convert_bonus_at || parisDate(user.convert_bonus_at) !== parisDate(Date.now());
 
 // Converts just enough pépites to cover `cost` graines (inside a withGarden transaction).
 async function coverWithNuggets(client, user, cost) {
