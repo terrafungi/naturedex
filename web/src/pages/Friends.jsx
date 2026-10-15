@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeftRight, Check, Clock, MessageCircle, Minus, Plus, Search, Send, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowLeftRight, Check, Clock, Gift, MessageCircle, Minus, Plus, Search, Send, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react';
 import InviteBanner from '../components/InviteBanner.jsx';
 import SeasonBadge from '../components/SeasonBadge.jsx';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { RARITIES } from '../game.jsx';
+import { Nugget, NUGGET_COLOR, Plant, PLANT_COLOR, Seed, SEED_COLOR } from '../components/Currency.jsx';
 
 const TABS = [
     ['friends', 'Mes amis'],
@@ -251,6 +252,112 @@ function TradeBuilder({ friend, total, onClose, onSent }) {
     );
 }
 
+const GIFTS = [
+    { key: 'coins', label: 'Graines', Icon: Seed, color: SEED_COLOR, presets: [10, 50, 100, 300] },
+    { key: 'nuggets', label: 'Pépites', Icon: Nugget, color: NUGGET_COLOR, presets: [20, 100, 250, 500] },
+    { key: 'plants', label: 'Plantes', Icon: Plant, color: PLANT_COLOR, presets: [1, 5, 10, 30] },
+];
+
+function GiftSheet({ friend, user, onClose, onSent }) {
+    const [info, setInfo] = useState(null);
+    const [currency, setCurrency] = useState('coins');
+    const [amount, setAmount] = useState(0);
+    const [note, setNote] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        api('giftInfo', { username: friend }).then(setInfo).catch((err) => setError(err.message));
+    }, [friend]);
+
+    const g = GIFTS.find((x) => x.key === currency);
+    const allow = info?.allowance[currency];
+    const balance = user[currency] ?? 0;
+    const max = allow ? Math.min(allow.left, balance) : 0;
+    const locked = info?.readyAt;
+    const pick = (key) => { setCurrency(key); setAmount(0); setError(''); };
+
+    async function send() {
+        setBusy(true);
+        setError('');
+        try {
+            const res = await api('giftCurrency', { username: friend, currency, amount, note });
+            onSent(res, `${amount.toLocaleString('fr-FR')} ${g.label.toLowerCase()}`);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
+            <motion.div className="relative w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] bg-[#081a11] ring-1 ring-white/10 p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+                initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}>
+                <div className="flex items-center gap-3">
+                    <span className="grid place-items-center w-10 h-10 rounded-full bg-[#e9c46a]/15 text-[#e9c46a] shrink-0"><Gift className="w-5 h-5" /></span>
+                    <div className="min-w-0">
+                        <h2 className="font-display text-xl text-white truncate">Offrir à {friend}</h2>
+                        <p className="text-xs text-white/55">Le cadeau arrive tout de suite, avec un petit mot dans vos messages.</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="ml-auto grid place-items-center w-9 h-9 rounded-full nd-cta-glass shrink-0" aria-label="Fermer"><X className="w-4 h-4" /></button>
+                </div>
+
+                {!info && !error && <div className="py-10 text-center text-sm text-white/55">Chargement…</div>}
+                {locked && (
+                    <p className="mt-5 rounded-2xl bg-white/5 ring-1 ring-white/10 p-4 text-sm text-white/75 flex gap-2">
+                        <Clock className="w-4 h-4 mt-0.5 shrink-0 text-[#e9c46a]" />
+                        Vous êtes amis depuis moins de 24 h. Les cadeaux seront possibles le {new Date(locked).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit' })}.
+                    </p>
+                )}
+                {info && !locked && (
+                    <>
+                        <div className="mt-5 grid grid-cols-3 gap-2">
+                            {GIFTS.map(({ key, label, Icon, color }) => (
+                                <button key={key} type="button" onClick={() => pick(key)}
+                                    className={`rounded-2xl p-3 text-left ring-1 transition-colors ${currency === key ? 'bg-white/10 ring-[#e9c46a]/70' : 'bg-white/[0.03] ring-white/10 hover:bg-white/5'}`}>
+                                    <span style={{ color }}><Icon className="w-5 h-5" /></span>
+                                    <div className="mt-1 text-sm font-bold text-white">{label}</div>
+                                    <div className="text-[11px] text-white/50">Tu as {(user[key] ?? 0).toLocaleString('fr-FR')}</div>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="mt-4 flex items-center gap-3">
+                            <button type="button" disabled={amount <= 0} onClick={() => setAmount((a) => Math.max(0, a - 1))} className="grid place-items-center w-10 h-10 rounded-full ring-1 ring-white/15 text-white/80 disabled:opacity-40" aria-label="Moins"><Minus className="w-4 h-4" /></button>
+                            <div className="flex-1 text-center">
+                                <div className="font-display text-4xl text-white tabular-nums flex items-center justify-center gap-2">
+                                    <span style={{ color: g.color }}><g.Icon className="w-7 h-7" /></span>{amount.toLocaleString('fr-FR')}
+                                </div>
+                            </div>
+                            <button type="button" disabled={amount >= max} onClick={() => setAmount((a) => Math.min(max, a + 1))} className="grid place-items-center w-10 h-10 rounded-full ring-1 ring-white/15 text-white/80 disabled:opacity-40" aria-label="Plus"><Plus className="w-4 h-4" /></button>
+                        </div>
+                        <div className="mt-3 grid grid-cols-4 gap-2">
+                            {g.presets.map((n) => (
+                                <button key={n} type="button" disabled={n > max} onClick={() => setAmount(n)}
+                                    className={`py-2 rounded-full text-sm font-bold ring-1 disabled:opacity-35 ${amount === n ? 'bg-[#e9c46a] text-[#05130d] ring-transparent' : 'ring-white/15 text-white/85 hover:bg-white/5'}`}>{n}</button>
+                            ))}
+                        </div>
+                        <p className="mt-3 text-xs text-center text-white/55">
+                            {allow.friendFull
+                                ? `${friend} a déjà reçu le maximum de ${g.label.toLowerCase()} aujourd'hui.`
+                                : `Encore ${allow.left.toLocaleString('fr-FR')} ${g.label.toLowerCase()} à offrir aujourd'hui (maximum ${allow.max} par jour).`}
+                        </p>
+
+                        <div className="mt-4 flex gap-2">
+                            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={140} placeholder="Petit mot (facultatif)"
+                                className="flex-1 min-w-0 px-4 py-2.5 rounded-full bg-black/30 ring-1 ring-white/15 text-sm text-white outline-none focus:ring-[#e9c46a]/60 placeholder:text-white/40" />
+                            <button onClick={send} disabled={busy || amount < 1 || amount > max} className="nd-cta-gold px-5 rounded-full font-bold disabled:opacity-50 flex items-center gap-1.5 shrink-0"><Gift className="w-4 h-4" />Offrir</button>
+                        </div>
+                    </>
+                )}
+                {error && <p className="mt-3 text-sm font-semibold text-[#ffb4a2]">{error}</p>}
+            </motion.div>
+        </motion.div>
+    );
+}
+
 const STATUS = {
     accepted: ['Échange réalisé', '#4fd18b'],
     declined: ['Refusé', '#ff8a80'],
@@ -312,6 +419,7 @@ export default function Friends() {
     const [friends, setFriends] = useState(null);
     const [trades, setTrades] = useState(null);
     const [trading, setTrading] = useState(null); // friend username in the trade builder
+    const [gifting, setGifting] = useState(null); // friend username in the gift sheet
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState(null);
 
@@ -385,6 +493,7 @@ export default function Friends() {
                                     <div className="text-xs text-white/55">{f.discovered.toLocaleString('fr-FR')} espèces découvertes</div>
                                 </div>
                                 <Link to={`/messages/${encodeURIComponent(f.username)}`} className="grid place-items-center w-9 h-9 rounded-full ring-1 ring-white/15 text-white/80 hover:bg-white/10" aria-label={`Écrire à ${f.username}`} title="Message"><MessageCircle className="w-4 h-4" /></Link>
+                                <button onClick={() => setGifting(f.username)} className="grid place-items-center w-9 h-9 rounded-full ring-1 ring-[#e9c46a]/40 text-[#e9c46a] hover:bg-[#e9c46a]/10" aria-label={`Offrir à ${f.username}`} title="Offrir des graines, pépites ou plantes"><Gift className="w-4 h-4" /></button>
                                 <button onClick={() => setTrading(f.username)} className="nd-cta-gold px-3.5 py-2 rounded-full text-sm font-bold flex items-center gap-1.5"><ArrowLeftRight className="w-4 h-4" /><span className="hidden min-[400px]:inline">Échanger</span></button>
                                 <button disabled={busy} onClick={() => window.confirm(`Retirer ${f.username} de tes amis ?`) && act('removeFriend', { username: f.username }, `${f.username} a été retiré de tes amis.`)}
                                     className="grid place-items-center w-9 h-9 rounded-full text-white/50 hover:text-[#ff8a80] hover:bg-white/5" aria-label={`Retirer ${f.username}`}><Trash2 className="w-4 h-4" /></button>
@@ -456,6 +565,10 @@ export default function Friends() {
             <AnimatePresence>
                 {trading && <TradeBuilder friend={trading} total={catalog?.total} onClose={() => setTrading(null)}
                     onSent={() => { setTrading(null); setTab('trades'); setMessage(['ok', `Proposition envoyée à ${trading} !`]); load(); }} />}
+            </AnimatePresence>
+            <AnimatePresence>
+                {gifting && <GiftSheet friend={gifting} user={user} onClose={() => setGifting(null)}
+                    onSent={(res, what) => { setUser(res.user); setGifting(null); setMessage(['ok', `Cadeau envoyé : ${what} pour ${gifting} !`]); }} />}
             </AnimatePresence>
         </div>
     );

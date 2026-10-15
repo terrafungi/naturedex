@@ -534,6 +534,41 @@ const MESSAGE_MAX = 1000;
 const MESSAGES_PER_MINUTE = 20;
 const THREAD_LIMIT = 100;
 
+// ---------- gifts between friends ----------
+
+// Daily limits (Paris day), applied both to what one sends and to what one receives,
+// so a crowd of fresh accounts can't funnel their welcome rewards into one player.
+const GIFT_CURRENCIES = {
+    coins: { column: 'coins', max: 300, one: 'graine', many: 'graines' },
+    nuggets: { column: 'nuggets', max: 500, one: 'pépite', many: 'pépites' },
+    plants: { column: 'plants', max: 30, one: 'plante', many: 'plantes' },
+};
+const GIFT_FRIEND_HOURS = 24;
+const GIFT_NOTE_MAX = 140;
+const PARIS_TODAY = `(date_trunc('day', now() AT TIME ZONE 'Europe/Paris') AT TIME ZONE 'Europe/Paris')`;
+
+// What each currency still allows today between me and a friend.
+async function giftAllowance(db, meId, friendId) {
+    const { rows } = await db.query(
+        `SELECT currency,
+                COALESCE(SUM(amount) FILTER (WHERE from_id = $1), 0)::int AS sent,
+                COALESCE(SUM(amount) FILTER (WHERE to_id = $2), 0)::int AS received
+         FROM gifts WHERE (from_id = $1 OR to_id = $2) AND created_at >= ${PARIS_TODAY}
+         GROUP BY currency`,
+        [meId, friendId]
+    );
+    const allowance = {};
+    for (const [key, c] of Object.entries(GIFT_CURRENCIES)) {
+        const r = rows.find((x) => x.currency === key) || { sent: 0, received: 0 };
+        allowance[key] = { max: c.max, sent: r.sent, left: Math.max(0, Math.min(c.max - r.sent, c.max - r.received)), friendFull: r.received >= c.max };
+    }
+    return allowance;
+}
+
+function giftReadyAt(friendship) {
+    return new Date(new Date(friendship.accepted_at).getTime() + GIFT_FRIEND_HOURS * 3600_000);
+}
+
 // ---------- auction house ----------
 
 const AUCTION_HOURS = [1, 6, 12, 24, 48];
@@ -1737,7 +1772,7 @@ const actions = {
         const after = Number(body.after) || 0;
         const { rows } = await db.query(
             `SELECT * FROM (
-                SELECT id, body, created_at, read_at, from_id = $1 AS mine FROM messages
+                SELECT id, body, gift, created_at, read_at, from_id = $1 AS mine FROM messages
                 WHERE ((from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1)) AND id > $3
                 ORDER BY id DESC LIMIT ${THREAD_LIMIT}) t ORDER BY id`,
             [user.id, other.id, after]
@@ -1762,6 +1797,74 @@ const actions = {
             [user.id, other.id, text]
         );
         return { message };
+    },
+
+    // ---- Gifts ----
+    async giftInfo(db, body, event) {
+        const user = await requireUser(db, event);
+        const other = await requireFriend(db, user.id, body.username);
+        const f = await relation(db, user.id, other.id);
+        const readyAt = giftReadyAt(f);
+        return {
+            username: other.username,
+            readyAt: readyAt > new Date() ? readyAt : null,
+            allowance: await giftAllowance(db, user.id, other.id),
+            user: await publicUser(db, user),
+        };
+    },
+
+    // Gives graines, pépites or plantes to a friend and drops a note in your conversation.
+    async giftCurrency(db, body, event) {
+        const user = await requireUser(db, event);
+        const currency = GIFT_CURRENCIES[body.currency];
+        if (!currency) throw new HttpError(400, 'Monnaie inconnue');
+        const amount = Number(body.amount);
+        if (!Number.isInteger(amount) || amount < 1) throw new HttpError(400, 'Montant invalide');
+        const note = String(body.note || '').replace(/\s+/g, ' ').trim().slice(0, GIFT_NOTE_MAX);
+        const other = await requireFriend(db, user.id, body.username);
+        if (other.id === user.id) throw new HttpError(400, 'Tu ne peux pas t\'offrir un cadeau');
+        const f = await relation(db, user.id, other.id);
+        const readyAt = giftReadyAt(f);
+        if (readyAt > new Date()) {
+            const hours = Math.ceil((readyAt - Date.now()) / 3600_000);
+            throw new HttpError(403, `Vous êtes amis depuis peu : les cadeaux seront possibles dans ${hours} h`);
+        }
+
+        const client = await db.connect();
+        let message;
+        try {
+            await client.query('BEGIN');
+            // Lock both players in id order so two crossed gifts can't deadlock.
+            const { rows: locked } = await client.query(
+                `SELECT id, ${currency.column} AS balance FROM users WHERE id = ANY($1) ORDER BY id FOR UPDATE`, [[user.id, other.id]]);
+            const me = locked.find((r) => r.id === user.id);
+            const allowance = (await giftAllowance(client, user.id, other.id))[body.currency];
+            if (allowance.left < amount) {
+                throw new HttpError(429, allowance.friendFull
+                    ? `${other.username} a déjà reçu le maximum de ${currency.many} aujourd'hui`
+                    : `Tu peux encore offrir ${allowance.left} ${allowance.left > 1 ? currency.many : currency.one} aujourd'hui (maximum ${currency.max} par jour)`);
+            }
+            if (me.balance < amount) throw new HttpError(402, `Pas assez de ${currency.many}`);
+            await client.query(`UPDATE users SET ${currency.column} = ${currency.column} - $2 WHERE id = $1`, [user.id, amount]);
+            await client.query(`UPDATE users SET ${currency.column} = ${currency.column} + $2 WHERE id = $1`, [other.id, amount]);
+            await client.query(`INSERT INTO gifts (from_id, to_id, currency, amount) VALUES ($1, $2, $3, $4)`, [user.id, other.id, body.currency, amount]);
+            const text = `🎁 Cadeau : ${amount.toLocaleString('fr-FR')} ${amount > 1 ? currency.many : currency.one}${note ? `\n${note}` : ''}`;
+            ({ rows: [message] } = await client.query(
+                `INSERT INTO messages (from_id, to_id, body, gift) VALUES ($1, $2, $3, true) RETURNING id, body, gift, created_at, read_at, true AS mine`,
+                [user.id, other.id, text]));
+            await client.query('COMMIT');
+        } catch (err) {
+            await client.query('ROLLBACK').catch(() => {});
+            throw err;
+        } finally {
+            client.release();
+        }
+        const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
+        return {
+            ok: true, amount, currency: body.currency, message,
+            allowance: await giftAllowance(db, user.id, other.id),
+            user: await publicUser(db, fresh),
+        };
     },
 
     // ---- Trades ----

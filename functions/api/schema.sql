@@ -292,3 +292,16 @@ CREATE TABLE IF NOT EXISTS garden_plots (
 
 -- Daily conversion bonus: the first Grainerie conversion of the (Paris) day gives +50 % graines.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS convert_bonus_at TIMESTAMPTZ;
+
+-- Gifts: friends can give each other graines, pépites or plantes, within daily limits.
+CREATE TABLE IF NOT EXISTS gifts (
+    id BIGSERIAL PRIMARY KEY,
+    from_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    currency TEXT NOT NULL,
+    amount INT NOT NULL CHECK (amount > 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS gifts_from_idx ON gifts (from_id, created_at);
+CREATE INDEX IF NOT EXISTS gifts_to_idx ON gifts (to_id, created_at);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS gift BOOLEAN NOT NULL DEFAULT false;

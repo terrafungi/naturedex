@@ -144,7 +144,7 @@ function Thread({ username, onActivity }) {
                     const gap = !prev || prev.mine !== m.mine || new Date(m.created_at) - new Date(prev.created_at) > 10 * 60_000;
                     return (
                         <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'} ${gap && i ? 'pt-2' : ''}`}>
-                            <p className={`max-w-[80%] px-3.5 py-2 rounded-2xl whitespace-pre-wrap break-words text-[15px] leading-snug ${m.mine ? 'bg-[#4fd18b] text-[#05130d] rounded-br-md' : 'bg-white/10 text-white rounded-bl-md'}`}>{m.body}</p>
+                            <p className={`max-w-[80%] px-3.5 py-2 rounded-2xl whitespace-pre-wrap break-words text-[15px] leading-snug ${m.gift ? 'bg-[#e9c46a] text-[#05130d] font-semibold ring-2 ring-[#e9c46a]/40 shadow-[0_0_24px_rgba(233,196,106,0.35)]' : m.mine ? 'bg-[#4fd18b] text-[#05130d]' : 'bg-white/10 text-white'} ${m.mine ? 'rounded-br-md' : 'rounded-bl-md'}`}>{m.body}</p>
                             {gap && <span className="mt-0.5 px-1 text-[10.5px] text-ink-soft">{when(m.created_at)}{m.mine && m.read_at && i === thread.messages.length - 1 ? ' · Lu' : ''}</span>}
                         </div>
                     );
