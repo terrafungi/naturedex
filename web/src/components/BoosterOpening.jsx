@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { Card, CardBack } from './Card.jsx';
@@ -122,13 +122,36 @@ function FlipCard({ card, revealed, charging, onClick }) {
     );
 }
 
+// Drag the card sideways to move on, like a tap. Each card gets its own motion value so the
+// leaving card and the arriving one never share a position.
+const SWIPE_EXIT = { exit: (dir) => ({ x: dir * 320, y: -20, rotate: dir * 16, opacity: 0, transition: { duration: 0.3 } }) };
+function SwipeCard({ children, onSwipe, draggedRef }) {
+    const x = useMotionValue(0);
+    const rotate = useTransform(x, [-220, 220], [-14, 14]);
+    return (
+        <motion.div style={{ x, rotate }} className="touch-pan-y"
+            drag="x" dragSnapToOrigin dragElastic={0.7} dragConstraints={{ left: 0, right: 0 }}
+            onDragStart={() => { draggedRef.current = true; }}
+            onDragEnd={(_, info) => {
+                const dx = info.offset.x;
+                if (Math.abs(dx) > 80 || Math.abs(info.velocity.x) > 500) onSwipe(Math.sign(dx || info.velocity.x));
+                setTimeout(() => { draggedRef.current = false; }, 0);
+            }}
+            initial={{ y: 40, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            variants={SWIPE_EXIT} exit="exit">
+            {children}
+        </motion.div>
+    );
+}
+
 function RarityBanner({ card, demo }) {
     const fx = fxOf(card);
     const r = RARITIES[card.rarity];
     if (fx.level === 5) return (
         <motion.div initial={{ opacity: 0, scale: 2.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', damping: 9, stiffness: 120, delay: 0.25 }}>
             <div className="nd-secret-text font-display text-3xl sm:text-4xl font-black uppercase tracking-[0.08em]">✦ Carte secrète ✦</div>
-            <div className="text-white/80 text-sm mt-1 [text-shadow:0_1px_8px_rgb(0_0_0/0.8)]">Environ 1 booster sur 500 en cache une. Touche pour continuer</div>
+            <div className="text-white/80 text-sm mt-1 [text-shadow:0_1px_8px_rgb(0_0_0/0.8)]">Environ 1 booster sur 500 en cache une. Touche ou glisse pour continuer</div>
             {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>
     );
@@ -139,7 +162,7 @@ function RarityBanner({ card, demo }) {
                 style={{ color: fx.level ? fx.color : '#e7ece8', textShadow: fx.level >= 2 ? `0 0 ${fx.level * 8}px ${fx.color}` : 'none' }}>
                 {r.symbol} {r.label}{fx.level >= 4 ? ' !' : ''}
             </div>
-            <div className="text-white/60 text-sm">Touche la carte pour continuer</div>
+            <div className="text-white/60 text-sm">Touche ou glisse la carte pour continuer</div>
             {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>
     );
@@ -149,6 +172,8 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
     const [stage, setStage] = useState('pack'); // pack → reveal → summary
     const [index, setIndex] = useState(0);
     const [revealed, setRevealed] = useState(false);
+    const [dir, setDir] = useState(-1); // which side the current card flies off to
+    const dragged = useRef(false);
 
     const current = cards[index];
     const fx = stage === 'reveal' ? fxOf(current) : FX.common;
@@ -160,9 +185,10 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
         return () => clearTimeout(t);
     }, [stage, index, cards]);
 
-    function next() {
+    function next(side = -1) {
         // big pulls keep their suspense: no skipping the charge
         if (!revealed) return fx.level < 2 && setRevealed(true);
+        setDir(side);
         if (index + 1 < cards.length) setIndex(index + 1);
         else setStage('summary');
     }
@@ -223,13 +249,10 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                     <span key={i} className={`h-1.5 w-6 rounded-full transition-colors ${i < index ? 'bg-[#e9c46a]' : i === index ? 'bg-white' : 'bg-white/20'}`} />
                                 ))}
                             </div>
-                            <AnimatePresence mode="popLayout">
-                                <motion.div key={index}
-                                    initial={{ x: 0, y: 40, opacity: 0, scale: 0.9 }}
-                                    animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-                                    exit={{ x: -260, y: -20, rotate: -14, opacity: 0, transition: { duration: 0.3 } }}>
-                                    <FlipCard card={current} revealed={revealed} charging={charging} onClick={next} />
-                                </motion.div>
+                            <AnimatePresence mode="popLayout" custom={dir}>
+                                <SwipeCard key={index} onSwipe={next} draggedRef={dragged}>
+                                    <FlipCard card={current} revealed={revealed} charging={charging} onClick={() => !dragged.current && next()} />
+                                </SwipeCard>
                             </AnimatePresence>
                             <div className="relative z-10 min-h-16 text-center">
                                 {revealed ? <RarityBanner key={index} card={current} demo={demo} /> : charging && (
