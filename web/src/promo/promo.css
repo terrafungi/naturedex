@@ -1,0 +1,4 @@
+/* Video capture: no transitions (each frame must be exactly its time), foil driven by the timeline. */
+html, body { background: #05130d; }
+.nd-promo * { transition: none !important; }
+.nd-promo .nd-card[data-rarity] { --mx: var(--pmx, 50%) !important; --my: var(--pmy, 50%) !important; }
