@@ -8,7 +8,7 @@ import { api, useGame } from '../api.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
 
 const SEED_ORDER = ['radis', 'tournesol', 'chene', 'rose'];
-const SEED_TAGS = { radis: 'Dorée 1 sur 5', rose: 'Meilleur rendement' };
+const SEED_TAGS = { radis: 'Rapide', rose: 'Meilleur rendement' };
 const LAST_SEED = 'naturdex.lastSeed';
 
 // Colours of each species once grown: stem, leaves, and the flower / crown / root.
@@ -430,7 +430,7 @@ export default function Garden() {
                     [Nugget, 'Convertis', `${per(user)} pépites = 1 graine, +50 % sur la première conversion du jour.`],
                     [Seed, 'Plante', 'Choisis une graine. Plus elle pousse longtemps, plus elle rapporte.'],
                     [Droplets, 'Arrose', `Une fois par plante : ${Math.round(garden.waterCut * 100)} % de temps en moins.`],
-                    [Sparkles, 'Récolte', `1 chance sur 10 d'une récolte dorée ×2 (1 sur 5 pour le radis)… et parfois un booster caché !`],
+                    [Sparkles, 'Récolte', `1 chance sur 10 d'une récolte dorée ×2… et parfois un booster caché !`],
                 ].map(([Icon, title, text], i) => (
                     <li key={title} className="p-4 rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
                         <p className="flex items-center gap-2 font-display text-lg font-bold text-white"><span className="text-white/40 text-sm">{i + 1}</span><Icon className="w-5 h-5 text-[#8ee6a8] shrink-0" />{title}</p>

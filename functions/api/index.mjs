@@ -845,20 +845,19 @@ async function stripeWebhook(event) {
 
 // Graines planted in plots grow into « plantes »; BOOSTER_PLANTS of them open a booster.
 // Every seed beats paying 100 graines directly, and the longer it grows the better it pays
-// (golden harvests included: ~69 graines a booster for the radish, ~45 for the moon rose).
-// The radish makes up for its small yield with golden harvests twice as often.
+// (golden harvests included: ~76 graines a booster for the radish, ~45 for the moon rose).
 const BOOSTER_PLANTS = 10;
 const SEEDS = {
-    radis: { name: 'Radis éclair', cost: 25, minutes: 3, plants: 3, golden: 0.2 },
-    tournesol: { name: 'Tournesol', cost: 50, minutes: 60, plants: 7, golden: 0.1 },
-    chene: { name: 'Chêne', cost: 100, minutes: 8 * 60, plants: 16, golden: 0.1 },
-    rose: { name: 'Rose de lune', cost: 200, minutes: 24 * 60, plants: 40, golden: 0.1 },
+    radis: { name: 'Radis éclair', cost: 25, minutes: 3, plants: 3 },
+    tournesol: { name: 'Tournesol', cost: 50, minutes: 60, plants: 7 },
+    chene: { name: 'Chêne', cost: 100, minutes: 8 * 60, plants: 16 },
+    rose: { name: 'Rose de lune', cost: 200, minutes: 24 * 60, plants: 40 },
 };
 const START_PLOTS = 3;
 const PLOT_PRICES = [300, 600, 1000, 1500, 2500, 4000]; // graines for plots 4 to 9
 const MAX_PLOTS = START_PLOTS + PLOT_PRICES.length;
 const WATER_CUT = 0.3; // one watering per plant takes 30 % off the time left
-const GOLDEN_CHANCE = 0.1; // harvest ×2 (unless the seed sets its own chance)
+const GOLDEN_CHANCE = 0.1; // harvest ×2
 const TREASURE_CHANCE = 0.01; // + one bonus booster
 // Two pépites make one graine: pépites come easily (recycling, auctions, rewards),
 // so they help the garden without replacing graines.
@@ -1158,7 +1157,7 @@ const actions = {
             );
             if (!rows.length) throw new HttpError(409, 'Rien n\'est encore prêt à récolter');
             const harvest = rows.map(({ slot, kind }) => {
-                const golden = Math.random() < (SEEDS[kind]?.golden ?? GOLDEN_CHANCE);
+                const golden = Math.random() < GOLDEN_CHANCE;
                 const base = SEEDS[kind]?.plants || 1;
                 return { slot, kind, plants: golden ? base * 2 : base, golden, treasure: Math.random() < TREASURE_CHANCE };
             }).sort((a, b) => a.slot - b.slot);
