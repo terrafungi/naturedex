@@ -12,10 +12,24 @@
       "name": "api",
       "runtime": "nodejs24.x",
       "memory": 512,
-      "timeout": 30,
+      "timeout": 120,
       "schedule": "rate(1 minute)"
     }
   ],
   "site": "./site",
-  "spa": "/index.html"
+  "spa": "/index.html",
+  "redirects": {
+    "rules": [
+      {
+        "from": "/blog",
+        "to": "/api/blog",
+        "status": 301
+      },
+      {
+        "from": "/blog/*",
+        "to": "/api/blog/:splat",
+        "status": 301
+      }
+    ]
+  }
 }

@@ -316,3 +316,30 @@ CREATE TABLE IF NOT EXISTS showcases (user_id INT PRIMARY KEY REFERENCES users(i
 
 -- Premium showcase backgrounds bought with pépites.
 CREATE TABLE IF NOT EXISTS showcase_backgrounds (user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE, background TEXT NOT NULL, bought_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (user_id, background));
+
+-- Blog: one sourced nature article per day, written by the scheduler from Wikipédia / RSS material.
+CREATE TABLE IF NOT EXISTS blog_posts (
+    id           SERIAL PRIMARY KEY,
+    status       TEXT NOT NULL DEFAULT 'generating', -- generating | published | failed
+    category     TEXT NOT NULL,
+    day          DATE,                               -- Paris day of a daily post (NULL for the launch batch)
+    slug         TEXT UNIQUE,
+    title        TEXT,
+    description  TEXT,
+    excerpt      TEXT,
+    body         JSONB,
+    sources      JSONB NOT NULL DEFAULT '[]'::jsonb,
+    image_url    TEXT,
+    image_alt    TEXT,
+    image_credit TEXT,
+    card_ids     INT[] NOT NULL DEFAULT '{}',
+    tags         TEXT[] NOT NULL DEFAULT '{}',
+    source_key   TEXT UNIQUE,
+    error        TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    published_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS blog_one_generating ON blog_posts ((true)) WHERE status = 'generating';
+CREATE UNIQUE INDEX IF NOT EXISTS blog_one_per_day ON blog_posts (day) WHERE status = 'published';
+CREATE INDEX IF NOT EXISTS blog_published_idx ON blog_posts (published_at DESC) WHERE status = 'published';
+CREATE INDEX IF NOT EXISTS blog_category_idx ON blog_posts (category, published_at DESC) WHERE status = 'published';

@@ -22,6 +22,7 @@ import {
 import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLabel, seasonRollover } from './arena.mjs';
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
+import { blogRoute, blogTick, latestPosts } from './blog.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -1524,6 +1525,11 @@ const actions = {
         return { binder, matches: rows[0]?.matches || 0, cards: rows.map(({ matches, ...c }) => c) };
     },
 
+    // Public: the 3 latest blog articles, for the home page.
+    async blogLatest(db) {
+        return { posts: await latestPosts(db, 3) };
+    },
+
     // Public: who sent this invite link (shown on the sign-up page).
     async inviteInfo(db, body) {
         const sponsor = body.code ? await findSponsor(db, body.code) : null;
@@ -2290,19 +2296,28 @@ const actions = {
 
 Object.assign(actions, arenaActions({ requireUser, inTransaction, HttpError, publicUser, parisDay }));
 
-const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo']);
+const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest']);
 
 export const handler = async (event) => {
     if (event.source === 'schedule') {
         await settleAuctions(getPool());
         await seasonRollover(getPool(), inTransaction);
         if (stripeReady() && new Date().getUTCMinutes() % 5 === 0) await refreshPendingPurchases(getPool());
+        await blogTick(getPool()).catch((err) => console.error('blogTick', err));
         return { ok: true };
     }
     if (event.requestContext?.http?.method === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
     }
     const share = event.requestContext?.http?.method === 'GET' && /\/partage\/(\d+)\/?$/.exec(event.rawPath || '');
+    if (event.requestContext?.http?.method === 'GET' && /^\/(api\/)?blog(\/|$)/.test(event.rawPath || '')) {
+        try {
+            return await blogRoute(getPool(), event.rawPath, event.queryStringParameters || {});
+        } catch (error) {
+            console.error('blog', error);
+            return { statusCode: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '60' }, body: 'Blog momentanément indisponible' };
+        }
+    }
     if (share) {
         try {
             return await sharePage(getPool(), Number(share[1]), event.queryStringParameters?.u);
