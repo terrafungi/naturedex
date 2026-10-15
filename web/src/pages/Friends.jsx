@@ -204,7 +204,7 @@ function TradeBuilder({ friend, total, onClose, onSent }) {
     const sum = (m) => [...m.values()].reduce((s, i) => s + i.qty, 0);
     const empty = give.size === 0 && get.size === 0;
     return (
-        <motion.div className="fixed inset-0 z-50 grid place-items-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="fixed inset-0 z-[100] grid place-items-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
             <motion.div className="relative w-full max-w-4xl h-full sm:h-auto sm:max-h-[94vh] flex flex-col sm:rounded-[2rem] bg-[#081a11] ring-1 ring-white/10"
                 initial={{ y: 30 }} animate={{ y: 0 }} exit={{ y: 30 }}>
@@ -291,7 +291,7 @@ function GiftSheet({ friend, user, onClose, onSent }) {
     }
 
     return (
-        <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
             <motion.div className="relative w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] bg-[#081a11] ring-1 ring-white/10 p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
                 initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}>
