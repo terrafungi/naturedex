@@ -289,3 +289,6 @@ CREATE TABLE IF NOT EXISTS garden_plots (
     watered    BOOLEAN NOT NULL DEFAULT false,
     PRIMARY KEY (user_id, slot)
 );
+
+-- Daily conversion bonus: the first Grainerie conversion of the (Paris) day gives +50 % graines.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS convert_bonus_at TIMESTAMPTZ;

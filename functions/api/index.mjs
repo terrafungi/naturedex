@@ -145,6 +145,7 @@ async function publicUser(db, user) {
         boosterPlants: BOOSTER_PLANTS,
         plots: user.plots,
         nuggetSeeds: NUGGET_SEEDS,
+        convertBonus: { ready: convertBonusReady(user), rate: CONVERT_BONUS, max: CONVERT_BONUS_MAX },
         dailyCoins: DAILY_COINS,
         nextDailyAt: nextDaily > Date.now() ? new Date(nextDaily).toISOString() : null,
         recycleValue: RECYCLE_VALUE,
@@ -861,6 +862,12 @@ const TREASURE_CHANCE = 0.01; // + one bonus booster
 // Pépites turn into graines at the shop's own € rate (500 pépites for 2,99 € ≈ 1 500 graines),
 // so buying either currency feeds the garden equally; free players get pépites by recycling.
 const NUGGET_SEEDS = 3;
+// First Grainerie conversion of the Paris day: +50 % graines, on up to 100 pépites (+150 max).
+// Automatic conversions while planting never use it, so it is never wasted on a few pépites.
+const CONVERT_BONUS = 0.5;
+const CONVERT_BONUS_MAX = 150;
+const parisDay = (d) => new Date(d).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+const convertBonusReady = (user) => !user.convert_bonus_at || parisDay(user.convert_bonus_at) !== parisDay(Date.now());
 
 // Converts just enough pépites to cover `cost` graines (inside a withGarden transaction).
 async function coverWithNuggets(client, user, cost) {
@@ -1085,8 +1092,13 @@ const actions = {
         if (!Number.isInteger(nuggets) || nuggets < 1) throw new HttpError(400, 'Montant invalide');
         return withGarden(db, event, async (client, user) => {
             if (nuggets > user.nuggets) throw new HttpError(402, 'Pas assez de pépites');
-            await client.query(`UPDATE users SET nuggets = nuggets - $2, coins = coins + $3 WHERE id = $1`, [user.id, nuggets, nuggets * NUGGET_SEEDS]);
-            return { converted: nuggets, seeds: nuggets * NUGGET_SEEDS };
+            const seeds = nuggets * NUGGET_SEEDS;
+            const bonus = convertBonusReady(user) ? Math.min(CONVERT_BONUS_MAX, Math.floor(seeds * CONVERT_BONUS)) : 0;
+            await client.query(
+                `UPDATE users SET nuggets = nuggets - $2, coins = coins + $3, convert_bonus_at = CASE WHEN $4 THEN now() ELSE convert_bonus_at END WHERE id = $1`,
+                [user.id, nuggets, seeds + bonus, bonus > 0]
+            );
+            return { converted: nuggets, seeds: seeds + bonus, bonus };
         });
     },
 
