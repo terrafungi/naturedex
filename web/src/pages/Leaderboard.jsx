@@ -51,7 +51,7 @@ function Podium({ rows, board }) {
                     {r.rank === 1 && <Crown className="w-6 h-6 text-[#e9c46a] mb-1" />}
                     <Avatar name={r.username} color={PODIUM[r.rank - 1] || PODIUM[2]} size={r.rank === 1 ? 'w-16 h-16 text-2xl' : 'w-12 h-12 text-lg'} />
                     <Link to={profile(r.username)} className={`mt-2 max-w-full flex items-center gap-1 text-sm font-semibold hover:underline ${r.me ? 'text-[#a8f0c6]' : 'text-white'}`}>
-                        <span className="truncate">{r.username}{r.me && ' (toi)'}</span><SeasonBadge badge={r.badge} compact />
+                        <span className="truncate min-w-0">{r.username}{r.me && ' (toi)'}</span><SeasonBadge badge={r.badge} compact />
                     </Link>
                     <p className="text-xs text-ink-soft tabular-nums">{n(r.score)} {board.unit}</p>
                     <div className={`mt-2 w-full ${heights[i]} rounded-t-2xl grid place-items-start justify-center pt-2 font-display text-2xl font-semibold text-[#10261a]`}
@@ -72,7 +72,7 @@ function Row({ r, board }) {
             <Avatar name={r.username} color={r.me ? '#4fd18b' : '#8fb8a0'} size="w-9 h-9 text-sm" />
             <div className="min-w-0 flex-1">
                 <Link to={profile(r.username)} className={`flex items-center gap-1.5 font-semibold hover:underline ${r.me ? 'text-[#a8f0c6]' : 'text-white'}`}>
-                    <span className="truncate">{r.username}{r.me && ' (toi)'}</span><SeasonBadge badge={r.badge} compact />
+                    <span className="truncate min-w-0">{r.username}{r.me && ' (toi)'}</span><SeasonBadge badge={r.badge} compact />
                 </Link>
                 {extra && <p className="text-xs text-ink-soft">{extra}</p>}
             </div>

@@ -374,13 +374,13 @@ export default function Friends() {
                         <p className="mt-3 text-ink-soft">Pas encore d'amis. Entre le pseudo d'un joueur ci-dessus pour lui envoyer une demande.</p>
                     </div>
                 ) : (
-                    <ul className="grid sm:grid-cols-2 gap-3">
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {friends.friends.map((f) => (
                             <li key={f.username} className="rounded-3xl nd-glass p-4 flex items-center gap-3">
                                 <Avatar name={f.username} />
                                 <div className="min-w-0 flex-1">
                                     <Link to={`/joueur/${encodeURIComponent(f.username)}`} className="flex items-center gap-1.5 font-display text-lg text-white hover:underline">
-                                        <span className="truncate">{f.username}</span><SeasonBadge badge={f.badge} compact />
+                                        <span className="truncate min-w-0">{f.username}</span><SeasonBadge badge={f.badge} compact />
                                     </Link>
                                     <div className="text-xs text-white/55">{f.discovered.toLocaleString('fr-FR')} espèces découvertes</div>
                                 </div>
