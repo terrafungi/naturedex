@@ -927,6 +927,11 @@ const actions = {
             await client.query('COMMIT');
 
             const { rows: cards } = await db.query(`SELECT ${CARD_FIELDS} FROM cards c WHERE c.id = ANY($1)`, [ids]);
+            // a few words about each species under the revealed card (intros are fetched lazily)
+            await Promise.all(cards.filter((c) => !c.extract && c.wiki_url).map(async (c) => {
+                c.extract = await fillExtract(db, c).catch(() => null);
+            }));
+            for (const c of cards) c.fact = intro(c.extract, 200);
             const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
             const seen = new Set();
             const pack = ids.map((id) => {

@@ -91,7 +91,7 @@ function FlipCard({ card, revealed, charging, onClick }) {
     const fx = fxOf(card);
     const amp = fx.level >= 3 ? fx.level - 1.5 : 0;
     return (
-        <div className="relative w-[250px] sm:w-[290px] cursor-pointer isolate" style={{ perspective: 1200 }} onClick={onClick}>
+        <div className="relative w-[var(--deal-w)] cursor-pointer isolate" style={{ perspective: 1200 }} onClick={onClick}>
             {charging && <Charging fx={fx} />}
             {revealed && <Burst fx={fx} />}
             <motion.div
@@ -152,6 +152,17 @@ function SwipeCard({ children, onSwipe, draggedRef }) {
     );
 }
 
+// Opening lines of the species' Wikipedia intro, so every pull teaches something.
+function Fact({ card }) {
+    if (!card.fact) return null;
+    return (
+        <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
+            className="mt-3 mx-auto max-w-[var(--deal-w)] text-left text-[13px] leading-snug text-white/75 line-clamp-4">
+            {card.fact}
+        </motion.p>
+    );
+}
+
 function RarityBanner({ card, demo }) {
     const fx = fxOf(card);
     const r = RARITIES[card.rarity];
@@ -159,6 +170,7 @@ function RarityBanner({ card, demo }) {
         <motion.div initial={{ opacity: 0, scale: 2.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', damping: 9, stiffness: 120, delay: 0.25 }}>
             <div className="nd-secret-text font-display text-3xl sm:text-4xl font-black uppercase tracking-[0.08em]">✦ Carte secrète ✦</div>
             <div className="text-white/80 text-sm mt-1 [text-shadow:0_1px_8px_rgb(0_0_0/0.8)]">Environ 1 booster sur 500 en cache une. Touche ou glisse pour continuer</div>
+            <Fact card={card} />
             {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>
     );
@@ -169,7 +181,8 @@ function RarityBanner({ card, demo }) {
                 style={{ color: fx.level ? fx.color : '#e7ece8', textShadow: fx.level >= 2 ? `0 0 ${fx.level * 8}px ${fx.color}` : 'none' }}>
                 {r.symbol} {r.label}{fx.level >= 4 ? ' !' : ''}
             </div>
-            <div className="text-white/60 text-sm">Touche ou glisse la carte pour continuer</div>
+            <Fact card={card} />
+            <div className="mt-2 text-white/50 text-xs">Touche ou glisse la carte pour continuer</div>
             {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>
     );
@@ -204,7 +217,9 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
     const lit = stage === 'reveal' && revealed && fx.level >= 3;
 
     return (
-        <motion.div className="fixed inset-0 z-50 bg-[#04100a]/95 backdrop-blur-sm overflow-y-auto overflow-x-hidden"
+        <motion.div className="fixed inset-0 z-[60] bg-[#04100a]/95 backdrop-blur-sm overflow-y-auto overflow-x-hidden"
+            // card as big as the screen allows, leaving room for the banner and the species blurb
+            style={{ '--deal-w': 'clamp(220px, min(84vw, 360px, calc((100dvh - 330px) / 1.4)), 360px)' }}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {/* backdrop: dims while charging, then floods with the rarity colour */}
             <motion.div className="fixed inset-0 pointer-events-none"
@@ -226,7 +241,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                 <X className="w-6 h-6" />
             </button>
 
-            <div className="min-h-full flex flex-col items-center justify-center px-4 py-12">
+            <div className="min-h-full flex flex-col items-center justify-center px-4 pt-14 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
                 <AnimatePresence mode="wait">
                     {stage === 'pack' && (
                         <motion.div key="pack" className="flex flex-col items-center gap-8"
@@ -246,7 +261,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                     )}
 
                     {stage === 'reveal' && current && (
-                        <motion.div key="reveal" className="relative flex flex-col items-center gap-6" initial={{ opacity: 0, y: 30 }}
+                        <motion.div key="reveal" className="relative flex flex-col items-center gap-4" initial={{ opacity: 0, y: 30 }}
                             animate={revealed && fx.level >= 4
                                 ? { opacity: 1, y: 0, x: fx.level === 5 ? [0, -18, 16, -12, 10, -6, 4, 0] : [0, -10, 9, -6, 4, 0] }
                                 : { opacity: 1, y: 0, x: 0 }}
@@ -256,7 +271,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                     <span key={i} className={`h-1.5 w-6 rounded-full transition-colors ${i < index ? 'bg-[#e9c46a]' : i === index ? 'bg-white' : 'bg-white/20'}`} />
                                 ))}
                             </div>
-                            <div className="relative w-[250px] sm:w-[290px] aspect-[5/7]">
+                            <div className="relative w-[var(--deal-w)] aspect-[5/7]">
                                 {/* face-down cards still to come, peeking out under the current one */}
                                 <AnimatePresence>
                                     {cards.slice(index + 1, index + 3).map((_, i) => (
