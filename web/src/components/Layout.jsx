@@ -176,7 +176,7 @@ export default function Layout() {
                 <Outlet />
             </main>
             <footer className={`border-t border-white/[0.07] px-4 pt-6 ${user ? 'pb-32' : 'pb-6'} text-center text-xs text-ink-soft`}>
-                NatureDex · Images et textes : <a className="underline hover:text-white" href="https://fr.wikipedia.org" target="_blank" rel="noreferrer">Wikipédia</a> & Wikimedia Commons (licences libres) · Données : Wikidata
+                NatureDex · Images et textes : <a className="underline hover:text-white" href="https://fr.wikipedia.org" target="_blank" rel="noreferrer">Wikipédia</a> & Wikimedia Commons (licences libres) · Données : Wikidata · <a className="underline hover:text-white" href="https://naturedex.fr/api/blog">Blog nature</a>
             </footer>
             {user && <TabBar />}
             {user && <GiftNotice />}

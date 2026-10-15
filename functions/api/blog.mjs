@@ -364,7 +364,7 @@ details{border-bottom:1px solid rgb(255 255 255/.1);padding:12px 0}summary{curso
 .post .in{padding:16px 18px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
 .post h3{font-size:1.25rem;margin:0;color:#fff}.post p{margin:0;color:var(--soft);font-size:.95rem}
 .post.big{display:grid;grid-template-columns:1.3fr 1fr}.post.big img{height:100%;aspect-ratio:auto;min-height:280px}.post.big h3{font-size:1.8rem}
-@media(max-width:760px){.post.big{display:flex}.post.big img{aspect-ratio:16/10;min-height:0}.brand span,.nav{display:none}}
+@media(max-width:760px){.post.big{display:flex}.post.big img{aspect-ratio:16/10;min-height:0}.brand span,.nav{display:none}header.top .cta{padding:8px 14px;font-size:.85rem}.brand b{font-size:1.3rem}.brand img{width:28px;height:28px}}
 .cats{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 30px}
 .pager{display:flex;justify-content:center;gap:12px;margin:40px 0}.pager a{padding:10px 18px;border-radius:999px;border:1px solid rgb(255 255 255/.15);text-decoration:none;color:#fff}
 footer{margin-top:70px;border-top:1px solid rgb(255 255 255/.08);padding:30px 0 50px;color:var(--soft);font-size:.85rem}
@@ -452,7 +452,7 @@ ${rows.length ? `${page === 1 && first ? card(first, true) : ''}
 <div class="grid" style="margin-top:22px">${(page === 1 ? rest : rows).map((p) => card(p)).join('')}</div>` : '<p class="meta">Les premiers articles arrivent très bientôt.</p>'}
 ${pages > 1 ? `<nav class="pager">${page > 1 ? `<a href="${pageUrl(page - 1)}">← Plus récents</a>` : ''}${page < pages ? `<a href="${pageUrl(page + 1)}">Plus anciens →</a>` : ''}</nav>` : ''}
 </main>`;
-    const head = jsonLd({
+    const head = (rows.length ? '' : '<meta name="robots" content="noindex, follow">') + jsonLd({
         '@context': 'https://schema.org', '@type': cat ? 'CollectionPage' : 'Blog', name: cat ? cat.label : 'Blog NatureDex', url: pageUrl(page), inLanguage: 'fr-FR', description,
         publisher: { '@type': 'Organization', name: 'NatureDex', url: `${SITE}/`, logo: { '@type': 'ImageObject', url: `${SITE}/og.png` } },
     });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowRight, ChevronRight, Compass, Dices, Eye, GalleryVerticalEnd, Gem, Leaf, PackageOpen, Shield, Sparkles, Zap } from 'lucide-react';
+import { ArrowRight, BookOpen, ChevronRight, Clock, Compass, Dices, Eye, GalleryVerticalEnd, Gem, Leaf, PackageOpen, Shield, Sparkles, Zap } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard, TypeBadge } from '../components/Card.jsx';
 import { ChallengeCard, SAMPLE_CHALLENGES } from '../components/Challenge.jsx';
@@ -247,6 +247,52 @@ function Featured({ cards }) {
     );
 }
 
+/* ---------- blog ---------- */
+
+const BLOG_URL = 'https://naturedex.fr/api/blog';
+
+// The 3 latest articles of the daily nature blog (server-rendered pages, outside the app).
+function BlogPosts() {
+    const [posts, setPosts] = useState(null);
+    useEffect(() => {
+        api('blogLatest').then((r) => setPosts(r.posts)).catch(() => setPosts([]));
+    }, []);
+    if (posts && !posts.length) return null;
+
+    return (
+        <section id="blog" className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-6 pb-12">
+            <div className="flex items-end justify-between gap-4">
+                <div>
+                    <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.18em] text-[#e9c46a]"><BookOpen className="w-3.5 h-3.5" />Le blog nature</p>
+                    <h2 className="mt-1 font-display text-[1.7rem] sm:text-4xl font-medium text-white">Un article chaque jour</h2>
+                </div>
+                <a href={BLOG_URL} className="flex items-center gap-0.5 text-sm font-semibold text-[#4fd18b] hover:text-[#a8f0c6] transition-colors whitespace-nowrap pb-1">
+                    Tous les articles<ChevronRight className="w-4 h-4" />
+                </a>
+            </div>
+            <div className="mt-5 grid gap-4 sm:gap-5 md:grid-cols-3">
+                {(posts || Array(3).fill(null)).map((p, i) => (p ? (
+                    <motion.a key={p.slug} href={p.url}
+                        className="group flex flex-col rounded-2xl overflow-hidden nd-glass hover:ring-1 hover:ring-[#4fd18b]/50 transition-shadow"
+                        initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: i * 0.08, ease: EASE }}>
+                        <div className="aspect-[16/10] overflow-hidden bg-paper-deep">
+                            <img src={p.image} alt={p.imageAlt} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        </div>
+                        <div className="flex flex-col gap-2 p-4 sm:p-5 flex-1">
+                            <span className="self-start px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-[#4fd18b]/15 text-[#a8f0c6] ring-1 ring-[#4fd18b]/30">{p.category}</span>
+                            <h3 className="font-display text-xl leading-snug text-white group-hover:text-[#f4d88f] transition-colors">{p.title}</h3>
+                            <p className="text-sm text-white/65 line-clamp-3">{p.excerpt}</p>
+                            <span className="mt-auto pt-1 flex items-center gap-1.5 text-xs text-ink-soft">
+                                {new Date(p.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}<span aria-hidden>·</span><Clock className="w-3 h-3" />{p.minutes} min
+                            </span>
+                        </div>
+                    </motion.a>
+                ) : <div key={i} className="h-80 rounded-2xl nd-glass animate-pulse" />))}
+            </div>
+        </section>
+    );
+}
+
 /* ---------- daily challenges ---------- */
 
 function DailyChallenges() {
@@ -476,6 +522,7 @@ export default function Landing() {
         <div className="overflow-x-clip">
             <Hero />
             {show ? <Featured cards={show.featured} /> : <div className="h-[420px]" />}
+            <BlogPosts />
             <DailyChallenges />
             {show && (
                 <>
