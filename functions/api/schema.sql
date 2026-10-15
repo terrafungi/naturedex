@@ -310,3 +310,6 @@ ALTER TABLE messages ADD COLUMN IF NOT EXISTS gift BOOLEAN NOT NULL DEFAULT fals
 ALTER TABLE gifts ADD COLUMN IF NOT EXISTS note TEXT;
 ALTER TABLE gifts ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS gifts_unseen_idx ON gifts (to_id) WHERE seen_at IS NULL;
+
+-- Showcases: one shareable "vitrine" per player (up to 10 cards on a drawn background).
+CREATE TABLE IF NOT EXISTS showcases (user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL DEFAULT '', background TEXT NOT NULL DEFAULT 'foret', layout TEXT NOT NULL DEFAULT 'grille', format TEXT NOT NULL DEFAULT 'story', card_ids INT[] NOT NULL DEFAULT '{}', updated_at TIMESTAMPTZ NOT NULL DEFAULT now());

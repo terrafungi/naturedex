@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Lock, MessageCircle, Star, UserPlus } from 'lucide-react';
+import { ArrowLeft, Frame, Lock, MessageCircle, Pencil, Star, UserPlus } from 'lucide-react';
 import { api } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { LeafLogo } from '../components/Layout.jsx';
+import ShowcaseCanvas from '../components/Showcase.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
 
 const n = (v) => Number(v || 0).toLocaleString('fr-FR');
@@ -76,10 +77,42 @@ export default function Player() {
                 {player.campaign > 0 && <> · campagne : étape {player.campaign}</>}
             </p>
 
+            <Showcase player={player} />
+
             <Binders player={player} />
 
             <div className="mt-6"><SeasonHistory seasons={player.seasons} /></div>
         </div>
+    );
+}
+
+// The player's showcase picture; on one's own profile, a way to create or edit it.
+function Showcase({ player }) {
+    const { showcase } = player;
+    if (!showcase) {
+        if (!player.me) return null;
+        return (
+            <Link to="/vitrine" className="mt-10 flex items-center gap-3 p-4 rounded-2xl nd-glass text-sm text-white/75 hover:ring-1 hover:ring-[#e9c46a]/50">
+                <Frame className="w-5 h-5 shrink-0 text-[#e9c46a]" />
+                <span>Crée ta <b className="text-white">vitrine</b> : tes 10 plus belles cartes sur un fond, à afficher ici et à partager en image.</span>
+            </Link>
+        );
+    }
+    return (
+        <section className="mt-10">
+            <div className="flex items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 font-display text-2xl text-white"><Frame className="w-5 h-5 text-[#e9c46a]" />Vitrine</h2>
+                {player.me && (
+                    <Link to="/vitrine" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 text-white/85 hover:bg-white/10">
+                        <Pencil className="w-3.5 h-3.5" />Modifier
+                    </Link>
+                )}
+            </div>
+            <div className="mt-4 mx-auto rounded-[1.4rem] overflow-hidden ring-1 ring-white/15 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]"
+                style={{ maxWidth: showcase.format === 'story' ? 'min(100%, 24rem, calc(75vh * 9 / 16))' : 'min(100%, 34rem, 75vh)' }}>
+                <ShowcaseCanvas showcase={showcase} username={player.username} />
+            </div>
+        </section>
     );
 }
 

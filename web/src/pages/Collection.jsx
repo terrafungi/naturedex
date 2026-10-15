@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FolderPlus, Pencil, Recycle, Search, Star, Trash2 } from 'lucide-react';
+import { FolderPlus, Frame, Pencil, Recycle, Search, Star, Trash2 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { FavoriteStar } from '../components/Favorite.jsx';
@@ -131,10 +131,15 @@ export default function Collection() {
                     <button onClick={newBinder} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-white/25 text-white/80 hover:bg-white/10">
                         <FolderPlus className="w-3.5 h-3.5" />Nouveau classeur
                     </button>
-                    {current && (
-                        <span className="ml-auto flex gap-1">
-                            <button onClick={renameBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title="Renommer le classeur" aria-label="Renommer le classeur"><Pencil className="w-4 h-4" /></button>
-                            <button onClick={deleteBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title="Supprimer le classeur" aria-label="Supprimer le classeur"><Trash2 className="w-4 h-4" /></button>
+                    {binder && (
+                        <span className="ml-auto flex items-center gap-1">
+                            <Link to={`/vitrine?classeur=${binder}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold nd-cta-gold">
+                                <Frame className="w-3.5 h-3.5" />Créer une vitrine
+                            </Link>
+                            {current && <>
+                                <button onClick={renameBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title="Renommer le classeur" aria-label="Renommer le classeur"><Pencil className="w-4 h-4" /></button>
+                                <button onClick={deleteBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title="Supprimer le classeur" aria-label="Supprimer le classeur"><Trash2 className="w-4 h-4" /></button>
+                            </>}
                         </span>
                     )}
                 </div>

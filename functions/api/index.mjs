@@ -988,6 +988,27 @@ async function addToBinder(db, userId, binderId, cardId) {
     }
 }
 
+// Showcase ("vitrine"): up to 10 owned cards arranged on a background, shown on the profile
+// and exported as an image by the browser.
+const SHOWCASE_MAX = 10;
+const SHOWCASE_BACKGROUNDS = ['foret', 'ocean', 'nuit', 'herbier', 'or', 'aube', 'jungle', 'givre'];
+const SHOWCASE_LAYOUTS = ['grille', 'eventail', 'vedette'];
+const SHOWCASE_FORMATS = ['story', 'carre'];
+
+// The saved showcase of a player, in its card order; cards traded away since are left out.
+async function loadShowcase(db, userId) {
+    const { rows: [s] } = await db.query(`SELECT title, background, layout, format, card_ids, updated_at FROM showcases WHERE user_id = $1`, [userId]);
+    if (!s) return null;
+    const { rows } = await db.query(
+        `SELECT ${LIGHT_FIELDS} FROM cards c JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1
+         WHERE c.id = ANY($2::int[]) ORDER BY array_position($2::int[], c.id)`,
+        [userId, s.card_ids]
+    );
+    if (!rows.length) return null;
+    const { card_ids, updated_at, ...rest } = s;
+    return { ...rest, updatedAt: updated_at, cards: rows };
+}
+
 // previews: add the thumbnails of the binder's 3 rarest cards (public profile)
 async function binderState(db, userId, previews = false) {
     const { rows: binders } = await db.query(
@@ -1421,7 +1442,38 @@ const actions = {
             seasons: seasons.map((r) => ({ ...r, label: seasonLabel(r.season) })),
             binders: shared ? binders.filter((b) => b.count) : null,
             binderCount: binders.filter((b) => b.count).length,
+            showcase: await loadShowcase(db, p.id),
         } };
+    },
+
+    async showcase(db, body, event) {
+        const user = await requireUser(db, event);
+        return { showcase: await loadShowcase(db, user.id) };
+    },
+
+    async saveShowcase(db, body, event) {
+        const user = await requireUser(db, event);
+        const ids = [...new Set((Array.isArray(body.cardIds) ? body.cardIds : []).map(Number).filter(Number.isInteger))];
+        if (!ids.length) throw new HttpError(400, 'Choisis au moins une carte');
+        if (ids.length > SHOWCASE_MAX) throw new HttpError(400, `${SHOWCASE_MAX} cartes maximum`);
+        const { rows: [{ n }] } = await db.query(
+            `SELECT COUNT(*)::int AS n FROM user_cards WHERE user_id = $1 AND card_id = ANY($2::int[])`, [user.id, ids]);
+        if (n !== ids.length) throw new HttpError(400, 'Tu ne peux exposer que tes propres cartes');
+        const pick = (value, list) => (list.includes(value) ? value : list[0]);
+        await db.query(
+            `INSERT INTO showcases (user_id, title, background, layout, format, card_ids, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, now())
+             ON CONFLICT (user_id) DO UPDATE SET title = $2, background = $3, layout = $4, format = $5, card_ids = $6, updated_at = now()`,
+            [user.id, String(body.title || '').trim().replace(/\s+/g, ' ').slice(0, 40),
+                pick(body.background, SHOWCASE_BACKGROUNDS), pick(body.layout, SHOWCASE_LAYOUTS), pick(body.format, SHOWCASE_FORMATS), ids]
+        );
+        return { showcase: await loadShowcase(db, user.id) };
+    },
+
+    async deleteShowcase(db, body, event) {
+        const user = await requireUser(db, event);
+        await db.query(`DELETE FROM showcases WHERE user_id = $1`, [user.id]);
+        return { showcase: null };
     },
 
     // One page of a friend's (or one's own) binder, with how many copies the viewer has of each card.
