@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, Brain, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
+import { Award, BookOpen, Brain, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 import GiftNotice from './GiftNotice.jsx';
@@ -18,6 +18,7 @@ export const NAV = [
     { to: '/amis', label: 'Amis', Icon: Users },
     { to: '/messages', label: 'Messages', Icon: MessageCircle },
     { to: '/defis', label: 'Défis', Icon: Trophy },
+    { href: 'https://naturedex.fr/api/blog', label: 'Blog', Icon: BookOpen },
     { to: '/trophees', label: 'Trophées', Icon: Award },
     { to: '/boutique', label: 'Boutique solidaire', short: 'Boutique', Icon: ShoppingBag },
     { to: '/inviter', label: 'Inviter des amis', short: 'Inviter', Icon: Gift },
@@ -97,10 +98,18 @@ function Wallet({ user }) {
 // main pages plus a "Plus" button that opens the rest; on large screens all fit.
 const PRIMARY = 5;
 
-function TabItem({ to, label, short, Icon, end, className = '' }) {
+const tabClass = 'relative flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors';
+
+function TabItem({ to, href, label, short, Icon, end, className = '' }) {
+    // the blog is server-rendered pages outside the app
+    if (href) return (
+        <a href={href} className={`${tabClass} text-white/55 hover:text-white ${className}`}>
+            <Icon className="w-5 h-5" strokeWidth={1.8} />{short || label}
+        </a>
+    );
     return (
         <NavLink to={to} end={end}
-            className={({ isActive }) => `relative flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors ${isActive ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/55 hover:text-white'} ${className}`}>
+            className={({ isActive }) => `${tabClass} ${isActive ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/55 hover:text-white'} ${className}`}>
             <Icon className="w-5 h-5" strokeWidth={1.8} />{short || label}<NavBadge to={to} className="absolute top-1 right-[calc(50%-1.4rem)]" />
         </NavLink>
     );
@@ -112,8 +121,8 @@ function TabBar() {
     const { badges, refreshBadges } = useGame();
     const primary = NAV.slice(0, PRIMARY);
     const more = NAV.slice(PRIMARY);
-    const activeMore = more.find(({ to }) => pathname === to || pathname.startsWith(`${to}/`));
-    const moreBadge = more.reduce((sum, { to }) => sum + (badges[to] || 0), 0);
+    const activeMore = more.find(({ to }) => to && (pathname === to || pathname.startsWith(`${to}/`)));
+    const moreBadge = more.reduce((sum, { to }) => sum + ((to && badges[to]) || 0), 0);
 
     useEffect(() => { setOpen(false); }, [pathname]);
     useEffect(() => { refreshBadges(); }, [pathname, refreshBadges]);
@@ -129,24 +138,24 @@ function TabBar() {
         <>
             <AnimatePresence>
                 {open && (
-                    <motion.div key="backdrop" className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" onClick={() => setOpen(false)}
+                    <motion.div key="backdrop" className="xl:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" onClick={() => setOpen(false)}
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
                 )}
             </AnimatePresence>
             <nav className="fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none" aria-label="Navigation">
                 <AnimatePresence>
                     {open && (
-                        <motion.div key="sheet" id="nd-more" className="lg:hidden nd-tabbar pointer-events-auto mx-auto mb-2 w-full max-w-md p-2 rounded-[1.6rem] grid grid-cols-3 sm:grid-cols-4 gap-1"
+                        <motion.div key="sheet" id="nd-more" className="xl:hidden nd-tabbar pointer-events-auto mx-auto mb-2 w-full max-w-md p-2 rounded-[1.6rem] grid grid-cols-3 sm:grid-cols-4 gap-1"
                             initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.97 }} transition={{ duration: 0.18 }}>
-                            {more.map((item) => <TabItem key={item.to} {...item} short={item.label} className="py-3 px-1 text-center text-[11.5px]" />)}
+                            {more.map((item) => <TabItem key={item.to || item.href} {...item} short={item.label} className="py-3 px-1 text-center text-[11.5px]" />)}
                         </motion.div>
                     )}
                 </AnimatePresence>
-                <div className="nd-tabbar pointer-events-auto mx-auto w-full max-w-md lg:w-fit lg:max-w-none flex gap-1 p-1.5 rounded-[1.6rem]">
-                    {primary.map((item) => <TabItem key={item.to} {...item} className="flex-1 min-w-0 lg:flex-none lg:w-[4.55rem]" />)}
-                    {more.map((item) => <TabItem key={item.to} {...item} className="hidden lg:flex lg:w-[4.55rem]" />)}
+                <div className="nd-tabbar pointer-events-auto mx-auto w-full max-w-md xl:w-fit xl:max-w-none flex gap-1 p-1.5 rounded-[1.6rem]">
+                    {primary.map((item) => <TabItem key={item.to} {...item} className="flex-1 min-w-0 xl:flex-none xl:w-[4.55rem]" />)}
+                    {more.map((item) => <TabItem key={item.to || item.href} {...item} className="hidden xl:flex xl:w-[4.55rem]" />)}
                     <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="nd-more"
-                        className={`lg:hidden relative flex-1 min-w-0 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors ${open || activeMore ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/80 hover:text-white'}`}>
+                        className={`xl:hidden relative flex-1 min-w-0 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors ${open || activeMore ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/80 hover:text-white'}`}>
                         <MoreIcon className="w-5 h-5" strokeWidth={1.8} />
                         <span className="max-w-full truncate px-0.5">{open ? 'Fermer' : activeMore ? (activeMore.short || activeMore.label) : 'Plus'}</span>
                         {!open && !activeMore && !moreBadge && <Plus className="absolute top-1.5 right-[calc(50%-1.3rem)] w-3 h-3 p-px rounded-full bg-[#e9c46a] text-[#2a1c00]" strokeWidth={3.5} />}
