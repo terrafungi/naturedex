@@ -9,6 +9,7 @@ const SITE = 'https://naturedex.fr';
 const BLOG = `${SITE}/api/blog`;
 const UA = 'NatureDexBlog/1.0 (https://naturedex.fr)'; // Wikimedia asks for a contact URL
 const MODEL = 'gemini-3.5-flash';
+const FREE_FALLBACK_MODEL = 'gemini-flash-latest';
 const LAUNCH_POSTS = 16; // first batch, one per category, generated one per minute
 const DAILY_HOUR = 8; // Paris hour from which the daily article is written
 const DAILY_ATTEMPTS = 3;
@@ -89,6 +90,9 @@ function commonsPage(url) {
     return m ? `https://commons.wikimedia.org/wiki/File:${m[1]}` : 'https://commons.wikimedia.org/';
 }
 
+// Psychoactive / drug species are never blog topics (young audience).
+const DRUGS = /psilocyb|hallucinog|psychotrop|psychoacti|enth[ée]og|narcoti|mescalin|cannabino|\bLSD\b|opiac|opioïd|cocaïn|ayahuasca/i;
+
 // Popular cards for a category, never already featured in a post.
 async function pickCards(db, cat) {
     const where = ['NOT EXISTS (SELECT 1 FROM blog_posts p WHERE c.id = ANY(p.card_ids))', 'c.image_url IS NOT NULL'];
@@ -111,7 +115,7 @@ async function pickCards(db, cat) {
         const texts = await Promise.all(rows.slice(i, i + 3).map((c) => wikiText(c.wiki_url).catch(() => '')));
         rows.slice(i, i + 3).forEach((card, j) => {
             const text = texts[j];
-            if (picked.length >= cat.count || text.length < 1500) return;
+            if (picked.length >= cat.count || text.length < 1500 || DRUGS.test(text)) return;
             if (cat.mustContain && !cat.mustContain.test(text)) return;
             if (cat.seasonal && !seasonal.test(text)) return;
             picked.push({ ...card, text: cat.count > 1 ? text.slice(0, 6000) : text });
@@ -138,7 +142,7 @@ async function pickNews(db) {
     for (const item of items.filter((i) => !usedSet.has(i.link)).slice(0, 8)) {
         const html = await fetchText(item.link).catch(() => '');
         const text = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)].map((m) => decode(m[1])).filter((p) => p.length > 60).join('\n').slice(0, 9000);
-        if (text.length < 1200) continue;
+        if (text.length < 1200 || DRUGS.test(`${item.title} ${text}`)) continue;
         const { rows: cards } = await db.query(
             `SELECT id, qid, name, sci_name, type, rarity, iucn, image_url, thumb_url, wiki_url FROM cards
              WHERE length(name) > 4 AND (position(lower(name) in lower($1)) > 0 OR (sci_name IS NOT NULL AND length(sci_name) > 6 AND position(lower(sci_name) in lower($1)) > 0))
@@ -146,22 +150,39 @@ async function pickNews(db) {
         if (!cards.length) continue;
         const main = cards[0];
         main.text = (await wikiText(main.wiki_url).catch(() => '')).slice(0, 5000);
+        if (DRUGS.test(main.text)) continue;
         return { item: { ...item, text }, cards };
     }
     throw new Error('Aucune actualité nature exploitable');
 }
 
+// Google AI Studio free tier first (GEMINI_API_KEY), then the paid OpenKBS proxy.
+function llmEndpoints() {
+    const key = process.env.GEMINI_API_KEY;
+    const free = (model) => ({ name: `free:${model}`, url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, headers: { 'x-goog-api-key': key } });
+    return [
+        ...(key ? [free(MODEL), free(FREE_FALLBACK_MODEL)] : []),
+        { name: 'openkbs', url: `https://proxy.openkbs.com/v1/google/models/${MODEL}:generateContent`, headers: { Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` } },
+    ];
+}
+
 async function llm(prompt) {
-    const res = await fetch(`https://proxy.openkbs.com/v1/google/models/${MODEL}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` },
-        body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json', temperature: 0.8, maxOutputTokens: 12000 },
-        }),
-        signal: AbortSignal.timeout(95_000),
+    const body = JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.8, maxOutputTokens: 12000 },
     });
-    if (!res.ok) throw new Error(`LLM ${res.status} ${(await res.text()).slice(0, 300)}`);
+    const errors = [];
+    const deadline = Date.now() + 95_000; // the whole chain must fit in the 120 s Lambda
+    let res;
+    for (const ep of llmEndpoints()) {
+        const left = deadline - Date.now();
+        if (left < 20_000) break;
+        res = await fetch(ep.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...ep.headers }, body, signal: AbortSignal.timeout(ep.name === 'openkbs' ? left : Math.min(left, 50_000)) })
+            .catch((err) => ({ ok: false, status: 0, text: async () => err.message }));
+        if (res.ok) break;
+        errors.push(`${ep.name} ${res.status} ${(await res.text()).slice(0, 150)}`);
+    }
+    if (!res?.ok) throw new Error(`LLM ${errors.join(' | ')}`);
     const data = await res.json();
     const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
     return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ''));
