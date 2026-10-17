@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Award, BookOpen, Brain, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
+import AwardNotice from './AwardNotice.jsx';
 import GiftNotice from './GiftNotice.jsx';
 
 export const NAV = [
@@ -190,6 +191,7 @@ export default function Layout() {
             </footer>
             {user && <TabBar />}
             {user && <GiftNotice />}
+            {user && <AwardNotice />}
         </div>
     );
 }

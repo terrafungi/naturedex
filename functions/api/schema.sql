@@ -354,3 +354,20 @@ CREATE TABLE IF NOT EXISTS showcase_votes (
 CREATE INDEX IF NOT EXISTS showcase_votes_owner_idx ON showcase_votes (owner_id, created_at);
 CREATE INDEX IF NOT EXISTS showcase_votes_voter_idx ON showcase_votes (voter_id, created_at);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS hide_donations BOOLEAN NOT NULL DEFAULT false;
+
+-- Concours vitrines
+-- One row per finished Paris week (Monday), so the weekly prize is handed out exactly once.
+CREATE TABLE IF NOT EXISTS showcase_weeks (
+    week    DATE PRIMARY KEY,
+    done_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS showcase_awards (
+    week       DATE NOT NULL,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rank       INTEGER NOT NULL,
+    votes      INTEGER NOT NULL,
+    nuggets    INTEGER NOT NULL,
+    claimed_at TIMESTAMPTZ,
+    PRIMARY KEY (week, user_id)
+);
+CREATE INDEX IF NOT EXISTS showcase_awards_unclaimed_idx ON showcase_awards (user_id) WHERE claimed_at IS NULL;

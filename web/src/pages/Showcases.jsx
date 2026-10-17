@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Crown, Flame, Frame, Globe2, Trophy, Users } from 'lucide-react';
 import { api } from '../api.jsx';
+import { Nugget, NUGGET_COLOR } from '../components/Currency.jsx';
 import { ShowcaseThumb, VoteButton } from '../components/Showcase.jsx';
 import SeasonBadge from '../components/SeasonBadge.jsx';
 
@@ -9,7 +10,7 @@ const profile = (name) => `/joueur/${encodeURIComponent(name)}`;
 
 const SORTS = [
     { key: 'recent', label: 'Récentes', Icon: Clock, text: 'Les dernières vitrines créées ou modifiées par les joueurs.' },
-    { key: 'week', label: 'Top semaine', Icon: Flame, text: 'Les vitrines qui ont reçu le plus de ♥ ces 7 derniers jours.' },
+    { key: 'week', label: 'Top semaine', Icon: Flame, text: 'Les vitrines qui ont reçu le plus de ♥ cette semaine (depuis lundi). Le podium gagne des pépites !' },
     { key: 'all', label: 'Top de tous les temps', short: 'Top absolu', Icon: Trophy, text: 'Les vitrines les plus aimées depuis toujours.' },
 ];
 const MEDALS = ['#e9c46a', '#c3ccd8', '#cd8a4a'];
@@ -50,6 +51,45 @@ function Tile({ s, rank, onError }) {
     );
 }
 
+function timeLeft(endsAt) {
+    const ms = new Date(endsAt) - Date.now();
+    if (ms <= 0) return 'résultats imminents';
+    const h = Math.floor(ms / 3600_000);
+    return h >= 24 ? `fin dans ${Math.floor(h / 24)} j ${h % 24} h` : `fin dans ${h} h ${Math.floor(ms / 60_000) % 60} min`;
+}
+
+// Weekly contest: prizes, time left and last week's podium.
+function Contest({ contest, onWeek }) {
+    return (
+        <section className="mt-6 rounded-3xl p-4 sm:p-5 bg-gradient-to-br from-[#e9c46a]/15 to-transparent ring-1 ring-[#e9c46a]/30">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <p className="flex items-center gap-2 font-display text-lg text-white"><Crown className="w-5 h-5 text-[#e9c46a]" />Concours de la semaine</p>
+                <span className="text-xs font-semibold text-[#f3dc9b] bg-black/25 rounded-full px-2.5 py-1">{timeLeft(contest.endsAt)} · lundi 0 h</span>
+                {onWeek && <button onClick={onWeek} className="ml-auto text-sm font-semibold text-[#a8f0c6] hover:underline">Voir le classement →</button>}
+            </div>
+            <p className="mt-2 text-sm text-white/75">Les 3 vitrines qui reçoivent le plus de ♥ entre lundi et dimanche gagnent :</p>
+            <ul className="mt-2 flex flex-wrap gap-2">
+                {contest.prizes.map((n, i) => (
+                    <li key={i} className="flex items-center gap-1.5 rounded-full bg-black/25 pl-1 pr-3 py-1 text-sm font-bold tabular-nums" style={{ color: NUGGET_COLOR }}>
+                        <span className="grid place-items-center w-6 h-6 rounded-full text-xs text-[#2a1c00]" style={{ background: MEDALS[i] }}>{i + 1}</span>
+                        {n}<Nugget className="w-4 h-4" />
+                    </li>
+                ))}
+            </ul>
+            {contest.last.length > 0 && (
+                <p className="mt-3 text-xs text-ink-soft">
+                    Gagnants de la semaine dernière :{' '}
+                    {contest.last.map((w, i) => (
+                        <span key={w.username}>{i > 0 && ', '}
+                            <Link to={profile(w.username)} className="font-semibold text-white hover:underline">{w.username}</Link> ({w.votes} ♥)
+                        </span>
+                    ))}
+                </p>
+            )}
+        </section>
+    );
+}
+
 export default function Showcases() {
     const [sort, setSort] = useState('recent');
     const [scope, setScope] = useState('all');
@@ -57,13 +97,14 @@ export default function Showcases() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState('');
     const [note, setNote] = useState('');
+    const [contest, setContest] = useState(null);
     const current = SORTS.find((s) => s.key === sort);
 
     useEffect(() => {
         let live = true;
         setError('');
         api('showcases', { sort, scope })
-            .then((r) => live && setData(r))
+            .then((r) => { if (!live) return; setData(r); if (r.contest) setContest(r.contest); })
             .catch((e) => live && setError(e.message));
         return () => { live = false; };
     }, [sort, scope]);
@@ -97,6 +138,8 @@ export default function Showcases() {
                     <Frame className="w-4 h-4" />Ma vitrine
                 </Link>
             </div>
+
+            {contest && <Contest contest={contest} onWeek={sort === 'week' ? null : () => setSort('week')} />}
 
             <div className="mt-6 flex flex-wrap gap-2">
                 {SORTS.map(({ key, label, short, Icon }) => (

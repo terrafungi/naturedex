@@ -1037,6 +1037,55 @@ async function showcaseVotes(db, ownerId, meId) {
     return v;
 }
 
+// Weekly contest: the 3 showcases with the most ♥ received during the Paris week (Monday 00:00 →
+// next Monday) win pépites, handed out once the week is over and claimed from a pop-up.
+const SHOWCASE_PRIZES = [300, 200, 100];
+const PARIS_WEEK = `date_trunc('week', now() AT TIME ZONE 'Europe/Paris')`; // local timestamp of this Monday 00:00
+const parisWeekStart = (week) => `(${week}::timestamp AT TIME ZONE 'Europe/Paris')`;
+
+// Runs every minute from the schedule; only the first run after Monday 00:00 does anything.
+// `week` / `tests` let the test script settle an arbitrary week among zz_test_ accounts only.
+async function showcaseWeekRollover(db, { week = null, tests = false } = {}) {
+    return inTransaction(db, async (client) => {
+        const { rows: [w] } = await client.query(
+            `INSERT INTO showcase_weeks (week) VALUES (COALESCE($1::date, (${PARIS_WEEK} - interval '7 days')::date))
+             ON CONFLICT DO NOTHING RETURNING week::text AS week`, [week]);
+        if (!w) return null;
+        const { rows } = await client.query(
+            `SELECT v.owner_id, COUNT(*)::int AS votes FROM showcase_votes v
+             JOIN users u ON u.id = v.owner_id JOIN showcases s ON s.user_id = v.owner_id
+             WHERE v.created_at >= ${parisWeekStart('$1::date')} AND v.created_at < ${parisWeekStart('($1::date + 7)')}
+               AND (u.username LIKE 'zz\\_test\\_%') = $2
+             GROUP BY v.owner_id ORDER BY votes DESC, MAX(v.created_at), v.owner_id LIMIT $3`,
+            [w.week, tests, SHOWCASE_PRIZES.length]);
+        for (const [i, r] of rows.entries()) {
+            await client.query(
+                `INSERT INTO showcase_awards (week, user_id, rank, votes, nuggets) VALUES ($1, $2, $3, $4, $5)`,
+                [w.week, r.owner_id, i + 1, r.votes, SHOWCASE_PRIZES[i]]);
+        }
+        return { week: w.week, winners: rows.length };
+    });
+}
+
+// Prizes won and not yet collected (pop-up + Vitrines badge).
+async function unclaimedAwards(db, userId) {
+    const { rows } = await db.query(
+        `SELECT week::text AS week, rank, votes, nuggets FROM showcase_awards
+         WHERE user_id = $1 AND claimed_at IS NULL ORDER BY week, rank`, [userId]);
+    return rows;
+}
+
+// The running week (end time, prizes) and last week's podium, shown on the gallery.
+async function showcaseContest(db) {
+    const { rows } = await db.query(
+        `SELECT a.rank, a.votes, a.nuggets, u.username, a.week::text AS week FROM showcase_awards a JOIN users u ON u.id = a.user_id
+         WHERE a.week = (SELECT MAX(week) FROM showcase_weeks WHERE week < (${PARIS_WEEK})::date)
+           AND u.username NOT LIKE 'zz\\_test\\_%'
+         ORDER BY a.rank`);
+    const { rows: [e] } = await db.query(`SELECT ${parisWeekStart(`(${PARIS_WEEK} + interval '7 days')`)} AS "endsAt"`);
+    return { prizes: SHOWCASE_PRIZES, endsAt: e.endsAt, last: rows };
+}
+
 // previews: add the thumbnails of the binder's 3 rarest cards (public profile)
 async function binderState(db, userId, previews = false) {
     const { rows: binders } = await db.query(
@@ -1485,7 +1534,7 @@ const actions = {
         } };
     },
 
-    // Gallery of everyone's showcases: latest, or ranked by votes (last 7 days / all time).
+    // Gallery of everyone's showcases: latest, or ranked by votes (this Paris week / all time).
     async showcases(db, body, event) {
         const user = await requireUser(db, event);
         const sort = ['week', 'all'].includes(body.sort) ? body.sort : 'recent';
@@ -1496,7 +1545,7 @@ const actions = {
         const { rows } = await db.query(
             `WITH v AS (
                 SELECT owner_id, COUNT(*)::int AS total,
-                       COUNT(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS week,
+                       COUNT(*) FILTER (WHERE created_at >= ${parisWeekStart(PARIS_WEEK)})::int AS week,
                        bool_or(voter_id = $1) AS voted
                 FROM showcase_votes GROUP BY owner_id
              )
@@ -1521,7 +1570,21 @@ const actions = {
             sort, scope: friends ? 'friends' : 'all',
             showcases: rows.slice(0, limit).map(({ total, week, ...r }) => withBadge({ ...r, votes: sort === 'week' ? week : total, totalVotes: total })),
             more: rows.length > limit,
+            contest: offset === 0 ? await showcaseContest(db) : undefined,
         };
+    },
+
+    async claimShowcaseAward(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.week || ''))) throw new HttpError(400, 'Semaine invalide');
+        return inTransaction(db, async (client) => {
+            const { rows: [a] } = await client.query(
+                `UPDATE showcase_awards SET claimed_at = now() WHERE user_id = $1 AND week = $2 AND claimed_at IS NULL RETURNING nuggets`,
+                [user.id, body.week]);
+            if (!a) throw new HttpError(409, 'Récompense déjà récupérée');
+            const { rows: [u] } = await client.query(`UPDATE users SET nuggets = nuggets + $2 WHERE id = $1 RETURNING *`, [user.id, a.nuggets]);
+            return { nuggets: a.nuggets, user: await publicUser(client, u) };
+        });
     },
 
     async voteShowcase(db, body, event) {
@@ -1937,11 +2000,13 @@ const actions = {
     async badges(db, body, event) {
         const user = await requireUser(db, event);
         const pub = await publicUser(db, user);
-        const [badges, gifts] = await Promise.all([
+        const [badges, gifts, awards] = await Promise.all([
             badgeCounts(db, user, pub),
             pub.social.newGifts ? unseenGifts(db, user.id) : [],
+            unclaimedAwards(db, user.id),
         ]);
-        return { user: pub, badges, gifts };
+        if (awards.length) badges['/vitrines'] = awards.length;
+        return { user: pub, badges, gifts, awards };
     },
 
     // Closes the « cadeau reçu » pop-up: every gift up to `upTo` is marked as seen.
@@ -2405,6 +2470,7 @@ export const handler = async (event) => {
         await settleAuctions(getPool());
         await seasonRollover(getPool(), inTransaction);
         if (stripeReady() && new Date().getUTCMinutes() % 5 === 0) await refreshPendingPurchases(getPool());
+        await showcaseWeekRollover(getPool()).catch((err) => console.error('showcaseWeekRollover', err));
         await blogTick(getPool()).catch((err) => console.error('blogTick', err));
         return { ok: true };
     }
