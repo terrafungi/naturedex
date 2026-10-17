@@ -178,7 +178,8 @@ async function llm(prompt) {
         if (left < 20_000) break;
         res = await fetch(ep.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...ep.headers }, body, signal: AbortSignal.timeout(ep.name === 'openkbs' ? left : Math.min(left, 50_000)) })
             .catch((err) => ({ ok: false, status: 0, text: async () => err.message }));
-        if (res.ok) break;
+        if (res.ok) { console.log(`blog: LLM via ${ep.name}`); break; }
+        console.log(`blog: ${ep.name} failed ${res.status}`);
         errors.push(`${ep.name} ${res.status} ${(await res.text()).slice(0, 150)}`);
     }
     if (!res?.ok) throw new Error(`LLM ${errors.join(' | ')}`);
