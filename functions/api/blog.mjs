@@ -90,7 +90,7 @@ function commonsPage(url) {
     return m ? `https://commons.wikimedia.org/wiki/File:${m[1]}` : 'https://commons.wikimedia.org/';
 }
 
-// Psychoactive / drug species are never blog topics (young audience).
+// Psychoactive species are welcome topics, but written as information, never as a how-to.
 const DRUGS = /psilocyb|hallucinog|psychotrop|psychoacti|enth[ée]og|narcoti|mescalin|cannabino|\bLSD\b|opiac|opioïd|cocaïn|ayahuasca/i;
 
 // Popular cards for a category, never already featured in a post.
@@ -115,7 +115,7 @@ async function pickCards(db, cat) {
         const texts = await Promise.all(rows.slice(i, i + 3).map((c) => wikiText(c.wiki_url).catch(() => '')));
         rows.slice(i, i + 3).forEach((card, j) => {
             const text = texts[j];
-            if (picked.length >= cat.count || text.length < 1500 || DRUGS.test(text)) return;
+            if (picked.length >= cat.count || text.length < 1500) return;
             if (cat.mustContain && !cat.mustContain.test(text)) return;
             if (cat.seasonal && !seasonal.test(text)) return;
             picked.push({ ...card, text: cat.count > 1 ? text.slice(0, 6000) : text });
@@ -142,7 +142,7 @@ async function pickNews(db) {
     for (const item of items.filter((i) => !usedSet.has(i.link)).slice(0, 8)) {
         const html = await fetchText(item.link).catch(() => '');
         const text = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)].map((m) => decode(m[1])).filter((p) => p.length > 60).join('\n').slice(0, 9000);
-        if (text.length < 1200 || DRUGS.test(`${item.title} ${text}`)) continue;
+        if (text.length < 1200) continue;
         const { rows: cards } = await db.query(
             `SELECT id, qid, name, sci_name, type, rarity, iucn, image_url, thumb_url, wiki_url FROM cards
              WHERE length(name) > 4 AND (position(lower(name) in lower($1)) > 0 OR (sci_name IS NOT NULL AND length(sci_name) > 6 AND position(lower(sci_name) in lower($1)) > 0))
@@ -150,7 +150,6 @@ async function pickNews(db) {
         if (!cards.length) continue;
         const main = cards[0];
         main.text = (await wikiText(main.wiki_url).catch(() => '')).slice(0, 5000);
-        if (DRUGS.test(main.text)) continue;
         return { item: { ...item, text }, cards };
     }
     throw new Error('Aucune actualité nature exploitable');
@@ -216,7 +215,9 @@ function prompt(cat, material) {
 Espèces concernées : ${material.cards.map((c) => c.name).join(', ')}.
 
 ${docs.join('\n\n')}
-
+${DRUGS.test(docs.join(' ')) ? `
+Cette espèce a des propriétés psychoactives : traite-les de façon informative (ethnobotanie, histoire, usages culturels ou rituels, chimie, recherche médicale, statut légal en France, risques et confusions dangereuses), sans jamais donner de conseils de cueillette, de préparation, de dosage ou de consommation, ni de section « comment la reconnaître pour la récolter ».
+` : ''}
 ${OUTPUT}`;
 }
 
