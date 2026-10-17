@@ -6,6 +6,7 @@ import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 import AwardNotice from './AwardNotice.jsx';
 import GiftNotice from './GiftNotice.jsx';
+import NewsNotice from './NewsNotice.jsx';
 
 export const NAV = [
     { to: '/', label: 'Accueil', Icon: Home, end: true },
@@ -190,6 +191,7 @@ export default function Layout() {
                 NatureDex · Images et textes : <a className="underline hover:text-white" href="https://fr.wikipedia.org" target="_blank" rel="noreferrer">Wikipédia</a> & Wikimedia Commons (licences libres) · Données : Wikidata · <a className="underline hover:text-white" href="https://naturedex.fr/api/blog">Blog nature</a>
             </footer>
             {user && <TabBar />}
+            {user && <NewsNotice />}
             {user && <GiftNotice />}
             {user && <AwardNotice />}
         </div>

@@ -371,3 +371,7 @@ CREATE TABLE IF NOT EXISTS showcase_awards (
     PRIMARY KEY (week, user_id)
 );
 CREATE INDEX IF NOT EXISTS showcase_awards_unclaimed_idx ON showcase_awards (user_id) WHERE claimed_at IS NULL;
+
+-- Nouveautés
+-- Id of the last « Nouveautés » pop-up the player closed (shown once per account, on any device).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS news_seen TEXT;

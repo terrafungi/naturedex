@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Gift, MessageCircle } from 'lucide-react';
 import { Nugget, NUGGET_COLOR, Plant, PLANT_COLOR, Seed, SEED_COLOR } from './Currency.jsx';
 import { api, useGame } from '../api.jsx';
+import { hasNews } from '../news.js';
 
 const KINDS = {
     coins: { Icon: Seed, color: SEED_COLOR, one: 'graine', many: 'graines' },
@@ -13,7 +14,7 @@ const KINDS = {
 // Pop-up shown at the next visit after a friend sent graines, pépites or plantes.
 // Closing it (or answering) marks those gifts as seen, which also clears the Amis badge.
 export default function GiftNotice() {
-    const { gifts, setGifts, refreshBadges } = useGame();
+    const { user, gifts, setGifts, refreshBadges } = useGame();
     const senders = [...new Set(gifts.map((g) => g.from))];
 
     function close() {
@@ -24,7 +25,7 @@ export default function GiftNotice() {
 
     return (
         <AnimatePresence>
-            {gifts.length > 0 && (
+            {gifts.length > 0 && !hasNews(user) && (
                 <motion.div key="gift-notice" className="fixed inset-0 z-[110] grid place-items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={close} />
                     <motion.div role="dialog" aria-labelledby="gift-notice-title"

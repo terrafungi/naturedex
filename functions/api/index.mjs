@@ -152,6 +152,8 @@ async function publicUser(db, user) {
         recycleValue: RECYCLE_VALUE,
         social: await socialCounts(db, user.id),
         quizPerDay: QUIZ_PER_DAY,
+        newsSeen: user.news_seen,
+        joinedAt: user.created_at,
         ...rows[0],
     };
 }
@@ -2007,6 +2009,15 @@ const actions = {
         ]);
         if (awards.length) badges['/vitrines'] = awards.length;
         return { user: pub, badges, gifts, awards };
+    },
+
+    // Closes the « Nouveautés » pop-up for good on this account.
+    async seenNews(db, body, event) {
+        const user = await requireUser(db, event);
+        const id = String(body.id || '');
+        if (!/^[\w.-]{1,40}$/.test(id)) throw new HttpError(400, 'Nouveauté invalide');
+        await db.query(`UPDATE users SET news_seen = $2 WHERE id = $1`, [user.id, id]);
+        return { ok: true };
     },
 
     // Closes the « cadeau reçu » pop-up: every gift up to `upTo` is marked as seen.

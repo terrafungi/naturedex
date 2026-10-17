@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Crown, Frame } from 'lucide-react';
 import { Nugget, NUGGET_COLOR } from './Currency.jsx';
 import { api, useGame } from '../api.jsx';
+import { hasNews } from '../news.js';
 
 const MEDALS = ['#e9c46a', '#c3ccd8', '#cd8a4a'];
 const PLACES = ['1re', '2e', '3e'];
@@ -20,14 +21,14 @@ function weekLabel(week) {
 // Shown after the gift pop-up; « Plus tard » keeps the prize (and the Vitrines badge) until the
 // next visit of the Vitrines page.
 export default function AwardNotice() {
-    const { awards, setAwards, gifts, setUser } = useGame();
+    const { user, awards, setAwards, gifts, setUser } = useGame();
     const [later, setLater] = useState([]);
     const { pathname } = useLocation();
     useEffect(() => { if (pathname === '/vitrines') setLater([]); }, [pathname]);
     const [done, setDone] = useState(null); // prize just collected
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
-    const award = done || (gifts.length ? null : awards.find((a) => !later.includes(a.week)));
+    const award = done || (gifts.length || hasNews(user) ? null : awards.find((a) => !later.includes(a.week)));
 
     async function claim() {
         setBusy(true);
