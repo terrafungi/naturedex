@@ -1,4 +1,6 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { Heart } from 'lucide-react';
+import { api } from '../api.jsx';
 import { drawShowcase, loadCardImage, loadFonts } from '../showcase.js';
 
 // The showcase picture, drawn at full export size and scaled down by CSS.
@@ -66,4 +68,81 @@ export async function shareShowcase(showcase, username) {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
     return 'downloaded';
+}
+
+// Small picture of a showcase for galleries: drawn once it scrolls into view, then kept as a
+// light JPEG, so a page of full-size canvases never sits in memory. Drawing is queued one at a time.
+let drawQueue = Promise.resolve();
+let bigCanvas = null;
+export function ShowcaseThumb({ showcase, username, width = 480, className = '' }) {
+    const box = useRef(null);
+    const [src, setSrc] = useState(null);
+
+    useEffect(() => {
+        let live = true;
+        let url = null;
+        const io = new IntersectionObserver(async ([entry]) => {
+            if (!entry.isIntersecting) return;
+            io.disconnect();
+            const images = new Map();
+            await Promise.all([loadFonts(), ...showcase.cards.map(async (c) => {
+                const img = await loadCardImage(c.thumb_url);
+                if (img) images.set(c.id, img);
+            })]);
+            drawQueue = drawQueue.then(async () => {
+                if (!live) return;
+                bigCanvas ||= document.createElement('canvas');
+                drawShowcase(bigCanvas, { ...showcase, username }, images);
+                const small = document.createElement('canvas');
+                small.width = width;
+                small.height = Math.round((width * bigCanvas.height) / bigCanvas.width);
+                small.getContext('2d').drawImage(bigCanvas, 0, 0, small.width, small.height);
+                const blob = await new Promise((resolve) => small.toBlob(resolve, 'image/jpeg', 0.85));
+                if (!live || !blob) return;
+                url = URL.createObjectURL(blob);
+                setSrc(url);
+            }).catch(() => {});
+        }, { rootMargin: '400px' });
+        io.observe(box.current);
+        return () => { live = false; io.disconnect(); if (url) URL.revokeObjectURL(url); };
+    }, [showcase, username, width]);
+
+    return (
+        <div ref={box} className={`relative w-full overflow-hidden ${className}`} style={{ aspectRatio: showcase.format === 'carre' ? '1 / 1' : '9 / 16' }}>
+            {src
+                ? <img src={src} alt={showcase.title || `Vitrine de ${username}`} className="absolute inset-0 w-full h-full object-cover" />
+                : <div className="absolute inset-0 animate-pulse bg-white/[0.06]" />}
+        </div>
+    );
+}
+
+// ♥ vote for someone's showcase: the count changes at once and rolls back if the server refuses.
+// `votes` is whatever count the page shows (this week or all time); a vote moves it by one.
+export function VoteButton({ username, votes, voted, mine, onError, className = '' }) {
+    const [state, setState] = useState({ votes, voted });
+    const [busy, setBusy] = useState(false);
+    useEffect(() => { setState({ votes, voted }); }, [votes, voted]);
+
+    async function toggle() {
+        if (mine || busy) return;
+        const prev = state;
+        setState({ voted: !prev.voted, votes: prev.votes + (prev.voted ? -1 : 1) });
+        setBusy(true);
+        try {
+            const r = await api(prev.voted ? 'unvoteShowcase' : 'voteShowcase', { username });
+            setState({ voted: r.voted, votes: prev.votes + (r.voted ? 1 : 0) - (prev.voted ? 1 : 0) });
+        } catch (e) {
+            setState(prev);
+            onError?.(e.message);
+        } finally { setBusy(false); }
+    }
+
+    const label = mine ? 'Ta vitrine' : state.voted ? 'Retirer mon vote' : 'Voter pour cette vitrine';
+    return (
+        <button type="button" onClick={toggle} disabled={mine} aria-pressed={state.voted} aria-label={label} title={label}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold tabular-nums transition ${state.voted ? 'bg-[#ff6b8a]/15 text-[#ff9fb3] ring-1 ring-[#ff6b8a]/40' : 'bg-white/[0.06] text-white/80 hover:bg-white/10'} ${mine ? 'opacity-60 cursor-default' : ''} ${className}`}>
+            <Heart className={`w-4 h-4 ${state.voted ? 'fill-current' : ''}`} />
+            {state.votes.toLocaleString('fr-FR')}
+        </button>
+    );
 }

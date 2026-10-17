@@ -343,3 +343,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS blog_one_generating ON blog_posts ((true)) WHE
 CREATE UNIQUE INDEX IF NOT EXISTS blog_one_per_day ON blog_posts (day) WHERE status = 'published';
 CREATE INDEX IF NOT EXISTS blog_published_idx ON blog_posts (published_at DESC) WHERE status = 'published';
 CREATE INDEX IF NOT EXISTS blog_category_idx ON blog_posts (category, published_at DESC) WHERE status = 'published';
+
+-- Vitrines publiques
+CREATE TABLE IF NOT EXISTS showcase_votes (
+    voter_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (voter_id, owner_id)
+);
+CREATE INDEX IF NOT EXISTS showcase_votes_owner_idx ON showcase_votes (owner_id, created_at);
+CREATE INDEX IF NOT EXISTS showcase_votes_voter_idx ON showcase_votes (voter_id, created_at);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS hide_donations BOOLEAN NOT NULL DEFAULT false;

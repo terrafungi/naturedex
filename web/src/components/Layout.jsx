@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, BookOpen, Brain, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
+import { Award, BookOpen, Brain, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 import GiftNotice from './GiftNotice.jsx';
@@ -14,6 +14,7 @@ export const NAV = [
     { to: '/combat', label: 'Combat', Icon: Swords },
     { to: '/quiz', label: 'Quiz', Icon: Brain },
     { to: '/classement', label: 'Classement', Icon: Medal },
+    { to: '/vitrines', label: 'Vitrines', Icon: Frame },
     { to: '/encheres', label: 'Enchères', Icon: Gavel },
     { to: '/amis', label: 'Amis', Icon: Users },
     { to: '/messages', label: 'Messages', Icon: MessageCircle },
@@ -152,8 +153,8 @@ function TabBar() {
                     )}
                 </AnimatePresence>
                 <div className="nd-tabbar pointer-events-auto mx-auto w-full max-w-md xl:w-fit xl:max-w-none flex gap-1 p-1.5 rounded-[1.6rem]">
-                    {primary.map((item) => <TabItem key={item.to} {...item} className="flex-1 min-w-0 xl:flex-none xl:w-[4.55rem]" />)}
-                    {more.map((item) => <TabItem key={item.to || item.href} {...item} className="hidden xl:flex xl:w-[4.55rem]" />)}
+                    {primary.map((item) => <TabItem key={item.to} {...item} className="flex-1 min-w-0 xl:flex-none xl:w-[4.25rem]" />)}
+                    {more.map((item) => <TabItem key={item.to || item.href} {...item} className="hidden xl:flex xl:w-[4.25rem]" />)}
                     <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="nd-more"
                         className={`xl:hidden relative flex-1 min-w-0 flex flex-col items-center gap-1 py-2 rounded-2xl text-[10.5px] sm:text-[11px] font-semibold transition-colors ${open || activeMore ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25 text-[#a8f0c6]' : 'text-white/80 hover:text-white'}`}>
                         <MoreIcon className="w-5 h-5" strokeWidth={1.8} />

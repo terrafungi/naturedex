@@ -406,6 +406,216 @@ export const BACKGROUNDS = {
             }
             for (let i = 0; i < 12; i++) sparkle(ctx, rand() * W, rand() * H, 8 + rand() * 16, 'rgba(255,240,255,0.85)');
         },
+    },    recif: {
+        label: 'Récif corallien', ink: '#f2fffd', accent: '#7ff0e6', premium: true,
+        paint(ctx, W, H, rand) {
+            vertical(ctx, W, H, ['#38c6d6', '#0f8aa8', '#075a7d', '#043a57']);
+            // light rays from the surface
+            ctx.globalAlpha = 0.09;
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < 7; i++) {
+                const x = W * (rand() * 1.1 - 0.05), w = W * (0.03 + rand() * 0.06);
+                ctx.beginPath();
+                ctx.moveTo(x, 0); ctx.lineTo(x + w, 0); ctx.lineTo(x + w * 4 - W * 0.15, H); ctx.lineTo(x - W * 0.15, H);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            // branching corals and round brain corals along the floor
+            const colors = ['#ff7a8a', '#ff9f5a', '#f45fae', '#ffd166', '#c86bff'];
+            const branch = (x, y, len, angle, width, depth) => {
+                const x2 = x + Math.sin(angle) * len, y2 = y - Math.cos(angle) * len;
+                ctx.lineWidth = width;
+                ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+                if (depth > 0) for (const d of [-1, 1]) branch(x2, y2, len * (0.65 + rand() * 0.2), angle + d * (0.3 + rand() * 0.4), width * 0.7, depth - 1);
+            };
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 9; i++) {
+                ctx.strokeStyle = colors[i % colors.length];
+                ctx.globalAlpha = 0.55 + rand() * 0.35;
+                branch(W * (rand() * 1.1 - 0.05), H * (0.98 + rand() * 0.03), H * (0.05 + rand() * 0.05), (rand() - 0.5) * 0.5, W * 0.018, 4);
+            }
+            for (let i = 0; i < 8; i++) {
+                ctx.globalAlpha = 0.7;
+                ctx.fillStyle = colors[(i + 2) % colors.length];
+                ctx.beginPath(); ctx.ellipse(W * rand(), H * (0.97 + rand() * 0.03), W * (0.05 + rand() * 0.06), H * 0.03, 0, Math.PI, 0); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#05324a';
+            ctx.fillRect(0, H * 0.985, W, H);
+            // bubbles
+            for (let i = 0; i < 70; i++) {
+                const r = 2 + rand() * 9;
+                ctx.strokeStyle = `rgba(230,255,255,${0.25 + rand() * 0.4})`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.arc(rand() * W, rand() * H * 0.9, r, 0, Math.PI * 2); ctx.stroke();
+            }
+        },
+    },
+    sousbois: {
+        label: 'Sous-bois brumeux', ink: '#f3f7e8', accent: '#cfe7a2', premium: true,
+        paint(ctx, W, H, rand) {
+            vertical(ctx, W, H, ['#a9c79a', '#5f8a5a', '#2c4a30', '#142618']);
+            // three planes of trunks, fading into the mist
+            for (const [alpha, tone, n] of [[0.25, '#3f5d40', 9], [0.5, '#2a4029', 7], [0.85, '#14200f', 5]]) {
+                for (let i = 0; i < n; i++) {
+                    const x = W * rand(), w = W * (0.02 + rand() * 0.03) * (1 + alpha);
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = tone;
+                    ctx.beginPath();
+                    ctx.moveTo(x - w * 0.5, 0); ctx.lineTo(x + w * 0.5, 0); ctx.lineTo(x + w * 0.8, H); ctx.lineTo(x - w * 0.8, H);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 0.35;
+                vertical(ctx, W, H, ['rgba(220,235,200,0.0)', 'rgba(220,235,200,0.5)', 'rgba(220,235,200,0.0)']);
+            }
+            // god rays
+            ctx.globalAlpha = 0.12;
+            ctx.fillStyle = '#fffbe0';
+            for (let i = 0; i < 4; i++) {
+                const x = W * (0.2 + rand() * 0.6);
+                ctx.beginPath();
+                ctx.moveTo(x, 0); ctx.lineTo(x + W * 0.1, 0); ctx.lineTo(x + W * 0.45, H); ctx.lineTo(x + W * 0.2, H);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            for (let i = 0; i < 8; i++) frond(ctx, W * rand(), H * (1 + rand() * 0.05), H * (0.18 + rand() * 0.12), (rand() - 0.5) * 1.2, `rgba(40,80,40,${0.6 + rand() * 0.3})`);
+            for (let i = 0; i < 50; i++) glow(ctx, rand() * W, rand() * H, 3 + rand() * 8, `rgba(255,250,210,${0.2 + rand() * 0.4})`);
+        },
+    },
+    cerisiers: {
+        label: 'Cerisiers en fleurs', ink: '#4a1630', accent: '#c2185b', premium: true,
+        paint(ctx, W, H, rand) {
+            vertical(ctx, W, H, ['#ffe4ee', '#ffc9dc', '#f7a8c4', '#fde3ec']);
+            glow(ctx, W * 0.75, H * 0.12, W * 0.45, 'rgba(255,255,255,0.7)');
+            // dark branches entering from the sides
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#4b2a2f';
+            const blossoms = [];
+            const branch = (x, y, len, angle, width, depth) => {
+                const x2 = x + Math.cos(angle) * len, y2 = y + Math.sin(angle) * len;
+                ctx.lineWidth = width;
+                ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo((x + x2) / 2 + (rand() - 0.5) * len * 0.3, (y + y2) / 2, x2, y2); ctx.stroke();
+                blossoms.push([x2, y2]);
+                if (depth > 0) for (const d of [-1, 1]) branch(x2, y2, len * (0.6 + rand() * 0.2), angle + d * (0.35 + rand() * 0.4), width * 0.65, depth - 1);
+            };
+            branch(-W * 0.05, H * 0.08, W * 0.35, 0.25, W * 0.035, 4);
+            branch(W * 1.05, H * 0.3, W * 0.3, Math.PI - 0.3, W * 0.03, 4);
+            for (const [x, y] of blossoms) {
+                for (let k = 0; k < 6; k++) {
+                    const px = x + (rand() - 0.5) * W * 0.08, py = y + (rand() - 0.5) * W * 0.08, r = W * (0.008 + rand() * 0.01);
+                    ctx.fillStyle = rand() < 0.5 ? '#ffffff' : '#ff9ec0';
+                    for (let p = 0; p < 5; p++) {
+                        const a = (p / 5) * Math.PI * 2;
+                        ctx.beginPath(); ctx.arc(px + Math.cos(a) * r, py + Math.sin(a) * r, r * 0.8, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.fillStyle = '#e0457b';
+                    ctx.beginPath(); ctx.arc(px, py, r * 0.4, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+            // falling petals
+            for (let i = 0; i < 90; i++) {
+                ctx.save();
+                ctx.translate(rand() * W, rand() * H);
+                ctx.rotate(rand() * Math.PI);
+                ctx.fillStyle = `rgba(255,${130 + rand() * 80},${170 + rand() * 50},${0.5 + rand() * 0.4})`;
+                ctx.beginPath(); ctx.ellipse(0, 0, 5 + rand() * 6, 3 + rand() * 3, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+        },
+    },
+    savane: {
+        label: 'Savane au couchant', ink: '#fff4e0', accent: '#ffc46b', premium: true,
+        paint(ctx, W, H, rand) {
+            vertical(ctx, W, H, ['#3b1d4a', '#a83a3a', '#f0782a', '#ffc35c', '#e8892e']);
+            glow(ctx, W * 0.5, H * 0.66, W * 0.6, 'rgba(255,220,120,0.55)');
+            ctx.fillStyle = '#fff1c4';
+            ctx.beginPath(); ctx.arc(W * 0.5, H * 0.66, W * 0.13, 0, Math.PI * 2); ctx.fill();
+            ridge(ctx, W, H, H * 0.74, H * 0.03, 'rgba(120,40,30,0.55)', rand);
+            ctx.fillStyle = '#2a120c';
+            ctx.fillRect(0, H * 0.8, W, H);
+            // acacias: a trunk and a flat umbrella crown
+            const acacia = (x, y, s) => {
+                ctx.strokeStyle = '#2a120c';
+                ctx.lineCap = 'round';
+                ctx.lineWidth = s * 0.06;
+                ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + s * 0.05, y - s * 0.55); ctx.lineTo(x - s * 0.25, y - s * 0.8); ctx.moveTo(x + s * 0.05, y - s * 0.55); ctx.lineTo(x + s * 0.3, y - s * 0.82); ctx.stroke();
+                ctx.fillStyle = '#2a120c';
+                for (let k = 0; k < 7; k++) {
+                    ctx.beginPath(); ctx.ellipse(x - s * 0.45 + (k / 6) * s * 0.9, y - s * (0.85 + rand() * 0.06), s * 0.2, s * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+                }
+            };
+            acacia(W * 0.2, H * 0.81, W * 0.45);
+            acacia(W * 0.82, H * 0.805, W * 0.28);
+            // tall grass
+            ctx.strokeStyle = '#2a120c';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 220; i++) {
+                const x = rand() * W, h = H * (0.015 + rand() * 0.03);
+                ctx.beginPath(); ctx.moveTo(x, H * 0.805); ctx.quadraticCurveTo(x + 4, H * 0.805 - h / 2, x + (rand() - 0.5) * 14, H * 0.805 - h); ctx.stroke();
+            }
+            // birds
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 6; i++) {
+                const x = W * (0.3 + rand() * 0.4), y = H * (0.2 + rand() * 0.2), s = 10 + rand() * 12;
+                ctx.beginPath(); ctx.moveTo(x - s, y); ctx.quadraticCurveTo(x - s / 2, y - s / 2, x, y); ctx.quadraticCurveTo(x + s / 2, y - s / 2, x + s, y); ctx.stroke();
+            }
+        },
+    },
+    abysses: {
+        label: 'Abysses lumineuses', ink: '#eafcff', accent: '#5ff5ff', premium: true,
+        paint(ctx, W, H, rand) {
+            vertical(ctx, W, H, ['#021a2e', '#010d1c', '#00050d']);
+            ctx.globalCompositeOperation = 'lighter';
+            // drifting plankton
+            for (let i = 0; i < 260; i++) {
+                const c = rand() < 0.7 ? '90,240,255' : '190,120,255';
+                glow(ctx, rand() * W, rand() * H, 2 + rand() * 7, `rgba(${c},${0.3 + rand() * 0.6})`);
+            }
+            // jellyfish: a glowing bell and wavy tentacles
+            for (let i = 0; i < 5; i++) {
+                const x = W * (0.1 + rand() * 0.8), y = H * (0.1 + rand() * 0.7), r = W * (0.05 + rand() * 0.07);
+                const c = ['110,230,255', '220,130,255', '120,255,200'][i % 3];
+                glow(ctx, x, y, r * 2.4, `rgba(${c},0.18)`);
+                ctx.fillStyle = `rgba(${c},0.35)`;
+                ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.75, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+                ctx.strokeStyle = `rgba(${c},0.45)`;
+                ctx.lineWidth = 2;
+                for (let k = 0; k < 6; k++) {
+                    const tx = x - r * 0.8 + (k / 5) * r * 1.6;
+                    ctx.beginPath(); ctx.moveTo(tx, y);
+                    for (let s = 1; s <= 6; s++) ctx.lineTo(tx + Math.sin(s + k) * r * 0.15, y + s * r * 0.4);
+                    ctx.stroke();
+                }
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = 'rgba(95,245,255,0.35)';
+            ctx.lineWidth = 3;
+            rrect(ctx, 30, 30, W - 60, H - 60, 22); ctx.stroke();
+        },
+    },
+    arcenciel: {
+        label: 'Prisme arc-en-ciel', ink: '#ffffff', accent: '#fff3a6', premium: true,
+        paint(ctx, W, H, rand) {
+            const g = ctx.createConicGradient(rand() * Math.PI, W * 0.5, H * 0.45);
+            ['#ff5f6d', '#ffc371', '#fff36b', '#6bff9e', '#5fd8ff', '#8a6bff', '#ff6bd6', '#ff5f6d'].forEach((c, i, a) => g.addColorStop(i / (a.length - 1), c));
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, W, H);
+            // soften into a pearly iridescence, darker at the edges for the text
+            ctx.fillStyle = 'rgba(255,255,255,0.28)';
+            ctx.fillRect(0, 0, W, H);
+            const v = ctx.createRadialGradient(W / 2, H / 2, W * 0.2, W / 2, H / 2, Math.max(W, H) * 0.75);
+            v.addColorStop(0, 'rgba(30,10,60,0)');
+            v.addColorStop(1, 'rgba(30,10,60,0.55)');
+            ctx.fillStyle = v;
+            ctx.fillRect(0, 0, W, H);
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < 10; i++) glow(ctx, rand() * W, rand() * H, W * (0.1 + rand() * 0.2), 'rgba(255,255,255,0.18)');
+            ctx.globalCompositeOperation = 'source-over';
+            for (let i = 0; i < 24; i++) sparkle(ctx, rand() * W, rand() * H, 6 + rand() * 18, `rgba(255,255,255,${0.5 + rand() * 0.5})`);
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+            ctx.lineWidth = 3;
+            rrect(ctx, 30, 30, W - 60, H - 60, 22); ctx.stroke();
+        },
     },
 };
 

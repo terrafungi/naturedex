@@ -4,7 +4,7 @@ import { ArrowLeft, Frame, Lock, MessageCircle, Pencil, Star, UserPlus } from 'l
 import { api } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { LeafLogo } from '../components/Layout.jsx';
-import ShowcaseCanvas from '../components/Showcase.jsx';
+import ShowcaseCanvas, { VoteButton } from '../components/Showcase.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
 
 const n = (v) => Number(v || 0).toLocaleString('fr-FR');
@@ -89,6 +89,7 @@ export default function Player() {
 // The player's showcase picture; on one's own profile, a way to create or edit it.
 function Showcase({ player }) {
     const { showcase } = player;
+    const [error, setError] = useState('');
     if (!showcase) {
         if (!player.me) return null;
         return (
@@ -112,6 +113,12 @@ function Showcase({ player }) {
                 style={{ maxWidth: showcase.format === 'story' ? 'min(100%, 24rem, calc(75vh * 9 / 16))' : 'min(100%, 34rem, 75vh)' }}>
                 <ShowcaseCanvas showcase={showcase} username={player.username} />
             </div>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                <VoteButton username={player.username} votes={showcase.votes || 0} voted={!!showcase.voted} mine={player.me} onError={setError} />
+                <span className="text-xs text-ink-soft">{player.me ? 'Les ♥ reçus par ta vitrine' : 'Tu aimes cette vitrine ? Vote pour elle !'}</span>
+                <Link to="/vitrines" className="text-xs font-semibold text-[#a8f0c6] hover:underline">Toutes les vitrines</Link>
+            </div>
+            {error && <p className="mt-2 text-center text-xs text-[#ffc2ae]">{error}</p>}
         </section>
     );
 }

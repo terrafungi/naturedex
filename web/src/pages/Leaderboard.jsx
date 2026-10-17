@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Award, Brain, Crown, Gem, Layers, Medal, Users, Globe2, Swords } from 'lucide-react';
+import { Award, Brain, Crown, EyeOff, Gem, HeartHandshake, Layers, Medal, Users, Globe2, Swords } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.jsx';
 import SeasonBadge from '../components/SeasonBadge.jsx';
@@ -9,6 +9,8 @@ const profile = (name) => `/joueur/${encodeURIComponent(name)}`;
 
 const n = (v) => Number(v).toLocaleString('fr-FR');
 const plural = (v, word) => `${n(v)} ${word}${v > 1 ? 's' : ''}`;
+const euros = (cents) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: cents % 100 ? 2 : 0 });
+const score = (board, v) => (board.format ? board.format(v) : n(v));
 
 // `unit` labels the score, `extra` the tie-breaker shown under the name.
 const BOARDS = [
@@ -18,6 +20,7 @@ const BOARDS = [
     { key: 'prestige', label: 'Prestige', Icon: Crown, unit: 'points', text: 'Chaque espèce découverte rapporte des points selon sa rareté : Peu commune 1, Rare 3, Épique 8, Légendaire 25, Secrète 100.', extra: (v) => v ? plural(v, 'légendaire') : null },
     { key: 'arena', label: 'Arène', Icon: Swords, unit: 'points', text: 'Cote de l\'arène classée : +/− selon la force de l\'adversaire battu ou perdu (départ à 1000).', extra: (v) => plural(v, 'victoire') },
     { key: 'trophies', label: 'Trophées', Icon: Award, unit: 'trophées', text: 'Nombre de trophées récupérés.', extra: () => null },
+    { key: 'donors', label: 'Donateurs', Icon: HeartHandshake, unit: 'donnés', format: euros, text: '20 % de chaque achat en boutique est reversé à l\'association choisie (LPO, WWF, Humanité & Biodiversité). Classement par montant total reversé.', extra: (v, r) => [plural(v, 'achat'), r.assoc].filter(Boolean).join(' · ') },
 ];
 const PODIUM = ['#e9c46a', '#c3ccd8', '#cd8a4a'];
 
@@ -53,7 +56,7 @@ function Podium({ rows, board }) {
                     <Link to={profile(r.username)} className={`mt-2 max-w-full flex items-center gap-1 text-sm font-semibold hover:underline ${r.me ? 'text-[#a8f0c6]' : 'text-white'}`}>
                         <span className="truncate min-w-0">{r.username}{r.me && ' (toi)'}</span><SeasonBadge badge={r.badge} compact />
                     </Link>
-                    <p className="text-xs text-ink-soft tabular-nums">{n(r.score)} {board.unit}</p>
+                    <p className="text-xs text-ink-soft tabular-nums">{score(board, r.score)} {board.unit}</p>
                     <div className={`mt-2 w-full ${heights[i]} rounded-t-2xl grid place-items-start justify-center pt-2 font-display text-2xl font-semibold text-[#10261a]`}
                         style={{ background: `linear-gradient(to bottom, ${PODIUM[r.rank - 1] || PODIUM[2]}, color-mix(in oklab, ${PODIUM[r.rank - 1] || PODIUM[2]} 30%, transparent))` }}>
                         {r.rank}
@@ -65,7 +68,7 @@ function Podium({ rows, board }) {
 }
 
 function Row({ r, board }) {
-    const extra = board.extra(r.extra);
+    const extra = board.extra(r.extra, r);
     return (
         <li className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 rounded-2xl ${r.me ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/30' : 'bg-white/[0.03]'}`}>
             <span className="w-8 text-center font-display text-lg font-semibold tabular-nums text-white/60">{r.rank}</span>
@@ -77,10 +80,30 @@ function Row({ r, board }) {
                 {extra && <p className="text-xs text-ink-soft">{extra}</p>}
             </div>
             <span className="text-right">
-                <span className="block font-bold tabular-nums text-white">{n(r.score)}</span>
+                <span className="block font-bold tabular-nums text-white">{score(board, r.score)}</span>
                 <span className="block text-[11px] text-ink-soft">{board.unit}</span>
             </span>
         </li>
+    );
+}
+
+// Donors can choose not to show their amount publicly.
+function DonorPrivacy({ hidden, onChange, reload }) {
+    const [busy, setBusy] = useState(false);
+    async function toggle() {
+        setBusy(true);
+        try {
+            const r = await api('setDonationPrivacy', { hidden: !hidden });
+            onChange(r.hidden);
+            reload();
+        } finally { setBusy(false); }
+    }
+    return (
+        <label className="mt-6 flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] text-sm text-white/80 cursor-pointer">
+            <input type="checkbox" checked={hidden} disabled={busy} onChange={toggle} className="w-4 h-4 accent-[#4fd18b]" />
+            <EyeOff className="w-4 h-4 text-ink-soft" />
+            Ne pas apparaître dans le classement des donateurs
+        </label>
     );
 }
 
@@ -90,6 +113,7 @@ export default function Leaderboard() {
     const [scope, setScope] = useState('all');
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
+    const [reload, setReload] = useState(0);
     const board = BOARDS.find((b) => b.key === boardKey);
 
     useEffect(() => {
@@ -99,7 +123,7 @@ export default function Leaderboard() {
             .then((res) => live && setData(res))
             .catch((e) => live && setError(e.message));
         return () => { live = false; };
-    }, [boardKey, period, scope]);
+    }, [boardKey, period, scope, reload]);
 
     const fresh = data && data.board === boardKey && data.scope === scope && (boardKey !== 'quiz' || data.period === period);
     const top = fresh ? data.top : [];
@@ -127,6 +151,9 @@ export default function Leaderboard() {
                 </div>
             )}
             <p className="mt-4 text-sm text-ink-soft">{board.text}</p>
+            {boardKey === 'donors' && (
+                <p className="mt-2 text-sm"><Link to="/boutique" className="inline-flex items-center gap-1.5 font-semibold text-[#a8f0c6] hover:underline"><HeartHandshake className="w-4 h-4" />Soutenir une association depuis la boutique</Link></p>
+            )}
 
             {error && <p className="mt-6 text-sm font-semibold text-rust">{error}</p>}
             {!fresh && !error && <p className="mt-10 text-center text-ink-soft">Chargement…</p>}
@@ -137,8 +164,8 @@ export default function Leaderboard() {
                         <span className="grid place-items-center w-10 h-10 shrink-0 rounded-full bg-[#4fd18b]/15 text-[#a8f0c6]"><Medal className="w-5 h-5" /></span>
                         <p className="text-sm text-white/85">
                             {me
-                                ? <>Ta position : <strong className="text-white">{me.rank}<sup>{me.rank === 1 ? 'er' : 'e'}</sup></strong> sur {plural(data.players, 'joueur')}, avec {n(me.score)} {board.unit}.</>
-                                : <>Tu n'es pas encore classé{boardKey === 'quiz' ? ' : termine un quiz du jour pour entrer dans la course' : ''}.{data.players > 0 && <> {plural(data.players, 'joueur')} classé{data.players > 1 ? 's' : ''}.</>}</>}
+                                ? <>Ta position : <strong className="text-white">{me.rank}<sup>{me.rank === 1 ? 'er' : 'e'}</sup></strong> sur {plural(data.players, 'joueur')}, avec {score(board, me.score)} {board.unit}.</>
+                                : <>Tu n'es pas encore classé{boardKey === 'quiz' ? ' : termine un quiz du jour pour entrer dans la course' : boardKey === 'donors' ? (data.donor?.hidden ? ' : tu as choisi de ne pas apparaître ici' : ' : chaque achat en boutique soutient une association') : ''}.{data.players > 0 && <> {plural(data.players, 'joueur')} classé{data.players > 1 ? 's' : ''}.</>}</>}
                         </p>
                     </div>
 
@@ -159,6 +186,7 @@ export default function Leaderboard() {
                             )}
                         </>
                     )}
+                    {boardKey === 'donors' && data.donor?.donated && <DonorPrivacy hidden={data.donor.hidden} onChange={(hidden) => setData((d) => ({ ...d, donor: { ...d.donor, hidden } }))} reload={() => setReload((k) => k + 1)} />}
                 </>
             )}
         </div>

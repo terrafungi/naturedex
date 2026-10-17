@@ -339,6 +339,10 @@ const BOARDS = {
                      FROM user_cards uc JOIN cards c ON c.id = uc.card_id GROUP BY 1`,
     trophies: () => `SELECT user_id, COUNT(*)::int AS score, 0 AS extra FROM trophy_claims GROUP BY 1`,
     arena: () => `SELECT user_id, rating AS score, wins AS extra FROM arena WHERE wins + losses > 0`,
+    // Real (live) payments only; 20% of each goes to the chosen association. Players can opt out.
+    donors: () => `SELECT p.user_id, SUM(p.donation_cents)::int AS score, COUNT(*)::int AS extra
+                   FROM purchases p JOIN users u ON u.id = p.user_id
+                   WHERE p.status = 'paid' AND p.livemode AND NOT u.hide_donations GROUP BY 1`,
 };
 
 // Best final arena rank of a player (top 10, rated seasons only), shown as a badge next to the name.
@@ -993,7 +997,10 @@ async function addToBinder(db, userId, binderId, cardId) {
 // and exported as an image by the browser.
 const SHOWCASE_MAX = 10;
 // Premium backgrounds, unlocked for good with pépites (price each).
-const SHOWCASE_PREMIUM = { aurore: 250, volcan: 400, galaxie: 600 };
+const SHOWCASE_PREMIUM = {
+    aurore: 250, volcan: 400, galaxie: 600,
+    recif: 300, sousbois: 350, cerisiers: 450, savane: 500, abysses: 700, arcenciel: 900,
+};
 const SHOWCASE_BACKGROUNDS = ['foret', 'ocean', 'nuit', 'herbier', 'or', 'aube', 'jungle', 'givre', ...Object.keys(SHOWCASE_PREMIUM)];
 
 async function ownedBackgrounds(db, userId) {
@@ -1015,6 +1022,19 @@ async function loadShowcase(db, userId) {
     if (!rows.length) return null;
     const { card_ids, updated_at, ...rest } = s;
     return { ...rest, updatedAt: updated_at, cards: rows };
+}
+
+// Public gallery: votes needed to vote (no throwaway accounts) and a daily cap per voter.
+const VOTE_MIN_HOURS = 24;
+const VOTE_MIN_OPENINGS = 3;
+const VOTES_PER_DAY = 30;
+const GALLERY_PAGE = 24;
+
+async function showcaseVotes(db, ownerId, meId) {
+    const { rows: [v] } = await db.query(
+        `SELECT COUNT(*)::int AS votes, COALESCE(bool_or(voter_id = $2), false) AS voted FROM showcase_votes WHERE owner_id = $1`,
+        [ownerId, meId]);
+    return v;
 }
 
 // previews: add the thumbnails of the binder's 3 rarest cards (public profile)
@@ -1398,7 +1418,9 @@ const actions = {
         const { rows } = await db.query(
             `WITH s AS (${BOARDS[board](week)}),
              r AS (
-                SELECT u.username, s.score, s.extra, u.id = $1 AS me, ${SEASON_BADGE('u.id')},
+                SELECT u.username, s.score, s.extra, u.id = $1 AS me, ${SEASON_BADGE('u.id')},${board === 'donors' ? `
+                       (SELECT mode() WITHIN GROUP (ORDER BY association) FROM purchases
+                        WHERE user_id = u.id AND status = 'paid' AND livemode) AS assoc,` : ''}
                        RANK() OVER (ORDER BY s.score DESC, s.extra DESC)::int AS rank,
                        COUNT(*) OVER ()::int AS players
                 FROM s JOIN users u ON u.id = s.user_id
@@ -1412,7 +1434,16 @@ const actions = {
             [user.id, friends]
         );
         const me = rows.find((r) => r.me) || null;
+        for (const r of rows) if (r.assoc) r.assoc = ASSOCIATIONS[r.assoc]?.name || r.assoc;
+        let donor = null;
+        if (board === 'donors') {
+            const { rows: [d] } = await db.query(
+                `SELECT u.hide_donations AS hidden, EXISTS (SELECT 1 FROM purchases WHERE user_id = u.id AND status = 'paid' AND livemode) AS donated
+                 FROM users u WHERE id = $1`, [user.id]);
+            donor = d;
+        }
         return {
+            donor, share: DONATION_SHARE,
             board, period: week ? 'week' : 'all', scope: friends ? 'friends' : 'all',
             players: rows[0]?.players || 0,
             top: rows.filter((r) => r.rank <= 50).slice(0, 50).map(({ players, ...r }) => withBadge(r)),
@@ -1450,8 +1481,79 @@ const actions = {
             seasons: seasons.map((r) => ({ ...r, label: seasonLabel(r.season) })),
             binders: shared ? binders.filter((b) => b.count) : null,
             binderCount: binders.filter((b) => b.count).length,
-            showcase: await loadShowcase(db, p.id),
+            showcase: await loadShowcase(db, p.id).then(async (s) => s && { ...s, ...(await showcaseVotes(db, p.id, user.id)) }),
         } };
+    },
+
+    // Gallery of everyone's showcases: latest, or ranked by votes (last 7 days / all time).
+    async showcases(db, body, event) {
+        const user = await requireUser(db, event);
+        const sort = ['week', 'all'].includes(body.sort) ? body.sort : 'recent';
+        const friends = body.scope === 'friends';
+        const limit = Math.min(GALLERY_PAGE, Math.max(1, Number(body.limit) || GALLERY_PAGE));
+        const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
+        const order = { recent: 's.updated_at DESC', week: 'week DESC, total DESC, s.updated_at DESC', all: 'total DESC, week DESC, s.updated_at DESC' }[sort];
+        const { rows } = await db.query(
+            `WITH v AS (
+                SELECT owner_id, COUNT(*)::int AS total,
+                       COUNT(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS week,
+                       bool_or(voter_id = $1) AS voted
+                FROM showcase_votes GROUP BY owner_id
+             )
+             SELECT * FROM (
+                SELECT u.username, u.id = $1 AS me, s.title, s.background, s.layout, s.format, s.updated_at AS "updatedAt",
+                       COALESCE(v.total, 0) AS total, COALESCE(v.week, 0) AS week, COALESCE(v.voted, false) AS voted,
+                       ${SEASON_BADGE('u.id')},
+                       (SELECT json_agg(x) FROM (
+                            SELECT ${LIGHT_FIELDS} FROM cards c JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = s.user_id
+                            WHERE c.id = ANY(s.card_ids) ORDER BY array_position(s.card_ids, c.id)) x) AS cards
+                FROM showcases s JOIN users u ON u.id = s.user_id LEFT JOIN v ON v.owner_id = s.user_id
+                WHERE (u.username NOT LIKE 'zz\\_test\\_%' OR u.id = $1 OR $5)
+                  AND (NOT $2 OR u.id = $1 OR EXISTS (
+                        SELECT 1 FROM friendships f WHERE f.status = 'accepted'
+                          AND ((f.requester_id = $1 AND f.addressee_id = u.id) OR (f.addressee_id = $1 AND f.requester_id = u.id))))
+                ORDER BY ${order}, u.id
+             ) g WHERE cards IS NOT NULL
+             LIMIT $3 OFFSET $4`,
+            [user.id, friends, limit + 1, offset, user.username.startsWith('zz_test_')]
+        );
+        return {
+            sort, scope: friends ? 'friends' : 'all',
+            showcases: rows.slice(0, limit).map(({ total, week, ...r }) => withBadge({ ...r, votes: sort === 'week' ? week : total, totalVotes: total })),
+            more: rows.length > limit,
+        };
+    },
+
+    async voteShowcase(db, body, event) {
+        const user = await requireUser(db, event);
+        const owner = await findUser(db, body.username);
+        if (owner.id === user.id) throw new HttpError(400, 'Tu ne peux pas voter pour ta propre vitrine');
+        const { rows: [s] } = await db.query(`SELECT 1 FROM showcases WHERE user_id = $1`, [owner.id]);
+        if (!s) throw new HttpError(404, `${owner.username} n'a pas de vitrine`);
+        const { rows: [me] } = await db.query(
+            `SELECT created_at < now() - make_interval(hours => $2) AS old,
+                    (SELECT COUNT(*)::int FROM openings WHERE user_id = u.id) AS opened,
+                    (SELECT COUNT(*)::int FROM showcase_votes WHERE voter_id = u.id AND created_at >= ${PARIS_TODAY}) AS today
+             FROM users u WHERE id = $1`, [user.id, VOTE_MIN_HOURS]);
+        if (!me.old || me.opened < VOTE_MIN_OPENINGS) {
+            throw new HttpError(403, `Pour voter, ton compte doit avoir plus de ${VOTE_MIN_HOURS} h et ${VOTE_MIN_OPENINGS} boosters ouverts`);
+        }
+        if (me.today >= VOTES_PER_DAY) throw new HttpError(429, `${VOTES_PER_DAY} votes par jour maximum, reviens demain`);
+        await db.query(`INSERT INTO showcase_votes (voter_id, owner_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [user.id, owner.id]);
+        return showcaseVotes(db, owner.id, user.id);
+    },
+
+    async unvoteShowcase(db, body, event) {
+        const user = await requireUser(db, event);
+        const owner = await findUser(db, body.username);
+        await db.query(`DELETE FROM showcase_votes WHERE voter_id = $1 AND owner_id = $2`, [user.id, owner.id]);
+        return showcaseVotes(db, owner.id, user.id);
+    },
+
+    async setDonationPrivacy(db, body, event) {
+        const user = await requireUser(db, event);
+        await db.query(`UPDATE users SET hide_donations = $2 WHERE id = $1`, [user.id, !!body.hidden]);
+        return { hidden: !!body.hidden };
     },
 
     async showcase(db, body, event) {

@@ -10,6 +10,7 @@ import Boosters from './pages/Boosters.jsx';
 import Garden from './pages/Garden.jsx';
 import Collection from './pages/Collection.jsx';
 import ShowcaseEditor from './pages/ShowcaseEditor.jsx';
+import Showcases from './pages/Showcases.jsx';
 import CardPage from './pages/CardPage.jsx';
 import Challenges from './pages/Challenges.jsx';
 import Profile from './pages/Profile.jsx';
@@ -61,6 +62,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/joueur/:username" element={<Private><Player /></Private>} />
                         <Route path="/collection" element={<Private><Collection /></Private>} />
                         <Route path="/vitrine" element={<Private><ShowcaseEditor /></Private>} />
+                        <Route path="/vitrines" element={<Private><Showcases /></Private>} />
                         <Route path="/carte/:id" element={<Private><CardPage /></Private>} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>
