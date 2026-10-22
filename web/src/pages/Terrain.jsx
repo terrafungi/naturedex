@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Camera, Check, Flag, Layers, MapPin, Sparkles, Trash2, Users, X } from 'lucide-react';
+import { AlertTriangle, Camera, Check, Flag, Layers, MapPin, Sparkles, Trash2, Users, X } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, FieldCard } from '../components/Card.jsx';
 import { Amount } from '../components/Currency.jsx';
@@ -185,6 +185,10 @@ export default function Terrain() {
                                     <p className="text-sm text-white/75 text-center">{result.observation.reason}</p>
                                     {result.observation.captive && <p className="mt-1 text-xs text-[#ffd36e] text-center">Animal ou plante en captivité : récompense divisée par deux.</p>}
                                     <h2 className="mt-4 font-display text-xl text-white text-center">Quelle espèce as-tu photographiée ?</h2>
+                                    <p className="mt-2 flex items-start gap-2 p-3 rounded-2xl bg-[#ffd36e]/10 border border-[#ffd36e]/25 text-xs text-[#ffe4a3]">
+                                        <AlertTriangle className="w-4 h-4 shrink-0 mt-px" />
+                                        <span>L'IA peut se tromper, surtout entre espèces qui se ressemblent. Compare avec la photo de la carte avant de valider, et choisis « Aucune de ces espèces » en cas de doute.</span>
+                                    </p>
                                     <div className="mt-3 space-y-2">
                                         {result.observation.candidates.map(({ card, confidence, owned, hasField }) => {
                                             const r = RARITIES[card.rarity] || RARITIES.common;
@@ -246,6 +250,9 @@ export default function Terrain() {
                     </button>
                 ))}
             </div>
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-white/50 text-center">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />Identifications faites par une IA : elles peuvent contenir des erreurs.
+            </p>
             {tab === 'feed' && feed?.stats && (
                 <p className="mt-3 text-center text-sm text-white/60">{feed.stats.total} observations · {feed.stats.species} espèces · {feed.stats.players} naturalistes</p>
             )}
@@ -313,6 +320,9 @@ export function FieldViewer({ obs, onClose, onDeleted }) {
                             Observation n°{obs.number} de l'espèce sur NatureDex, par <Link to={`/joueur/${obs.username}`} className="font-semibold underline">{obs.username}</Link>
                             {obs.region ? `, ${obs.region}` : ''}.
                             {obs.captive && ' Photographiée en captivité.'}
+                        </p>
+                        <p className="mt-2 flex items-start gap-1.5 text-xs text-white/55">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />Espèce identifiée par une IA et validée par le joueur : une erreur reste possible. Signale la photo si elle est fausse.
                         </p>
                         <div className="mt-4 w-40"><Link to={`/carte/${obs.card.id}`}><Card card={obs.card} number={obs.card.num} /></Link></div>
                         <div className="mt-5 flex flex-wrap gap-3 text-sm">

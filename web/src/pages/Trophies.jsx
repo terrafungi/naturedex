@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-    Award, BookOpen, Check, Copy, Crown, Gavel, Gem, Globe2, Layers, Lock, Package, Recycle, ShoppingCart, Sparkles, Star, Trophy, Users, ArrowLeftRight, Brain, Lightbulb, Target, Flame, HeartHandshake, Swords, Map as MapIcon, Medal, Podium,
+    Award, BookOpen, Check, Copy, Crown, Gavel, Gem, Globe2, Layers, Lock, Package, Recycle, ShoppingCart, Sparkles, Star, Trophy, Users, ArrowLeftRight, Brain, Lightbulb, Target, Flame, HeartHandshake, Swords, Map as MapIcon, Medal, Podium, Camera, Compass, Aperture, Flag, CalendarDays,
 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Amount } from '../components/Currency.jsx';
@@ -11,6 +11,7 @@ const ICONS = {
     book: BookOpen, layers: Layers, globe: Globe2, copy: Copy, package: Package, star: Star, gem: Gem, crown: Crown,
     sparkles: Sparkles, trophy: Trophy, gavel: Gavel, cart: ShoppingCart, recycle: Recycle, users: Users, swap: ArrowLeftRight,
     brain: Brain, lightbulb: Lightbulb, target: Target, flame: Flame, heart: HeartHandshake, swords: Swords, map: MapIcon, medal: Medal, podium: Podium, champion: Crown,
+    camera: Camera, compass: Compass, aperture: Aperture, flag: Flag, calendar: CalendarDays,
 };
 // Medal colour by tier: bronze, argent, or, platine… up to the rainbow of the last tier.
 const TIERS = ['#cd8a4a', '#c3ccd8', '#e9c46a', '#8fe3dc', '#4fd18b', '#4ea8ff', '#b28bff', '#ff6b8b', '#ff5fd2'];

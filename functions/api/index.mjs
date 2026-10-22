@@ -328,6 +328,15 @@ const TROPHIES = [
         (g) => g > 1 ? `Termine ${g} saisons d'arène sur le podium` : 'Termine une saison d\'arène sur le podium (top 3)'),
     ...series('Combat', 'champion', 'seasonChampion', [[1, 'Champion de saison'], [3, 'Triple champion'], [6, 'Dynastie']],
         (g) => g > 1 ? `Termine ${g} saisons d'arène à la 1re place` : 'Termine une saison d\'arène à la 1re place'),
+    ...series('Terrain', 'camera', 'fieldSpecies', [[1, 'Premier cliché'], [10, 'Naturaliste de terrain'], [50, 'Œil de photographe'], [150, 'Inventaire vivant'], [500, 'Atlas de la biodiversité']],
+        (g) => g > 1 ? `Photographie ${n(g)} espèces différentes sur le terrain` : 'Photographie ta première espèce sur le terrain'),
+    ...series('Terrain', 'compass', 'fieldTypes', [[3, 'Œil curieux'], [6, 'Œil polyvalent'], [10, 'Tout-terrain']], (g) => `Photographie des espèces de ${g} types différents`),
+    ...series('Terrain', 'aperture', 'fieldRare', [[1, 'Belle trouvaille'], [10, 'Chasseur d\'images rares'], [30, 'Objectif rareté']],
+        (g) => `Photographie ${g} espèce${g > 1 ? 's' : ''} Rare${g > 1 ? 's' : ''} ou plus`),
+    ...series('Terrain', 'flag', 'fieldFirst', [[1, 'Pionnier'], [10, 'Défricheur'], [50, 'Grand découvreur']],
+        (g) => g > 1 ? `Sois le premier joueur à photographier ${g} espèces` : 'Sois le premier joueur à photographier une espèce'),
+    ...series('Terrain', 'calendar', 'fieldDays', [[7, 'Sorties régulières'], [30, 'Un mois dehors'], [100, 'Cent sorties nature']],
+        (g) => `Fais une observation ${g} jours différents`),
     ...series('Enchères', 'recycle', 'recycled', [[10, 'Tri sélectif'], [100, 'Recycleur'], [1000, 'Compost géant']], (g) => `Recycle ${n(g)} doublons`),
 ];
 
@@ -489,6 +498,13 @@ async function trophyList(db, userId) {
                     (SELECT COUNT(*) FILTER (WHERE rank <= 10)::int FROM season_results WHERE user_id = $1 AND rating >= ${SEASON_MIN_RATING}) AS "seasonTop10",
                     (SELECT COUNT(*) FILTER (WHERE rank <= 3)::int FROM season_results WHERE user_id = $1 AND rating >= ${SEASON_MIN_RATING}) AS "seasonPodium",
                     (SELECT COUNT(*) FILTER (WHERE rank = 1)::int FROM season_results WHERE user_id = $1 AND rating >= ${SEASON_MIN_RATING}) AS "seasonChampion",
+                    (SELECT COUNT(*)::int FROM observations WHERE user_id = $1 AND status = 'confirmed') AS "fieldSpecies",
+                    (SELECT COUNT(DISTINCT c.type)::int FROM observations o JOIN cards c ON c.id = o.card_id WHERE o.user_id = $1 AND o.status = 'confirmed') AS "fieldTypes",
+                    (SELECT COUNT(*)::int FROM observations o JOIN cards c ON c.id = o.card_id WHERE o.user_id = $1 AND o.status = 'confirmed'
+                        AND c.rarity IN ('rare', 'epic', 'legendary', 'secret')) AS "fieldRare",
+                    (SELECT COUNT(*)::int FROM observations WHERE user_id = $1 AND status = 'confirmed' AND first_ever) AS "fieldFirst",
+                    (SELECT COUNT(DISTINCT (confirmed_at AT TIME ZONE 'Europe/Paris')::date)::int FROM observations
+                        WHERE user_id = $1 AND status IN ('confirmed', 'replaced')) AS "fieldDays",
                     recycled FROM users WHERE id = $1`, [userId]),
         db.query(`SELECT c.type, c.rarity, COUNT(*)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
                   WHERE uc.user_id = $1 GROUP BY 1, 2`, [userId]),
