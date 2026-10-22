@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
-import { ArrowRight, BookOpen, ChevronRight, Clock, Compass, Dices, Eye, GalleryVerticalEnd, Gem, Leaf, PackageOpen, Shield, Sparkles, Zap } from 'lucide-react';
+import { motion, useInView } from 'motion/react';
+import { ArrowRight, Award, BookOpen, Brain, CalendarCheck, Camera, ChevronRight, Clock, Compass, Eye, Frame, Gavel, GalleryVerticalEnd, Gem, HeartHandshake, Leaf, Shield, Shirt, Sprout, Swords, Users, Zap } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard, TypeBadge } from '../components/Card.jsx';
 import { ChallengeCard, SAMPLE_CHALLENGES } from '../components/Challenge.jsx';
-import { Pack } from '../components/Pack.jsx';
-import BoosterOpening from '../components/BoosterOpening.jsx';
+import AvatarStage from '../components/AvatarStage.jsx';
+import PatronBadge from '../components/PatronBadge.jsx';
+import { defaultAvatar } from '../components/PlayerAvatar.jsx';
 import { RARITIES, TYPES, formatViews } from '../game.jsx';
 
 const RARITY_TIERS = {
@@ -17,13 +18,6 @@ const RARITY_TIERS = {
     legendary: 'Top 1 % de son type',
     secret: 'Les 50 espèces stars',
 };
-
-// Same odds as the server draw (functions/api).
-const SLOTS = [
-    ...Array(4).fill({ common: 70, uncommon: 30 }),
-    { uncommon: 80, rare: 17, epic: 3 },
-    { rare: 70, epic: 22, legendary: 8 },
-];
 
 const EASE = [0.16, 1, 0.3, 1];
 
@@ -62,31 +56,14 @@ function useShowcase(catalog) {
             const all = byViews.filter((c) => c.type === key);
             return { key, star: all[0], count: Object.values(catalog.types[key] || {}).reduce((a, n) => a + n, 0) };
         }).sort((a, b) => (b.star?.views || 0) - (a.star?.views || 0));
-        const pools = Object.fromEntries(Object.keys(RARITIES).map((r) => [r, cards.filter((c) => c.rarity === r)]));
 
         const named = (list) => list.filter((c) => c.sci_name && c.name !== c.sci_name);
         const lanes = FEATURED_ORDER.map((r) => distinctTypes(named(r === 'rare' ? scramble(of(r)) : of(r)), 6));
         const featured = [];
         for (let k = 0; k < 6; k++) for (const lane of lanes) if (lane[k]) featured.push(lane[k]);
 
-        return { ladder, types, pools, featured, top: of('legendary').slice(0, 6) };
+        return { ladder, types, featured, top: of('legendary').slice(0, 6) };
     }, [catalog]);
-}
-
-function drawDemo(pools) {
-    const picked = new Set();
-    return SLOTS.map((weights) => {
-        let roll = Math.random() * 100;
-        let rarity = Object.keys(weights).at(-1);
-        for (const [r, w] of Object.entries(weights)) {
-            if ((roll -= w) < 0) { rarity = r; break; }
-        }
-        const pool = pools[rarity]?.length ? pools[rarity] : pools.common;
-        let card;
-        for (let i = 0; i < 8 && (!card || picked.has(card.id)); i++) card = pool[Math.floor(Math.random() * pool.length)];
-        picked.add(card.id);
-        return card;
-    });
 }
 
 function Pill({ children, className = '' }) {
@@ -129,27 +106,31 @@ function SectionTitle({ kicker, children, sub, center }) {
 /* ---------- hero (mockup) ---------- */
 
 function Hero() {
-    const { user } = useGame();
     const fade = (delay) => ({ initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.9, delay, ease: EASE } });
     return (
         <section className="relative isolate overflow-hidden">
             <motion.div className="nd-hero-bg" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 2.4, ease: EASE }} />
             <div className="max-w-6xl mx-auto px-5 sm:px-6 pt-36 sm:pt-44 pb-14 sm:pb-24 min-h-[640px] sm:min-h-[760px] md:min-h-[min(88vh,860px)] flex flex-col justify-end">
-                <motion.h1 {...fade(0.1)} className="font-display font-medium leading-[0.98] text-[clamp(3.1rem,11vw,6.6rem)] text-white drop-shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+                <motion.div {...fade(0)}>
+                    <Link to="/exploration" className="inline-flex items-center gap-2 rounded-full nd-glass pl-1.5 pr-3.5 py-1.5 text-xs font-semibold text-white/90 hover:bg-white/10 transition-colors">
+                        <span className="rounded-full bg-[#4fd18b] text-[#05130d] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">Nouveau</span>
+                        Exploration sur la carte · Avatar 3D<ChevronRight className="w-3.5 h-3.5 text-white/60" />
+                    </Link>
+                </motion.div>
+                <motion.h1 {...fade(0.1)} className="mt-5 font-display font-medium leading-[0.98] text-[clamp(3.1rem,11vw,6.6rem)] text-white drop-shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                     Collectionne<br /><span className="text-[#a8f0c6] italic">la Nature</span>
                 </motion.h1>
-                <motion.p {...fade(0.25)} className="mt-5 max-w-md text-[15px] sm:text-lg leading-relaxed text-white/75">
-                    Des créatures extraordinaires, des paysages majestueux, un monde à protéger.
+                <motion.p {...fade(0.25)} className="mt-5 max-w-lg text-[15px] sm:text-lg leading-relaxed text-white/75">
+                    Capture les espèces cachées autour de chez toi, photographie le vivant sur le terrain, ouvre des boosters et habille ton naturaliste en 3D.
                 </motion.p>
                 <motion.div {...fade(0.4)} className="mt-8 flex items-end justify-between gap-4">
                     <div className="flex flex-col sm:flex-row gap-3">
-                        <Link to={user ? '/booster' : '/connexion?mode=register'} className="nd-cta-gold group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-bold text-sm sm:text-base whitespace-nowrap">
-                            <GalleryVerticalEnd className="w-5 h-5" />Ouvrir un Booster<ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                        <Link to="/exploration" className="nd-cta-gold group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-bold text-sm sm:text-base whitespace-nowrap">
+                            <Compass className="w-5 h-5" />Partir en exploration<ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                         </Link>
-                        <a href={user ? '/collection' : '#vedette'} onClick={user ? undefined : (e) => { e.preventDefault(); document.getElementById('vedette')?.scrollIntoView({ behavior: 'smooth' }); }}
-                            className="nd-cta-glass group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-semibold text-sm sm:text-base text-white whitespace-nowrap">
-                            <Compass className="w-5 h-5 text-[#a8f0c6]" />Explorer les Cartes<ChevronRight className="w-4 h-4 text-white/60 transition-transform group-hover:translate-x-0.5" />
-                        </a>
+                        <Link to="/booster" className="nd-cta-glass group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-semibold text-sm sm:text-base text-white whitespace-nowrap">
+                            <GalleryVerticalEnd className="w-5 h-5 text-[#a8f0c6]" />Ouvrir un booster<ChevronRight className="w-4 h-4 text-white/60 transition-transform group-hover:translate-x-0.5" />
+                        </Link>
                     </div>
                     <p className="shrink-0 text-right text-[8px] min-[400px]:text-[9px] sm:text-[11px] font-semibold uppercase tracking-[0.22em] sm:tracking-[0.28em] leading-[2] text-white/70 pb-1">
                         Plus qu'un jeu<br />une nature<br />à préserver
@@ -157,6 +138,112 @@ function Hero() {
                     </p>
                 </motion.div>
             </div>
+        </section>
+    );
+}
+
+/* ---------- everything you can do ---------- */
+
+// The two first tiles are wide; `fresh` ones carry a "Nouveau" tag.
+const FEATURES = [
+    { to: '/exploration', Icon: Compass, color: '#4fd18b', fresh: true, title: 'Exploration', text: 'Des cartes cachées sur une vraie carte autour de toi, avec les espèces qui vivent vraiment dans ta région. De nouvelles toutes les 30 minutes.' },
+    { to: '/avatar', Icon: Shirt, color: '#e9c46a', fresh: true, title: 'Ton avatar en 3D', text: 'Plus de 100 tenues, chapeaux et compagnons pour ton naturaliste. Fais-le tourner du doigt.' },
+    { to: '/terrain', Icon: Camera, color: '#7cc6ff', title: 'Sur le terrain', text: 'Photographie une vraie espèce : l\'IA la reconnaît et ta photo devient une carte unique.' },
+    { to: '/jardin', Icon: Sprout, color: '#8ee6a8', title: 'Jardin', text: 'Plante, récolte, et transforme tes plantes en boosters.' },
+    { to: '/combat', Icon: Swords, color: '#ff8a65', title: 'Combat', text: 'Au tour par tour, sans hasard. Saisons, classement et badges.' },
+    { to: '/quiz', Icon: Brain, color: '#c79bff', title: 'Quiz du jour', text: '10 questions sur le vivant, de facile à expert.' },
+    { to: '/encheres', Icon: Gavel, color: '#f4c25b', title: 'Enchères', text: 'Vends tes doubles, trouve les espèces qui te manquent.' },
+    { to: '/vitrines', Icon: Frame, color: '#ffb4d0', title: 'Vitrines', text: 'Compose et partage tes plus belles cartes.' },
+    { to: '/amis', Icon: Users, color: '#a8f0c6', title: 'Amis et messages', text: 'Échange, discute et compare vos carnets.' },
+    { to: '/trophees', Icon: Award, color: '#e9c46a', title: 'Trophées', text: 'Des dizaines de défis à débloquer au fil du jeu.' },
+];
+
+function Features() {
+    return (
+        <section className="max-w-6xl mx-auto px-5 sm:px-6 pt-8 pb-14">
+            <h2 className="font-display text-[1.7rem] sm:text-4xl font-medium text-white">Bien plus que des boosters</h2>
+            <p className="mt-1 text-ink-soft">Tout ce que tu peux faire dans NatureDex.</p>
+            <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                {FEATURES.map((f, i) => (
+                    <Reveal key={f.to} delay={(i % 4) * 0.06} className={i < 2 ? 'col-span-2' : ''}>
+                        <Link to={f.to} className="group relative flex flex-col h-full rounded-2xl nd-glass p-4 sm:p-5 overflow-hidden ring-1 ring-white/5 hover:ring-white/25 hover:-translate-y-0.5 transition">
+                            <span className="absolute -right-10 -top-10 w-32 h-32 rounded-full opacity-25 blur-2xl transition-opacity group-hover:opacity-45" style={{ background: f.color }} aria-hidden />
+                            <span className="flex items-center gap-2">
+                                <span className="grid place-items-center w-10 h-10 rounded-xl" style={{ background: `${f.color}22`, color: f.color }}><f.Icon className="w-5 h-5" /></span>
+                                {f.fresh && <span className="rounded-full bg-[#4fd18b] text-[#05130d] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">Nouveau</span>}
+                            </span>
+                            <h3 className={`mt-3 font-display font-semibold text-white ${i < 2 ? 'text-2xl' : 'text-lg'}`}>{f.title}</h3>
+                            <p className={`mt-1 text-white/65 leading-snug ${i < 2 ? 'text-sm sm:text-[15px]' : 'text-[13px]'}`}>{f.text}</p>
+                            <ChevronRight className="mt-auto pt-2 w-6 h-6 self-end text-white/30 transition group-hover:text-white group-hover:translate-x-0.5" />
+                        </Link>
+                    </Reveal>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+/* ---------- Pass Naturaliste ---------- */
+
+// Same values as PASS in functions/api/shop.mjs (and the free amounts it adds to).
+const PASS_PERKS = [
+    [CalendarCheck, 'Bonus du jour doublé', '200 graines + 40 pépites chaque jour'],
+    [Compass, '15 captures par jour', 'en Exploration, au lieu de 10'],
+    [Brain, '5 quiz par jour', 'au lieu de 3'],
+    [Shirt, '5 objets d\'avatar exclusifs', 'Mécène, Lauriers d\'or, Faon, garde forestier, Baskets ailées'],
+    [Leaf, 'Badge Mécène', 'à côté de ton pseudo'],
+    [HeartHandshake, '0,80 € par mois pour la nature', 'reversés à la LPO, au WWF France ou à Humanité & Biodiversité'],
+];
+const PASS_LOOK = { shirt: 'mecene', hat: 'lauriers', pet: 'faon', pants: 'garde', shoes: 'ailees', face: 'aucun', neck: 'aucun' };
+
+function PassSection() {
+    const { user } = useGame();
+    const stage = useRef(null);
+    // three.js is only downloaded once the section comes into view.
+    const seen = useInView(stage, { once: true, margin: '200px' });
+    const avatar = { ...(user.avatar || defaultAvatar(user.username)), ...PASS_LOOK };
+    const mine = user.pass;
+    return (
+        <section id="pass" className="px-5 sm:px-6 py-10 scroll-mt-20">
+            <Reveal>
+                <div className="relative isolate overflow-hidden max-w-6xl mx-auto rounded-[2rem] ring-1 ring-[#e9c46a]/50 shadow-[0_0_80px_-30px_#e9c46a] bg-[linear-gradient(135deg,#0d3321,#0a2418_50%,#3a2c0c)] grid md:grid-cols-[1fr_1.15fr] items-center">
+                    <Aurora className="-z-10 opacity-70" />
+                    <div ref={stage} className="p-4 sm:p-6 md:pr-0">
+                        {seen ? (
+                            <AvatarStage avatar={avatar} height={400} className="shadow-2xl shadow-black/40">
+                                <span className="pointer-events-none absolute top-4 left-4 rounded-full bg-black/45 backdrop-blur px-3 py-1 text-[11px] font-bold text-[#f4d88f]">Tenue du Pass, sur ton avatar</span>
+                            </AvatarStage>
+                        ) : <div className="h-[400px] rounded-3xl bg-white/5" />}
+                    </div>
+                    <div className="px-6 pb-8 pt-2 sm:px-10 md:py-10">
+                        <span className="inline-flex rounded-full bg-[#e9c46a] text-[#2a1c00] text-[11px] font-extrabold uppercase tracking-wider px-3 py-1">Abonnement solidaire</span>
+                        <h2 className="mt-4 font-display text-4xl sm:text-5xl font-semibold text-white leading-[1.02]">Le Pass <span className="nd-gold-text">Naturaliste</span></h2>
+                        <p className="mt-3 text-white/75">Plus de jeu chaque jour, une tenue que personne d'autre ne peut acheter, et un vrai coup de pouce régulier à la nature.</p>
+                        <ul className="mt-6 grid sm:grid-cols-2 gap-x-5 gap-y-3.5">
+                            {PASS_PERKS.map(([Icon, title, sub]) => (
+                                <li key={title} className="flex items-start gap-3">
+                                    <span className="grid place-items-center w-8 h-8 shrink-0 rounded-lg bg-[#e9c46a]/15 text-[#e9c46a]"><Icon className="w-4 h-4" /></span>
+                                    <span className="leading-snug"><b className="block text-sm text-white">{title}</b><span className="text-xs text-white/60">{sub}</span></span>
+                                </li>
+                            ))}
+                        </ul>
+                        {mine ? (
+                            <div className="mt-7 flex flex-wrap items-center gap-3">
+                                <PatronBadge />
+                                <span className="text-white/80">Merci, ton Pass est actif.</span>
+                                <Link to="/boutique" className="inline-flex items-center gap-1 text-sm font-semibold text-[#f4d88f] hover:text-white">Gérer mon Pass<ChevronRight className="w-4 h-4" /></Link>
+                            </div>
+                        ) : (
+                            <div className="mt-7 flex flex-wrap items-center gap-4">
+                                <Link to="/boutique" className="nd-cta-gold group inline-flex items-center gap-2 px-5 sm:px-6 py-3.5 rounded-full font-bold whitespace-nowrap">
+                                    <Leaf className="w-5 h-5" />Prendre le Pass · 3,99 €/mois<ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                                </Link>
+                                <span className="text-xs text-white/55">Sans engagement,<br />résiliable en un clic.</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </Reveal>
         </section>
     );
 }
@@ -319,60 +406,6 @@ function DailyChallenges() {
     );
 }
 
-function Demo({ show }) {
-    const [cards, setCards] = useState(null);
-    const [last, setLast] = useState(null);
-    const open = () => setCards(drawDemo(show.pools));
-    function close() {
-        setLast([...cards].sort((a, b) => RARITIES[b.rarity].order - RARITIES[a.rarity].order)[0]);
-        setCards(null);
-    }
-
-    return (
-        <section id="demo" className="px-5 py-24 scroll-mt-16">
-            <Reveal>
-                <div className="relative isolate overflow-hidden max-w-7xl mx-auto rounded-[2.5rem] nd-glass nd-ring px-6 sm:px-14 py-14 grid md:grid-cols-[1.2fr_1fr] gap-10 items-center">
-                    <Aurora className="-z-10 opacity-60" />
-                    <div>
-                        <Pill><Dices className="w-3.5 h-3.5 text-[#a8f0c6]" />Sans compte</Pill>
-                        <h2 className="mt-5 font-display text-4xl sm:text-6xl font-semibold tracking-[-0.01em] text-white leading-[1]">
-                            Essaie un booster<br /><span className="nd-grad-text">tout de suite.</span>
-                        </h2>
-                        <p className="mt-5 text-lg text-ink-soft max-w-md">Les mêmes chances que dans le vrai jeu. Touche le paquet, retourne les cartes… et croise les doigts pour une Légendaire.</p>
-                        <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold">
-                            {[['uncommon', '4 Communes ou Peu communes'], ['rare', '1 Rare garantie'], ['legendary', '8 % de Légendaire']].map(([r, label]) => (
-                                <span key={r} className="rounded-full px-3 py-1.5 border" style={{ color: RARITIES[r].color, background: `${RARITIES[r].color}18`, borderColor: `${RARITIES[r].color}55` }}>
-                                    {RARITIES[r].symbol} {label}
-                                </span>
-                            ))}
-                        </div>
-                        <button onClick={open} className="nd-btn mt-8 inline-flex items-center gap-2.5 px-7 py-4 rounded-2xl font-bold text-lg">
-                            <PackageOpen className="w-5 h-5" />Ouvrir un booster d'essai
-                        </button>
-                        {last && (
-                            <p className="mt-4 text-sm text-ink-soft">Ton dernier tirage : <b style={{ color: RARITIES[last.rarity].color }}>{last.name}</b> ({RARITIES[last.rarity].label}). Crée un compte pour garder tes cartes !</p>
-                        )}
-                    </div>
-                    <div className="relative flex justify-center py-6">
-                        <div className="nd-halo absolute left-1/2 top-1/2 w-[280px] h-[280px] -translate-x-1/2 -translate-y-1/2" />
-                        <motion.button onClick={open} aria-label="Ouvrir un booster d'essai"
-                            className="relative w-[200px] sm:w-[230px] cursor-pointer"
-                            animate={{ y: [0, -16, 0], rotate: [-4, 3, -4] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-                            whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}>
-                            <div className="drop-shadow-[0_40px_50px_rgba(40,0,90,0.6)]"><Pack /></div>
-                        </motion.button>
-                    </div>
-                </div>
-            </Reveal>
-            <AnimatePresence>
-                {cards && (
-                    <BoosterOpening key={cards.map((c) => c.id).join()} demo cards={cards} canOpenAgain onAgain={open} onClose={close} />
-                )}
-            </AnimatePresence>
-        </section>
-    );
-}
-
 function Rarity({ show }) {
     const { user } = useGame();
     const max = show.top[0]?.views || 1;
@@ -483,55 +516,24 @@ function Types({ show }) {
     );
 }
 
-function FinalCta() {
-    return (
-        <section className="px-5 pb-24">
-            <Reveal>
-                <div className="relative isolate overflow-hidden max-w-7xl mx-auto rounded-[2.5rem] px-8 sm:px-16 py-16 grid md:grid-cols-[1.4fr_1fr] gap-10 items-center bg-[linear-gradient(135deg,#0d3321,#0a2418_50%,#3a2c0c)]">
-                    <Aurora className="-z-10" />
-                    <div className="nd-rays absolute -right-40 top-1/2 w-[700px] h-[700px] -translate-y-1/2 -z-10" />
-                    <div>
-                        <Sparkles className="w-8 h-8 text-amber-300" />
-                        <h2 className="mt-4 font-display text-4xl sm:text-6xl font-semibold tracking-[-0.01em] text-white leading-[1]">Ton premier booster<br /><span className="nd-grad-text">t'attend.</span></h2>
-                        <p className="mt-5 text-white/70 text-lg max-w-md">Crée ton compte en 10 secondes, avec un pseudo et un mot de passe. 10 ouvertures gratuites t'attendent, rechargées toutes les heures.</p>
-                        <div className="mt-8 flex flex-wrap gap-3">
-                            <Link to="/connexion?mode=register" className="nd-btn inline-flex items-center gap-2.5 px-7 py-4 rounded-2xl font-bold text-lg">
-                                <PackageOpen className="w-5 h-5" />Commencer la collection
-                            </Link>
-                            <Link to="/connexion" className="inline-flex items-center gap-2 px-6 py-4 rounded-2xl nd-glass text-white font-semibold hover:bg-white/10 transition-colors">
-                                Se connecter
-                            </Link>
-                        </div>
-                    </div>
-                    <div className="flex justify-center">
-                        <motion.div className="w-[200px] sm:w-[230px]" animate={{ y: [0, -14, 0], rotate: [6, 2, 6] }} transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}>
-                            <div className="drop-shadow-[0_40px_50px_rgba(0,0,0,0.5)]"><Pack /></div>
-                        </motion.div>
-                    </div>
-                </div>
-            </Reveal>
-        </section>
-    );
-}
-
 export default function Landing() {
-    const { user, catalog } = useGame();
+    const { catalog } = useGame();
     const show = useShowcase(catalog);
 
     return (
         <div className="overflow-x-clip">
             <Hero />
             {show ? <Featured cards={show.featured} /> : <div className="h-[420px]" />}
+            <Features />
+            <PassSection />
             <BlogPosts />
             <DailyChallenges />
             {show && (
                 <>
-                    {!user && <Demo show={show} />}
                     <Rarity show={show} />
                     <Types show={show} />
                 </>
             )}
-            {!user && <FinalCta />}
         </div>
     );
 }

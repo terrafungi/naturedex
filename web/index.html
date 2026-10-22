@@ -4,23 +4,23 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#05130d">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NatureDex — jeu de cartes à collectionner : 60 000 espèces du vivant</title>
-    <meta name="description" content="Jeu gratuit : ouvre des boosters et collectionne plus de 60 000 espèces réelles (animaux, plantes, champignons, bactéries, virus, fossiles). Quiz du jour, échanges, combats et 20 % des achats reversés à la nature.">
+    <title>NatureDex — jeu nature : capture 60 000 espèces sur la carte, cartes et avatar 3D</title>
+    <meta name="description" content="Jeu gratuit : capture les espèces cachées autour de toi sur une vraie carte, photographie le vivant, ouvre des boosters et habille ton avatar 3D. 60 000 espèces réelles, 20 % des achats reversés à la nature.">
     <meta name="robots" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="https://naturedex.fr/">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="NatureDex">
     <meta property="og:url" content="https://naturedex.fr/">
-    <meta property="og:title" content="NatureDex : collectionne 60 106 espèces du vivant">
-    <meta property="og:description" content="Ouvre des boosters, fais le quiz du jour, échange avec tes amis. Cartes tirées de Wikipédia, 20 % des achats reversés à des associations nature.">
+    <meta property="og:title" content="NatureDex : explore, capture et collectionne 60 106 espèces du vivant">
+    <meta property="og:description" content="Des cartes cachées sur une vraie carte autour de chez toi, des photos de terrain reconnues par l'IA, des boosters, un avatar 3D et des combats. Pass Naturaliste solidaire : 20 % reversés à la nature.">
     <meta property="og:image" content="https://naturedex.fr/og.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Cartes NatureDex d'espèces animales et végétales">
     <meta property="og:locale" content="fr_FR">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="NatureDex : collectionne 60 106 espèces du vivant">
-    <meta name="twitter:description" content="Ouvre des boosters, fais le quiz du jour, échange avec tes amis. Cartes tirées de Wikipédia, 20 % des achats reversés à des associations nature.">
+    <meta name="twitter:title" content="NatureDex : explore, capture et collectionne 60 106 espèces du vivant">
+    <meta name="twitter:description" content="Des cartes cachées sur une vraie carte autour de chez toi, des photos de terrain reconnues par l'IA, des boosters, un avatar 3D et des combats. Pass Naturaliste solidaire : 20 % reversés à la nature.">
     <meta name="twitter:image" content="https://naturedex.fr/og.png">
     <link rel="alternate" type="application/rss+xml" title="Blog nature NatureDex" href="https://naturedex.fr/api/blog/rss.xml">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -41,11 +41,28 @@
             },
             {
                 "@type": ["VideoGame", "WebApplication"], "name": "NatureDex", "url": "https://naturedex.fr/", "inLanguage": "fr-FR",
-                "description": "Jeu de cartes à collectionner gratuit : plus de 60 000 espèces réelles tirées de Wikipédia, boosters, quiz du jour, échanges et combats.",
+                "description": "Jeu nature gratuit : capture des espèces réelles sur une carte autour de toi, photographie le vivant sur le terrain, ouvre des boosters, habille ton avatar 3D et affronte tes amis. Plus de 60 000 espèces tirées de Wikipédia.",
+                "featureList": [
+                    "Exploration géolocalisée : des cartes d'espèces locales cachées sur une vraie carte, renouvelées toutes les 30 minutes",
+                    "Mode Sur le terrain : photographie une espèce, l'IA la reconnaît et crée une carte unique",
+                    "Avatar 3D personnalisable : plus de 100 tenues, chapeaux et compagnons",
+                    "Boosters de cartes avec 6 raretés selon la popularité de l'espèce",
+                    "Combats au tour par tour avec saisons et classement",
+                    "Quiz nature du jour, défis quotidiens et trophées",
+                    "Jardin, enchères entre joueurs, vitrines, amis et messages",
+                    "Pass Naturaliste : bonus doublés, objets d'avatar exclusifs et don mensuel à une association"
+                ],
                 "image": "https://naturedex.fr/og.png", "genre": ["Jeu de cartes à collectionner", "Jeu éducatif"],
                 "gamePlatform": "Navigateur web", "applicationCategory": "GameApplication", "operatingSystem": "Tous (navigateur web)",
                 "playMode": ["SinglePlayer", "MultiPlayer"], "isAccessibleForFree": true,
-                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+                "offers": [
+                    { "@type": "Offer", "name": "Jeu gratuit", "price": "0", "priceCurrency": "EUR" },
+                    {
+                        "@type": "Offer", "name": "Pass Naturaliste", "url": "https://naturedex.fr/boutique", "price": "3.99", "priceCurrency": "EUR",
+                        "description": "Abonnement mensuel sans engagement : bonus du jour doublé, 15 captures et 5 quiz par jour, 5 objets d'avatar exclusifs, badge Mécène, 20 % reversés à la LPO, au WWF France ou à Humanité & Biodiversité.",
+                        "priceSpecification": { "@type": "UnitPriceSpecification", "price": "3.99", "priceCurrency": "EUR", "billingDuration": 1, "unitCode": "MON" }
+                    }
+                ],
                 "publisher": { "@id": "https://naturedex.fr/#org" }
             }
         ]
@@ -57,7 +74,12 @@
     <div id="root"><main style="max-width:680px;margin:0 auto;padding:18vh 20px 40px;text-align:center;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#a3b5a9;line-height:1.6">
         <h1 style="font-family:'Playfair Display',Georgia,serif;color:#fff;font-weight:600;font-size:2.4rem;margin:0 0 .4em">NatureDex, le jeu de cartes du vivant</h1>
         <p>Collectionne plus de 60 000 espèces réelles — mammifères, oiseaux, insectes, plantes, champignons, bactéries, virus et fossiles. Chaque carte vient de Wikipédia et sa rareté dépend de la popularité de l'espèce.</p>
-        <p>Ouvre des boosters gratuits, fais le quiz nature du jour, cultive ton jardin, échange et combats avec tes amis. 20 % de chaque achat est reversé à la LPO, au WWF France ou à Humanité &amp; Biodiversité.</p>
+        <h2 style="color:#fff;font-size:1.3rem;margin:1.4em 0 .3em">Explore la nature autour de toi</h2>
+        <p>En Exploration, des cartes sont cachées sur une vraie carte autour de chez toi, avec les espèces qui vivent vraiment dans ta région. Sur le terrain, photographie une plante, un animal ou un champignon : l'IA reconnaît l'espèce et ta photo devient une carte unique.</p>
+        <h2 style="color:#fff;font-size:1.3rem;margin:1.4em 0 .3em">Ton naturaliste en 3D</h2>
+        <p>Habille ton avatar 3D avec plus de 100 tenues, chapeaux et compagnons. Ouvre des boosters gratuits, fais le quiz nature du jour, cultive ton jardin, vends aux enchères, compose tes vitrines et combats tes amis.</p>
+        <h2 style="color:#fff;font-size:1.3rem;margin:1.4em 0 .3em">Le Pass Naturaliste, un jeu qui soutient la nature</h2>
+        <p>Pour 3,99 € par mois, sans engagement : bonus du jour doublé, 15 captures et 5 quiz par jour, 5 objets d'avatar exclusifs et le badge Mécène. 20 % de chaque achat est reversé à la LPO, au WWF France ou à Humanité &amp; Biodiversité.</p>
         <p><a href="/connexion?mode=register" style="color:#e9c46a">Créer mon compte gratuit</a> · <a href="/api/especes" style="color:#a8f0c6">Toutes les espèces</a> · <a href="/api/blog" style="color:#a8f0c6">Blog nature</a></p>
     </main></div>
     <script type="module" src="/src/main.jsx"></script>

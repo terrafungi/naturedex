@@ -72,6 +72,11 @@ function Intro({ catalog }) {
             <p className="mt-2 text-sm text-ink-soft max-w-md mx-auto lg:mx-0">
                 Animaux, plantes, champignons, microbes, fossiles : chaque carte vient de Wikipédia. Ouvre des boosters, complète ton carnet, échange avec tes amis.
             </p>
+            <ul className="mt-3 flex flex-wrap justify-center lg:justify-start gap-1.5 text-[11px] font-semibold text-white/80">
+                {['Exploration sur une vraie carte', 'Photos sur le terrain', 'Avatar 3D', 'Combats', 'Enchères', 'Quiz', 'Jardin'].map((f) => (
+                    <li key={f} className="px-2.5 py-1 rounded-full bg-[#4fd18b]/10 ring-1 ring-[#4fd18b]/25">{f}</li>
+                ))}
+            </ul>
 
             <a href="#inscription" className="lg:hidden mt-4 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full nd-cta-gold font-bold text-sm">
                 Je m'inscris gratuitement<ArrowDown className="w-4 h-4" />
@@ -95,7 +100,7 @@ function Intro({ catalog }) {
             <div className="mt-5 flex items-start gap-3 text-left rounded-2xl p-3.5 bg-[#e9c46a]/[0.08] ring-1 ring-[#e9c46a]/25 max-w-md mx-auto lg:mx-0">
                 <span className="grid place-items-center w-10 h-10 shrink-0 rounded-full bg-[#e9c46a] text-[#2a1c00]"><HeartHandshake className="w-5 h-5" /></span>
                 <p className="text-sm text-white/85 leading-snug">
-                    <strong className="text-[#f4d88f]">20 % de chaque achat</strong> en boutique est reversé à l'association nature de ton choix : LPO, WWF France ou Humanité & Biodiversité. Le jeu reste jouable gratuitement.
+                    <strong className="text-[#f4d88f]">20 % de chaque achat</strong> en boutique est reversé à l'association nature de ton choix : LPO, WWF France ou Humanité & Biodiversité. Le jeu reste jouable gratuitement, et le <strong className="text-[#f4d88f]">Pass Naturaliste</strong> (3,99 € / mois) double tes bonus et soutient la nature chaque mois.
                 </p>
             </div>
 
