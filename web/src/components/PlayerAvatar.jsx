@@ -55,7 +55,7 @@ const dots = (list, fill) => <g fill={fill}>{list.map(([x, y, r]) => <circle key
 const flower = (x, y, petal, r = 2.2) => (
     <g key={`${x},${y}`}>{[0, 72, 144, 216, 288].map((a) => <ellipse key={a} cx={x} cy={y - r} rx={r * 0.6} ry={r} fill={petal} transform={`rotate(${a} ${x} ${y})`} />)}<circle cx={x} cy={y} r={r * 0.55} fill="#ffd36e" /></g>
 );
-const eye = (x, y, r = 1.2) => <g key={`${x},${y}`}><circle cx={x} cy={y} r={r} fill="#1d1410" /><circle cx={x + r * 0.35} cy={y - r * 0.35} r={r * 0.35} fill="#fff" /></g>;
+const eye = (x, y, r = 1.2) => <g key={`${x},${y}`} className="nd-pet-eye"><circle cx={x} cy={y} r={r} fill="#1d1410" /><circle cx={x + r * 0.35} cy={y - r * 0.35} r={r * 0.35} fill="#fff" /></g>;
 
 function Motif({ kind, ink }) {
     switch (kind) {
@@ -219,7 +219,7 @@ function Pet({ id }) {
         case 'lapin':
             return <g><ellipse cx="-3" cy="-12" rx="2.3" ry="6.5" fill="#f2ede4" /><ellipse cx="3" cy="-12" rx="2.3" ry="6.5" fill="#f2ede4" /><ellipse cx="-3" cy="-12" rx="1" ry="4.5" fill="#f5b5c4" /><ellipse cx="3" cy="-12" rx="1" ry="4.5" fill="#f5b5c4" /><ellipse cx="0" cy="6" rx="8.5" ry="6.5" fill="#f2ede4" /><circle cx="0" cy="-2" r="6.5" fill="#f2ede4" />{eye(-2.5, -2.5, 1)}{eye(2.5, -2.5, 1)}<circle cx="0" cy="0.5" r="0.9" fill="#f08aa0" /></g>;
         case 'chat':
-            return <g><ellipse cx="0" cy="8" rx="8" ry="5" fill="#e59a4a" /><path d="M-8 -2 L-7 -11 L-2 -6 Z M8 -2 L7 -11 L2 -6 Z" fill="#e59a4a" /><circle cx="0" cy="0" r="8" fill="#e59a4a" /><path d="M-2 -7.5 V-5 M0 -8 V-5 M2 -7.5 V-5" stroke="#b86b25" strokeWidth="0.9" /><ellipse cx="-3" cy="0" rx="1.1" ry="1.6" fill="#2f6b2f" /><ellipse cx="3" cy="0" rx="1.1" ry="1.6" fill="#2f6b2f" /><path d="M-1 3 L1 3 L0 4 Z" fill="#f08aa0" /><path d="M-3 4 L-9 3 M-3 5 L-9 6 M3 4 L9 3 M3 5 L9 6" stroke="#fff" strokeWidth="0.4" /></g>;
+            return <g><ellipse cx="0" cy="8" rx="8" ry="5" fill="#e59a4a" /><path d="M-8 -2 L-7 -11 L-2 -6 Z M8 -2 L7 -11 L2 -6 Z" fill="#e59a4a" /><circle cx="0" cy="0" r="8" fill="#e59a4a" /><path d="M-2 -7.5 V-5 M0 -8 V-5 M2 -7.5 V-5" stroke="#b86b25" strokeWidth="0.9" /><g className="nd-pet-eye"><ellipse cx="-3" cy="0" rx="1.1" ry="1.6" fill="#2f6b2f" /><ellipse cx="3" cy="0" rx="1.1" ry="1.6" fill="#2f6b2f" /></g><path d="M-1 3 L1 3 L0 4 Z" fill="#f08aa0" /><path d="M-3 4 L-9 3 M-3 5 L-9 6 M3 4 L9 3 M3 5 L9 6" stroke="#fff" strokeWidth="0.4" /></g>;
         case 'ecureuil':
             return <g><path d="M3 10 C14 10 15 -4 10 -9 C7 -12 2 -10 5 -6 C9 -2 8 4 3 4 Z" fill="#c9752a" /><ellipse cx="-2" cy="6" rx="6" ry="5.5" fill="#b5651d" /><ellipse cx="-2" cy="7" rx="3.5" ry="3.5" fill="#f2d6a8" /><circle cx="-3" cy="-3" r="5.5" fill="#b5651d" /><path d="M-6 -7 L-6 -11 L-3 -8 Z" fill="#b5651d" />{eye(-5, -3.5, 1)}<circle cx="-8.2" cy="-1.8" r="0.8" fill="#1d1410" /><ellipse cx="-6" cy="4" rx="2" ry="2.4" fill="#8b5a2b" /><rect x="-7.3" y="1.2" width="2.6" height="1.2" rx="0.6" fill="#5a3a1a" /></g>;
         case 'chouette':
@@ -237,7 +237,8 @@ function Pet({ id }) {
     }
 }
 
-export function AvatarFigure({ avatar, size = 40, className = '', ring }) {
+/** `animate`: the companion blinks and hops (big avatars only: profile, editor). */
+export function AvatarFigure({ avatar, size = 40, className = '', ring, animate = false }) {
     const uid = useId().replace(/:/g, '');
     const a = upgrade(avatar) || defaultAvatar('');
     const skin = SKINS[a.skin] || SKINS[0];
@@ -246,7 +247,7 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring }) {
     const fill = shirt.gradient ? `url(#g${uid})` : shirt.base;
     const v = `url(#v${uid})`;
     return (
-        <svg viewBox="0 0 100 100" width={size} height={size} className={`shrink-0 rounded-full ${className}`}
+        <svg viewBox="0 0 100 100" width={size} height={size} className={`shrink-0 rounded-full ${animate ? 'nd-animated' : ''} ${className}`}
             style={ring ? { boxShadow: `0 0 0 2px ${ring}` } : undefined} role="img" aria-label="Avatar">
             <defs>
                 <clipPath id={`c${uid}`}><circle cx="50" cy="50" r="50" /></clipPath>
@@ -307,7 +308,7 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring }) {
                 <path d="M45.5 55.5 Q50 59.5 54.5 55.5" fill="none" stroke="#7a3b2a" strokeWidth="1.5" strokeLinecap="round" />
                 <g filter={v}><Face id={a.face} hairColor={hairColor} /></g>
                 <g filter={v}><Hat id={a.hat} /></g>
-                {a.pet && a.pet !== 'aucun' && <g filter={v}><g transform="translate(73 79) scale(1.3)"><Pet id={a.pet} /></g></g>}
+                {a.pet && a.pet !== 'aucun' && <g filter={v}><g className="nd-pet-hop"><g transform="translate(73 79) scale(1.3)"><Pet id={a.pet} /></g></g></g>}
             </g>
         </svg>
     );

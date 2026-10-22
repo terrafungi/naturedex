@@ -108,7 +108,7 @@ export default function AvatarEditor() {
             <Link to="/profil" className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" />Profil</Link>
             <h1 className="mt-3 font-display text-4xl text-white">Mon avatar</h1>
 
-            <div className="mt-6 flex justify-center"><Tilt><AvatarFigure avatar={draft} size={176} className="shadow-2xl shadow-black/40" /></Tilt></div>
+            <div className="mt-6 flex justify-center"><Tilt><AvatarFigure avatar={draft} size={176} animate className="shadow-2xl shadow-black/40" /></Tilt></div>
 
             <div className="mt-6 flex flex-wrap gap-2">
                 {Object.entries(SLOT_NAMES).map(([slot, label]) => (

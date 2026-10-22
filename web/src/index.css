@@ -525,3 +525,20 @@ body {
 .nd-spawn.is-done .nd-spawn-tag { background: #7dffb0; }
 @keyframes nd-spawn-bob { 50% { translate: 0 -4px; } }
 @media (prefers-reduced-motion: reduce) { .nd-spawn { animation: none; } }
+
+/* Avatar companion: a little hop now and then, and a blink (AvatarFigure animate). */
+.nd-animated .nd-pet-hop { animation: ndPetHop 4.6s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+.nd-animated .nd-pet-eye { animation: ndPetBlink 3.7s infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes ndPetHop {
+    0%, 62%, 100% { transform: translateY(0) scale(1, 1); }
+    66% { transform: translateY(0) scale(1.06, 0.9); }
+    72% { transform: translateY(-5px) scale(0.96, 1.05); }
+    78% { transform: translateY(0) scale(1.05, 0.93); }
+    82% { transform: translateY(-1.5px) scale(1, 1); }
+    86% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes ndPetBlink {
+    0%, 40%, 44%, 88%, 92%, 96%, 100% { transform: scaleY(1); }
+    42%, 90%, 94% { transform: scaleY(0.1); }
+}
+@media (prefers-reduced-motion: reduce) { .nd-animated .nd-pet-hop, .nd-animated .nd-pet-eye { animation: none; } }
