@@ -338,6 +338,20 @@ const TROPHIES = [
         (g) => g > 1 ? `Sois le premier joueur à photographier ${g} espèces` : 'Sois le premier joueur à photographier une espèce'),
     ...series('Terrain', 'calendar', 'fieldDays', [[7, 'Sorties régulières'], [30, 'Un mois dehors'], [100, 'Cent sorties nature']],
         (g) => `Fais une observation ${g} jours différents`),
+    ...series('Exploration', 'hand', 'exploreCatches', [[1, 'Première capture'], [10, 'Bonne main'], [50, 'Chasseur de cartes'], [200, 'Trappeur'], [500, 'Maître de l\'exploration']],
+        (g) => g > 1 ? `Attrape ${n(g)} cartes en exploration` : 'Attrape ta première carte en exploration'),
+    ...series('Exploration', 'trees', 'exploreForest', [[1, 'Sous les arbres'], [25, 'Esprit de la forêt'], [100, 'Gardien des bois']],
+        (g) => g > 1 ? `Attrape ${g} cartes en forêt` : 'Attrape une carte en forêt'),
+    ...series('Exploration', 'mountain', 'exploreHabitats', [[3, 'Randonneur'], [5, 'Baroudeur'], [8, 'Globe-trotteur']],
+        (g) => `Attrape des cartes dans ${g} milieux différents (forêt, prairie, ville, eau…)`),
+    ...series('Exploration', 'star', 'exploreRare', [[1, 'Belle prise'], [10, 'Flair de pisteur'], [50, 'Traqueur de raretés']],
+        (g) => `Attrape ${g} carte${g > 1 ? 's' : ''} Rare${g > 1 ? 's' : ''} ou plus en exploration`),
+    ...series('Exploration', 'crown', 'exploreLegendary', [[1, 'Capture légendaire'], [5, 'Chasseur de légendes'], [20, 'Mythe vivant']],
+        (g) => g > 1 ? `Attrape ${g} cartes Légendaires en exploration` : 'Attrape une carte Légendaire en exploration'),
+    ...series('Exploration', 'crosshair', 'explorePerfect', [[1, 'Lancer parfait'], [25, 'Main sûre'], [100, 'Tireur d\'élite']],
+        (g) => g > 1 ? `Réussis ${g} captures avec un lancer parfait` : 'Réussis une capture avec un lancer parfait'),
+    ...series('Exploration', 'footprints', 'exploreDays', [[7, 'Promeneur'], [30, 'Un mois de balades'], [100, 'Cent explorations']],
+        (g) => `Attrape au moins une carte ${g} jours différents`),
     ...series('Enchères', 'recycle', 'recycled', [[10, 'Tri sélectif'], [100, 'Recycleur'], [1000, 'Compost géant']], (g) => `Recycle ${n(g)} doublons`),
 ];
 
@@ -506,6 +520,15 @@ async function trophyList(db, userId) {
                     (SELECT COUNT(*)::int FROM observations WHERE user_id = $1 AND status = 'confirmed' AND first_ever) AS "fieldFirst",
                     (SELECT COUNT(DISTINCT (confirmed_at AT TIME ZONE 'Europe/Paris')::date)::int FROM observations
                         WHERE user_id = $1 AND status IN ('confirmed', 'replaced')) AS "fieldDays",
+                    (SELECT COUNT(*)::int FROM explore_catches WHERE user_id = $1 AND caught) AS "exploreCatches",
+                    (SELECT COUNT(*)::int FROM explore_catches WHERE user_id = $1 AND caught AND habitat = 'forest') AS "exploreForest",
+                    (SELECT COUNT(DISTINCT habitat)::int FROM explore_catches WHERE user_id = $1 AND caught) AS "exploreHabitats",
+                    (SELECT COUNT(*)::int FROM explore_catches e JOIN cards c ON c.id = e.card_id WHERE e.user_id = $1 AND e.caught
+                        AND c.rarity IN ('rare', 'epic', 'legendary', 'secret')) AS "exploreRare",
+                    (SELECT COUNT(*)::int FROM explore_catches e JOIN cards c ON c.id = e.card_id WHERE e.user_id = $1 AND e.caught
+                        AND c.rarity = 'legendary') AS "exploreLegendary",
+                    (SELECT COUNT(*)::int FROM explore_catches WHERE user_id = $1 AND caught AND perfect) AS "explorePerfect",
+                    (SELECT COUNT(DISTINCT (at AT TIME ZONE 'Europe/Paris')::date)::int FROM explore_catches WHERE user_id = $1 AND caught) AS "exploreDays",
                     recycled FROM users WHERE id = $1`, [userId]),
         db.query(`SELECT c.type, c.rarity, COUNT(*)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
                   WHERE uc.user_id = $1 GROUP BY 1, 2`, [userId]),

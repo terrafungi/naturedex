@@ -328,8 +328,8 @@ export function exploreActions({ requireUser, inTransaction, HttpError, publicUs
                 const chance = quality === 'miss' ? 0 : Math.min(0.97, CATCH_CHANCE[spawn.card.rarity] + (quality === 'perfect' ? PERFECT_BONUS : 0));
                 const caught = crypto.randomInt(1_000_000) < chance * 1_000_000;
                 const tries = row.tries + 1;
-                await client.query(`UPDATE explore_catches SET tries = $3, caught = $4, at = now() WHERE user_id = $1 AND spawn = $2`,
-                    [user.id, spawn.id, tries, caught]);
+                await client.query(`UPDATE explore_catches SET tries = $3, caught = $4, perfect = $5, at = now() WHERE user_id = $1 AND spawn = $2`,
+                    [user.id, spawn.id, tries, caught, caught && quality === 'perfect']);
                 let isNew = false;
                 if (caught) {
                     const { rows: [uc] } = await client.query(

@@ -469,6 +469,7 @@ CREATE TABLE IF NOT EXISTS explore_catches (
     at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, spawn)
 );
+ALTER TABLE explore_catches ADD COLUMN IF NOT EXISTS perfect BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS explore_catches_day_idx ON explore_catches (user_id, at DESC) WHERE caught;
 -- only the last known position (speed check), never a track
 CREATE TABLE IF NOT EXISTS explore_positions (
