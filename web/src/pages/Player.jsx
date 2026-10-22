@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Frame, Lock, MessageCircle, Pencil, Star, UserPlus } from 'lucide-react';
+import { ArrowLeft, Camera, Frame, Lock, MessageCircle, Pencil, Star, UserPlus } from 'lucide-react';
 import { api } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { LeafLogo } from '../components/Layout.jsx';
 import ShowcaseCanvas, { VoteButton } from '../components/Showcase.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
+import { FieldGrid, FieldViewer } from './Terrain.jsx';
 
 const n = (v) => Number(v || 0).toLocaleString('fr-FR');
 
@@ -38,6 +39,7 @@ export default function Player() {
         ['Espèces', n(player.discovered)],
         ['Cartes', n(player.owned)],
         ['Trophées', n(player.trophies)],
+        ['Observations', n(player.observations)],
         ['Cote d\'arène', games ? n(player.rating) : '—'],
     ];
     return (
@@ -63,7 +65,7 @@ export default function Player() {
             )}
             {note && <p className="mt-3 text-sm font-semibold text-[#a8f0c6]">{note}</p>}
 
-            <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="mt-8 grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {stats.map(([label, value]) => (
                     <div key={label} className="rounded-2xl nd-glass p-4">
                         <div className="font-display text-3xl text-white">{value}</div>
@@ -78,11 +80,32 @@ export default function Player() {
             </p>
 
             <Showcase player={player} />
+            <FieldJournal player={player} />
 
             <Binders player={player} />
 
             <div className="mt-6"><SeasonHistory seasons={player.seasons} /></div>
         </div>
+    );
+}
+
+// Latest field cards (« Sur le terrain ») of the player.
+function FieldJournal({ player }) {
+    const [cards, setCards] = useState(null);
+    const [open, setOpen] = useState(null);
+    useEffect(() => {
+        if (player.observations) api('fieldJournal', { username: player.username }).then((r) => setCards(r.cards)).catch(() => {});
+    }, [player.username, player.observations]);
+    if (!player.observations || !cards) return null;
+    return (
+        <section className="mt-10">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 font-display text-2xl text-white"><Camera className="w-5 h-5 text-[#7dffb0]" />Carnet de terrain · {n(player.observations)}</h2>
+                {player.me && <Link to="/terrain" className="text-sm font-semibold text-white underline underline-offset-4">Tout voir</Link>}
+            </div>
+            <FieldGrid cards={cards.slice(0, 8)} onOpen={setOpen} />
+            <FieldViewer obs={open} onClose={() => setOpen(null)} onDeleted={() => { setOpen(null); setCards((c) => c.filter((o) => o.id !== open.id)); }} />
+        </section>
     );
 }
 

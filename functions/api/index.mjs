@@ -25,6 +25,7 @@ import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 import { blogRoute, blogTick, latestPosts } from './blog.mjs';
 import { speciesRoute } from './species.mjs';
 import { speciesEnrichTick } from './species-enrich.mjs';
+import { fieldActions } from './field.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -1513,6 +1514,7 @@ const actions = {
                     (SELECT COALESCE(SUM(count), 0)::int FROM user_cards WHERE user_id = u.id) AS owned,
                     (SELECT COUNT(*)::int FROM trophy_claims WHERE user_id = u.id) AS trophies,
                     (SELECT COUNT(*)::int FROM battles WHERE user_id = u.id AND status = 'won') AS "battleWins",
+                    (SELECT COUNT(*)::int FROM observations WHERE user_id = u.id AND status = 'confirmed') AS observations,
                     a.rating, a.wins, a.losses, COALESCE(a.campaign, 0) AS campaign,
                     (SELECT f.status FROM friendships f WHERE (f.requester_id = $1 AND f.addressee_id = u.id)
                         OR (f.requester_id = u.id AND f.addressee_id = $1)) AS friendship,
@@ -2475,6 +2477,7 @@ const actions = {
 };
 
 Object.assign(actions, arenaActions({ requireUser, inTransaction, HttpError, publicUser, parisDay }));
+Object.assign(actions, fieldActions({ requireUser, inTransaction, HttpError, publicUser }));
 
 const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest']);
 

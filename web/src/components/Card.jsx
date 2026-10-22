@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Eye, HelpCircle, Sparkles, Zap } from 'lucide-react';
+import { Camera, Eye, HelpCircle, MapPin, Sparkles, Zap } from 'lucide-react';
 import { RARITIES, TYPES, formatViews } from '../game.jsx';
 import { ABILITIES, battleStats } from '../battle.js';
 
@@ -91,6 +91,51 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                         {r.symbol} {r.label}
                     </span>
                     {number != null && <span>{String(number).padStart(3, '0')}/{total}</span>}
+                </div>
+            </div>
+        </div>
+        </div>
+    );
+}
+
+/**
+ * Field card (« Sur le terrain »): the player's own photo of the species, holographic frame,
+ * observation number, region, date and photographer. `obs` comes from the field* API actions.
+ */
+export function FieldCard({ obs, className = '' }) {
+    const ref = useRef(null);
+    const card = obs.card;
+    const t = TYPES[card.type] || TYPES.plant;
+    const r = RARITIES[card.rarity] || RARITIES.common;
+    const date = obs.at ? new Date(obs.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+    function onMove(e) {
+        const el = ref.current;
+        const box = el.getBoundingClientRect();
+        el.style.setProperty('--mx', `${((e.clientX - box.left) / box.width) * 100}%`);
+        el.style.setProperty('--my', `${((e.clientY - box.top) / box.height) * 100}%`);
+    }
+
+    return (
+        <div className="nd-box">
+        <div ref={ref} className={`nd-field ${className}`} style={{ '--type': t.color, '--rar': r.color }} onPointerMove={onMove}>
+            <img className="nd-field-photo" src={obs.thumb} alt={`${card.name}, photo de ${obs.username}`} loading="lazy" draggable="false"
+                onError={(e) => { if (e.currentTarget.src !== obs.photo) e.currentTarget.src = obs.photo; }} />
+            <div className="nd-field-top">
+                <span className="nd-field-tag"><Camera />Terrain</span>
+                <TypeBadge type={card.type} />
+            </div>
+            {obs.captive && <span className="nd-field-captive">En captivité</span>}
+            <div className="nd-field-bottom">
+                <div className="nd-field-name line-clamp-2 break-words">{card.name}</div>
+                {card.sci_name && <div className="nd-field-sci">{card.sci_name}</div>}
+                <div className="nd-field-meta">
+                    <span className="font-bold" style={{ color: r.color }} title={r.label}>{r.symbol} Obs. n°{obs.number}</span>
+                    <span className="truncate">@{obs.username}</span>
+                </div>
+                <div className="nd-field-meta opacity-80">
+                    <span className="flex items-center gap-[1cqi] min-w-0 truncate">{obs.region && <><MapPin className="w-[3.4cqi] h-[3.4cqi] shrink-0" />{obs.region}</>}</span>
+                    <span className="shrink-0">{date}</span>
                 </div>
             </div>
         </div>

@@ -392,3 +392,52 @@ CREATE TABLE IF NOT EXISTS species_texts (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS species_texts_status_idx ON species_texts (status, updated_at);
+
+-- « Sur le terrain »: players photograph real species; the AI identifies them and the confirmed
+-- photo becomes a personal field card. status: pending (waiting for the player's choice) |
+-- confirmed | replaced (a better photo took its place) | hidden (reported) | deleted
+CREATE TABLE IF NOT EXISTS observations (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    card_id     INTEGER REFERENCES cards(id) ON DELETE CASCADE,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    photo_key   TEXT NOT NULL,
+    candidates  JSONB NOT NULL DEFAULT '[]'::jsonb,   -- [{ id, confidence }] proposed by the AI
+    captive     BOOLEAN NOT NULL DEFAULT false,
+    region      TEXT,
+    lat         REAL,
+    lon         REAL,
+    sha256      TEXT NOT NULL,
+    dhash       TEXT,
+    number      INTEGER,                              -- n-th confirmed observation of this species
+    first_ever  BOOLEAN NOT NULL DEFAULT false,
+    reward      INTEGER NOT NULL DEFAULT 0,
+    gave_card   BOOLEAN NOT NULL DEFAULT false,
+    model       TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    confirmed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS observations_user_idx ON observations (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS observations_card_idx ON observations (card_id, confirmed_at DESC) WHERE status = 'confirmed';
+CREATE INDEX IF NOT EXISTS observations_feed_idx ON observations (confirmed_at DESC) WHERE status = 'confirmed';
+CREATE INDEX IF NOT EXISTS observations_sha_idx ON observations (sha256);
+CREATE INDEX IF NOT EXISTS observations_dhash_idx ON observations (dhash);
+-- one field card per species and player
+CREATE UNIQUE INDEX IF NOT EXISTS observations_one_per_species ON observations (user_id, card_id) WHERE status = 'confirmed';
+
+-- every identification request, including rejected photos (daily AI limit)
+CREATE TABLE IF NOT EXISTS field_attempts (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    outcome     TEXT NOT NULL,
+    reason      TEXT,
+    at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS field_attempts_user_idx ON field_attempts (user_id, at DESC);
+
+CREATE TABLE IF NOT EXISTS field_reports (
+    observation_id BIGINT NOT NULL REFERENCES observations(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (observation_id, user_id)
+);

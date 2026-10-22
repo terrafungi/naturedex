@@ -8,6 +8,7 @@ import Landing from './pages/Landing.jsx';
 import Auth from './pages/Auth.jsx';
 import Boosters from './pages/Boosters.jsx';
 import Garden from './pages/Garden.jsx';
+import Terrain from './pages/Terrain.jsx';
 import Collection from './pages/Collection.jsx';
 import ShowcaseEditor from './pages/ShowcaseEditor.jsx';
 import Showcases from './pages/Showcases.jsx';
@@ -45,6 +46,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/" element={<Private><Landing /></Private>} />
                         <Route path="/connexion" element={<Auth />} />
                         <Route path="/booster" element={<Private><Boosters /></Private>} />
+                        <Route path="/terrain" element={<Private><Terrain /></Private>} />
                         <Route path="/jardin" element={<Private><Garden /></Private>} />
                         <Route path="/defis" element={<Private><Challenges /></Private>} />
                         <Route path="/trophees" element={<Private><Trophies /></Private>} />

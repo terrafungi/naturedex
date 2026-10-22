@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Eye, Gavel, Recycle, Ruler, Weight } from 'lucide-react';
+import { ArrowLeft, Camera, ExternalLink, Eye, Gavel, Recycle, Ruler, Weight } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
 import { IUCN, RARITIES, TYPES, formatViews } from '../game.jsx';
 import ShareButton from '../components/ShareButton.jsx';
 import { FavoriteStar } from '../components/Favorite.jsx';
+import { FieldGrid, FieldViewer } from './Terrain.jsx';
 
 function formatMeasure(value, unit) {
     if (value == null) return null;
@@ -109,6 +110,31 @@ export default function CardPage() {
                     </div>
                 </div>
             </div>
+            <FieldSection cardId={card.id} />
         </div>
+    );
+}
+
+// « Observée sur le terrain »: the players' photos of this species.
+function FieldSection({ cardId }) {
+    const [data, setData] = useState(null);
+    const [open, setOpen] = useState(null);
+    useEffect(() => { api('cardObservations', { cardId }).then(setData).catch(() => {}); }, [cardId]);
+    if (!data) return null;
+    return (
+        <section className="mt-14">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 font-display text-2xl text-white">
+                    <Camera className="w-5 h-5 text-[#7dffb0]" />Observée sur le terrain{data.total ? ` · ${data.total}` : ''}
+                </h2>
+                {data.mine
+                    ? <span className="px-3 py-1 rounded-full bg-gradient-to-r from-[#7dffb0] to-[#6ec8ff] text-[#05261a] text-xs font-black uppercase">Tu l'as photographiée</span>
+                    : <Link to="/terrain" className="nd-btn inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold"><Camera className="w-4 h-4" />La photographier</Link>}
+            </div>
+            {data.total
+                ? <FieldGrid cards={data.cards} onOpen={setOpen} />
+                : <p className="mt-3 text-white/60">Aucun joueur ne l'a encore photographiée : la première observation rapporte +50 graines.</p>}
+            <FieldViewer obs={open} onClose={() => setOpen(null)} onDeleted={() => { setOpen(null); api('cardObservations', { cardId }).then(setData); }} />
+        </section>
     );
 }

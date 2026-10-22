@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, BookOpen, Brain, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
+import { Award, BookOpen, Brain, Camera, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
 import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 import AwardNotice from './AwardNotice.jsx';
@@ -12,6 +12,7 @@ export const NAV = [
     { to: '/', label: 'Accueil', Icon: Home, end: true },
     { to: '/collection', label: 'Collection', Icon: Layers },
     { to: '/booster', label: 'Booster', Icon: Package },
+    { to: '/terrain', label: 'Sur le terrain', short: 'Terrain', Icon: Camera },
     { to: '/jardin', label: 'Jardin', Icon: Sprout },
     { to: '/combat', label: 'Combat', Icon: Swords },
     { to: '/quiz', label: 'Quiz', Icon: Brain },
