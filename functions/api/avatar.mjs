@@ -1,101 +1,161 @@
 /**
- * Avatar: a small drawn character (skin, hair, accessory, background, t-shirt), stored as JSON on
- * the user and drawn in the browser. Free t-shirts are worn by everyone; the others are bought once
- * with pépites, and the Mécène one is worn only while the Pass Naturaliste is active.
+ * Avatar: a small drawn character (skin, hair, background) dressed with items in five slots —
+ * t-shirt, hat, face, neck and a pet companion. Stored as JSON on the user and drawn in the browser.
+ * Free items are worn by everyone; the others are bought once with pépites, and the Pass ones are
+ * worn only while the Pass Naturaliste is active.
  * The drawings themselves live in web/src/components/PlayerAvatar.jsx, keyed by the same ids.
  */
 import { passActive } from './shop.mjs';
 
-export const SHIRTS = [
-    { id: 'foret', name: 'Forêt', price: 0 },
-    { id: 'ciel', name: 'Ciel', price: 0 },
-    { id: 'terre', name: 'Terre', price: 0 },
-    { id: 'feuille', name: 'Feuille', price: 0 },
-    { id: 'rayures', name: 'Marinière', price: 80 },
-    { id: 'sapin', name: 'Sapin', price: 100 },
-    { id: 'champignon', name: 'Amanite', price: 120 },
-    { id: 'abeille', name: 'Abeille', price: 150 },
-    { id: 'ocean', name: 'Océan', price: 200 },
-    { id: 'papillon', name: 'Papillon', price: 200 },
-    { id: 'nuit', name: 'Nuit étoilée', price: 300 },
-    { id: 'aurore', name: 'Aurore boréale', price: 400 },
-    { id: 'legende', name: 'Légende', price: 600 },
-    { id: 'mecene', name: 'Mécène', price: 0, pass: true },
-];
-const SHIRT = Object.fromEntries(SHIRTS.map((s) => [s.id, s]));
-const FREE = SHIRTS.filter((s) => !s.price && !s.pass).map((s) => s.id);
+const free = (id, name) => ({ id, name, price: 0 });
+const paid = (id, name, price) => ({ id, name, price });
+const pass = (id, name) => ({ id, name, price: 0, pass: true });
+
+export const ITEMS = {
+    shirt: [
+        free('foret', 'Forêt'), free('ciel', 'Ciel'), free('terre', 'Terre'), free('feuille', 'Feuille'),
+        paid('rayures', 'Marinière', 80), paid('sapin', 'Sapin', 100), paid('champignon', 'Amanite', 120),
+        paid('carreaux', 'Chemise à carreaux', 120), paid('abeille', 'Abeille', 150), paid('salopette', 'Salopette', 150),
+        paid('coccinelle', 'Coccinelle', 180), paid('tournesol', 'Tournesol', 180), paid('ocean', 'Océan', 200),
+        paid('papillon', 'Papillon', 200), paid('flocons', 'Pull d\'hiver', 220), paid('camouflage', 'Camouflage', 250),
+        paid('nuit', 'Nuit étoilée', 300), paid('arcenciel', 'Arc-en-ciel', 350), paid('aurore', 'Aurore boréale', 400),
+        paid('legende', 'Légende', 600), pass('mecene', 'Mécène'),
+    ],
+    hat: [
+        free('aucun', 'Aucun'), free('casquette', 'Casquette'), free('explorateur', 'Explorateur'), free('bandana', 'Bandana'),
+        free('fleur', 'Fleur'), paid('bonnet', 'Bonnet', 80), paid('paille', 'Chapeau de paille', 100), paid('beret', 'Béret', 100),
+        paid('bob', 'Bob', 120), paid('couronne_fleurs', 'Couronne de fleurs', 180), paid('champi', 'Chapeau champignon', 220),
+        paid('renard', 'Oreilles de renard', 250), paid('sorcier', 'Chapeau de sorcier', 300), paid('couronne', 'Couronne', 600),
+        pass('lauriers', 'Lauriers d\'or'),
+    ],
+    face: [
+        free('aucun', 'Aucun'), free('lunettes', 'Lunettes'), free('rousseur', 'Taches de rousseur'),
+        paid('soleil', 'Lunettes de soleil', 80), paid('moustache', 'Moustache', 120), paid('rondes', 'Lunettes dorées', 120),
+        paid('monocle', 'Monocle', 150), paid('peinture', 'Peinture de feuilles', 150), paid('plongee', 'Masque de plongée', 200),
+        paid('coeurs', 'Lunettes cœur', 250),
+    ],
+    neck: [
+        free('aucun', 'Aucun'), free('jumelles', 'Jumelles'), free('foulard', 'Foulard'),
+        paid('noeud', 'Nœud papillon', 100), paid('echarpe', 'Écharpe', 100), paid('loupe', 'Loupe', 120),
+        paid('appareil', 'Appareil photo', 150), paid('coquillages', 'Collier de coquillages', 150), paid('medaille', 'Médaille d\'or', 400),
+    ],
+    pet: [
+        free('aucun', 'Aucun'), free('coccinelle', 'Coccinelle'), paid('escargot', 'Escargot', 100), paid('grenouille', 'Grenouille', 150),
+        paid('tortue', 'Tortue', 200), paid('herisson', 'Hérisson', 200), paid('lapin', 'Lapin', 200), paid('chat', 'Chat', 250),
+        paid('ecureuil', 'Écureuil', 250), paid('chouette', 'Chouette', 300), paid('renard', 'Renardeau', 350),
+        paid('panda', 'Panda roux', 500), paid('dragon', 'Dragonnet', 800), pass('faon', 'Faon'),
+    ],
+};
+export const SLOTS = Object.keys(ITEMS);
+const ITEM = Object.fromEntries(SLOTS.map((slot) => [slot, Object.fromEntries(ITEMS[slot].map((i) => [i.id, i]))]));
+// What a Pass item turns into when the Pass is over.
+const FALLBACK = { shirt: 'feuille', hat: 'aucun', face: 'aucun', neck: 'aucun', pet: 'aucun' };
+const key = (slot, id) => `${slot}:${id}`;
 
 const OPTIONS = {
     skin: 6, hairColor: 8, bg: 6,
     hair: ['court', 'meche', 'boucles', 'long', 'chignon', 'tresses', 'rase'],
-    acc: ['aucun', 'lunettes', 'casquette', 'explorateur', 'bandana', 'jumelles', 'fleur'],
 };
 
-// Without the Pass, the Mécène t-shirt falls back to a free one (in SQL for player lists).
-export const AVATAR_SQL = (u) => `CASE WHEN ${u}.avatar->>'shirt' = 'mecene' AND NOT COALESCE(${u}.pass_until > now(), false)
-    THEN jsonb_set(${u}.avatar, '{shirt}', '"feuille"') ELSE ${u}.avatar END`;
-export const avatarOf = (user) => (user?.avatar?.shirt === 'mecene' && !passActive(user) ? { ...user.avatar, shirt: 'feuille' } : user?.avatar || null);
+// Avatars saved before the slots had a single "acc" field.
+const LEGACY_ACC = { lunettes: 'face', jumelles: 'neck', casquette: 'hat', explorateur: 'hat', bandana: 'hat', fleur: 'hat' };
+function upgrade(a) {
+    if (!a || !('acc' in a)) return a;
+    const { acc, ...rest } = a;
+    const out = { hat: 'aucun', face: 'aucun', neck: 'aucun', pet: 'aucun', ...rest };
+    if (LEGACY_ACC[acc]) out[LEGACY_ACC[acc]] = acc;
+    return out;
+}
 
-function clean(a, HttpError) {
+// Without the Pass, Pass items fall back to free ones (in SQL for player lists).
+const PASS_ITEMS = SLOTS.flatMap((slot) => ITEMS[slot].filter((i) => i.pass).map((i) => [slot, i.id]));
+export const AVATAR_SQL = (u) => `CASE WHEN ${u}.avatar IS NULL OR COALESCE(${u}.pass_until > now(), false) THEN ${u}.avatar
+    ELSE ${u}.avatar || jsonb_strip_nulls(jsonb_build_object(${PASS_ITEMS.map(([slot, id]) =>
+        `'${slot}', CASE WHEN ${u}.avatar->>'${slot}' = '${id}' THEN '${FALLBACK[slot]}' END`).join(', ')})) END`;
+export function avatarOf(user) {
+    const a = upgrade(user?.avatar);
+    if (!a || passActive(user)) return a || null;
+    return Object.fromEntries(Object.entries(a).map(([k, v]) => [k, ITEM[k]?.[v]?.pass ? FALLBACK[k] : v]));
+}
+
+function clean(raw, HttpError) {
+    const a = upgrade(raw);
     if (!a || typeof a !== 'object') throw new HttpError(400, 'Avatar invalide');
     const index = (k) => {
         const v = Number(a[k]);
         if (!Number.isInteger(v) || v < 0 || v >= OPTIONS[k]) throw new HttpError(400, 'Avatar invalide');
         return v;
     };
-    const pick = (k) => {
-        if (!OPTIONS[k].includes(a[k])) throw new HttpError(400, 'Avatar invalide');
-        return a[k];
-    };
-    if (!SHIRT[a.shirt]) throw new HttpError(400, 'Ce t-shirt n\'existe pas');
-    return { skin: index('skin'), hair: pick('hair'), hairColor: index('hairColor'), acc: pick('acc'), bg: index('bg'), shirt: a.shirt };
+    if (!OPTIONS.hair.includes(a.hair)) throw new HttpError(400, 'Avatar invalide');
+    const out = { skin: index('skin'), hair: a.hair, hairColor: index('hairColor'), bg: index('bg') };
+    for (const slot of SLOTS) {
+        const id = a[slot] ?? FALLBACK[slot];
+        if (!ITEM[slot][id]) throw new HttpError(400, 'Cet objet n\'existe pas');
+        out[slot] = id;
+    }
+    return out;
 }
 
 export function avatarActions({ requireUser, inTransaction, HttpError, publicUser }) {
-    const owned = async (db, userId) => new Set([...FREE,
-        ...(await db.query(`SELECT shirt FROM user_shirts WHERE user_id = $1`, [userId])).rows.map((r) => r.shirt)]);
+    const owned = async (db, userId) => new Set(
+        (await db.query(`SELECT item FROM user_items WHERE user_id = $1`, [userId])).rows.map((r) => r.item));
+    const has = (mine, user, slot, item) => (item.pass ? passActive(user) : !item.price || mine.has(key(slot, item.id)));
 
     const state = async (db, user) => {
         const mine = await owned(db, user.id);
-        const pass = passActive(user);
         return {
             avatar: avatarOf(user),
-            shirts: SHIRTS.map((s) => ({ ...s, owned: s.pass ? pass : mine.has(s.id) })),
+            items: Object.fromEntries(SLOTS.map((slot) => [slot, ITEMS[slot].map((i) => ({ ...i, owned: has(mine, user, slot, i) }))])),
             options: OPTIONS,
         };
     };
+
+    // { items: [{ slot, id }] } → all bought in one go with pépites
+    async function avatarBuy(db, body, event) {
+        const user = await requireUser(db, event);
+        const wanted = (Array.isArray(body.items) ? body.items : []).slice(0, 20).map(({ slot, id } = {}) => {
+            const item = ITEM[slot]?.[id];
+            if (!item || !item.price) throw new HttpError(400, 'Cet objet ne s\'achète pas');
+            return { slot, item };
+        });
+        if (!wanted.length) throw new HttpError(400, 'Rien à acheter');
+        const fresh = await inTransaction(db, async (client) => {
+            const { rows: [u] } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+            let total = 0;
+            for (const { slot, item } of wanted) {
+                const { rowCount } = await client.query(
+                    `INSERT INTO user_items (user_id, item, price) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [u.id, key(slot, item.id), item.price]);
+                total += rowCount ? item.price : 0;
+            }
+            if (!total) throw new HttpError(409, 'Tu as déjà tout ça');
+            if (u.nuggets < total) throw new HttpError(402, `Il te faut ${total} pépites`);
+            return (await client.query(`UPDATE users SET nuggets = nuggets - $2 WHERE id = $1 RETURNING *`, [u.id, total])).rows[0];
+        });
+        return { ...(await state(db, fresh)), user: await publicUser(db, fresh) };
+    }
 
     return {
         async avatarGet(db, body, event) {
             return state(db, await requireUser(db, event));
         },
 
-        // { avatar } → saved; the t-shirt must be free, bought, or the Pass one while it is active
+        // { avatar } → saved; every item must be free, bought, or a Pass one while it is active
         async avatarSave(db, body, event) {
             const user = await requireUser(db, event);
             const avatar = clean(body.avatar, HttpError);
-            const s = SHIRT[avatar.shirt];
-            if (s.pass && !passActive(user)) throw new HttpError(403, 'Le t-shirt Mécène est réservé au Pass Naturaliste');
-            if (!s.pass && !(await owned(db, user.id)).has(s.id)) throw new HttpError(402, `Achète d'abord le t-shirt ${s.name}`);
+            const mine = await owned(db, user.id);
+            for (const slot of SLOTS) {
+                const item = ITEM[slot][avatar[slot]];
+                if (item.pass && !passActive(user)) throw new HttpError(403, `${item.name} est réservé au Pass Naturaliste`);
+                if (!has(mine, user, slot, item)) throw new HttpError(402, `Achète d'abord : ${item.name}`);
+            }
             const { rows: [fresh] } = await db.query(`UPDATE users SET avatar = $2 WHERE id = $1 RETURNING *`, [user.id, avatar]);
             return { ...(await state(db, fresh)), user: await publicUser(db, fresh) };
         },
 
-        // { shirt } → bought once with pépites
-        async avatarBuyShirt(db, body, event) {
-            const user = await requireUser(db, event);
-            const s = SHIRT[body.shirt];
-            if (!s || !s.price) throw new HttpError(400, 'Ce t-shirt ne s\'achète pas');
-            const fresh = await inTransaction(db, async (client) => {
-                const { rows: [u] } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
-                const { rowCount } = await client.query(
-                    `INSERT INTO user_shirts (user_id, shirt, price) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [u.id, s.id, s.price]);
-                if (!rowCount) throw new HttpError(409, 'Tu as déjà ce t-shirt');
-                if (u.nuggets < s.price) throw new HttpError(402, `Il te faut ${s.price} pépites`);
-                return (await client.query(`UPDATE users SET nuggets = nuggets - $2 WHERE id = $1 RETURNING *`, [u.id, s.price])).rows[0];
-            });
-            return { ...(await state(db, fresh)), user: await publicUser(db, fresh) };
-        },
+        avatarBuy,
+        // Older clients still in a browser tab
+        avatarBuyShirt: (db, body, event) => avatarBuy(db, { items: [{ slot: 'shirt', id: body.shirt }] }, event),
 
         // { usernames: [...] } → { avatars: { name: avatar | null } }, for player lists
         async avatars(db, body, event) {
@@ -103,7 +163,7 @@ export function avatarActions({ requireUser, inTransaction, HttpError, publicUse
             const names = [...new Set((Array.isArray(body.usernames) ? body.usernames : []).map(String))].slice(0, 100);
             if (!names.length) return { avatars: {} };
             const { rows } = await db.query(`SELECT u.username, ${AVATAR_SQL('u')} AS avatar FROM users u WHERE u.username = ANY($1)`, [names]);
-            return { avatars: Object.fromEntries(rows.map((r) => [r.username, r.avatar])) };
+            return { avatars: Object.fromEntries(rows.map((r) => [r.username, upgrade(r.avatar)])) };
         },
     };
 }

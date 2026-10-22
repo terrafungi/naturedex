@@ -497,3 +497,21 @@ CREATE TABLE IF NOT EXISTS user_shirts (
     bought_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, shirt)
 );
+
+-- Avatar items in five slots (shirt, hat, face, neck, pet), keyed "slot:id"; replaces user_shirts.
+CREATE TABLE IF NOT EXISTS user_items (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    bought_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, item)
+);
+INSERT INTO user_items (user_id, item, price, bought_at)
+    SELECT user_id, 'shirt:' || shirt, price, bought_at FROM user_shirts ON CONFLICT DO NOTHING;
+-- The old single "acc" field moves to its slot.
+UPDATE users SET avatar = (avatar - 'acc') || jsonb_build_object(
+    'hat', CASE WHEN avatar->>'acc' IN ('casquette', 'explorateur', 'bandana', 'fleur') THEN avatar->>'acc' ELSE 'aucun' END,
+    'face', CASE WHEN avatar->>'acc' = 'lunettes' THEN 'lunettes' ELSE 'aucun' END,
+    'neck', CASE WHEN avatar->>'acc' = 'jumelles' THEN 'jumelles' ELSE 'aucun' END,
+    'pet', 'aucun')
+WHERE avatar ? 'acc';
