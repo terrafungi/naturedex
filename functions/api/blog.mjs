@@ -13,7 +13,8 @@ const MODEL = 'gemini-3.5-flash';
 const FREE_FALLBACK_MODEL = 'gemini-flash-latest';
 const LAUNCH_POSTS = 16; // first batch, one per category, generated one per minute
 const DAILY_HOUR = 8; // Paris hour from which the daily article is written
-const DAILY_ATTEMPTS = 3;
+const DAILY_ATTEMPTS = 6;
+const RETRY_AFTER = 20; // minutes between two attempts of the same day, so one overload spike does not use them all
 const PAGE_SIZE = 12;
 export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const jsonLd = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
@@ -173,11 +174,12 @@ async function llm(prompt) {
     });
     const errors = [];
     const deadline = Date.now() + 95_000; // the whole chain must fit in the 120 s Lambda
+    const PAID_RESERVE = 50_000; // a slow or overloaded free tier must never eat the paid fallback's time
     let res;
     for (const ep of llmEndpoints()) {
         const left = deadline - Date.now();
-        if (left < 20_000) break;
-        res = await fetch(ep.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...ep.headers }, body, signal: AbortSignal.timeout(ep.name === 'openkbs' ? left : Math.min(left, 50_000)) })
+        if (left < (ep.name === 'openkbs' ? 20_000 : PAID_RESERVE + 15_000)) continue;
+        res = await fetch(ep.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...ep.headers }, body, signal: AbortSignal.timeout(ep.name === 'openkbs' ? left : Math.min(left - PAID_RESERVE, 50_000)) })
             .catch((err) => ({ ok: false, status: 0, text: async () => err.message }));
         if (res.ok) { console.log(`blog: LLM via ${ep.name}`); break; }
         console.log(`blog: ${ep.name} failed ${res.status}`);
@@ -301,8 +303,9 @@ export async function blogTick(db) {
             ?? CATEGORY_KEYS.filter((k) => !CATEGORIES[k].news)[s.published % (CATEGORY_KEYS.length - 1)];
     } else {
         if (hour < DAILY_HOUR) return;
-        const { rows: [d] } = await db.query(`SELECT count(*) FILTER (WHERE status = 'published')::int AS done, count(*)::int AS tries FROM blog_posts WHERE day = $1`, [day]);
-        if (d.done || d.tries >= DAILY_ATTEMPTS) return;
+        const { rows: [d] } = await db.query(`SELECT count(*) FILTER (WHERE status = 'published')::int AS done, count(*)::int AS tries,
+            bool_or(created_at > now() - interval '${RETRY_AFTER} minutes') AS recent FROM blog_posts WHERE day = $1`, [day]);
+        if (d.done || d.tries >= DAILY_ATTEMPTS || d.recent) return;
         postDay = day;
         // news on Monday, Wednesday and Friday (falls back to another category when no usable news)
         if (['Mon', 'Wed', 'Fri'].includes(weekday) && d.tries === 0) category = 'actualite';
