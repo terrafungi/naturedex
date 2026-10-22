@@ -26,6 +26,7 @@ import { blogRoute, blogTick, latestPosts } from './blog.mjs';
 import { speciesRoute } from './species.mjs';
 import { speciesEnrichTick } from './species-enrich.mjs';
 import { fieldActions } from './field.mjs';
+import { exploreActions } from './explore.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -2494,6 +2495,7 @@ const actions = {
 
 Object.assign(actions, arenaActions({ requireUser, inTransaction, HttpError, publicUser, parisDay }));
 Object.assign(actions, fieldActions({ requireUser, inTransaction, HttpError, publicUser }));
+Object.assign(actions, exploreActions({ requireUser, inTransaction, HttpError, publicUser }));
 
 const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest']);
 

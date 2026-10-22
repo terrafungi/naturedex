@@ -441,3 +441,40 @@ CREATE TABLE IF NOT EXISTS field_reports (
     at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (observation_id, user_id)
 );
+
+-- « Exploration »: GBIF taxon of each card (species pools around the player)
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS gbif_key INTEGER;
+CREATE INDEX IF NOT EXISTS cards_gbif_idx ON cards (gbif_key);
+
+-- land-cover shares of each ~200 m grid cell (ESA WorldCover), computed once
+CREATE TABLE IF NOT EXISTS explore_cells (
+    cell        TEXT PRIMARY KEY,
+    cover       JSONB NOT NULL,
+    at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- cards really recorded around each ~5 km cell (GBIF): { cardId: weight }, refreshed after 60 days
+CREATE TABLE IF NOT EXISTS explore_pools (
+    cell        TEXT PRIMARY KEY,
+    cards       JSONB NOT NULL,
+    at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- one row per player and spawn: throws used, caught or not
+CREATE TABLE IF NOT EXISTS explore_catches (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    spawn       TEXT NOT NULL,
+    card_id     INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    habitat     TEXT,
+    tries       INTEGER NOT NULL DEFAULT 0,
+    caught      BOOLEAN NOT NULL DEFAULT false,
+    at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, spawn)
+);
+CREATE INDEX IF NOT EXISTS explore_catches_day_idx ON explore_catches (user_id, at DESC) WHERE caught;
+-- only the last known position (speed check), never a track
+CREATE TABLE IF NOT EXISTS explore_positions (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    lat         DOUBLE PRECISION NOT NULL,
+    lon         DOUBLE PRECISION NOT NULL,
+    at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    cooldown_until TIMESTAMPTZ
+);

@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import './index.css';
@@ -9,6 +9,7 @@ import Auth from './pages/Auth.jsx';
 import Boosters from './pages/Boosters.jsx';
 import Garden from './pages/Garden.jsx';
 import Terrain from './pages/Terrain.jsx';
+const Exploration = lazy(() => import('./pages/Exploration.jsx')); // MapLibre: its own chunk
 import Collection from './pages/Collection.jsx';
 import ShowcaseEditor from './pages/ShowcaseEditor.jsx';
 import Showcases from './pages/Showcases.jsx';
@@ -46,6 +47,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/" element={<Private><Landing /></Private>} />
                         <Route path="/connexion" element={<Auth />} />
                         <Route path="/booster" element={<Private><Boosters /></Private>} />
+                        <Route path="/exploration" element={<Private><Suspense fallback={<div className="py-32 text-center font-display text-xl text-ink-soft">Chargement de la carte…</div>}><Exploration /></Suspense></Private>} />
                         <Route path="/terrain" element={<Private><Terrain /></Private>} />
                         <Route path="/jardin" element={<Private><Garden /></Private>} />
                         <Route path="/defis" element={<Private><Challenges /></Private>} />

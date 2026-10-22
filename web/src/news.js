@@ -1,15 +1,15 @@
-import { Camera, Sparkles, Sprout, Users } from 'lucide-react';
+import { Camera, Compass, MapPin, Trees } from 'lucide-react';
 
 // « Nouveautés » pop-up shown once per account at the next visit. To announce new features,
 // replace the items and give NEWS a new id (the date): every player who joined before it sees it once.
 export const NEWS = {
-    id: '2026-10-22',
-    title: 'Nouveau : Sur le terrain',
+    id: '2026-10-23',
+    title: 'Nouveau : Exploration',
     items: [
-        { Icon: Camera, title: 'Photographie la vraie nature', text: "Prends en photo une plante, un animal ou un champignon : l'IA reconnaît l'espèce et ta photo devient une carte de terrain unique.", to: '/terrain' },
-        { Icon: Sprout, title: 'De 30 à 150 graines', text: "Selon la rareté de l'espèce, 5 observations récompensées par jour. La carte, elle, se trouve toujours dans les boosters !", to: '/terrain' },
-        { Icon: Sparkles, title: 'Sois le premier', text: 'Première observation NatureDex d\'une espèce ? +50 graines et ton pseudo sur l\'observation n°1.', to: '/terrain' },
-        { Icon: Users, title: 'Le carnet de la communauté', text: 'Découvre les photos des autres naturalistes, et les tiennes sur la fiche de chaque espèce.', to: '/terrain' },
+        { Icon: Compass, title: 'Des cartes dans le vrai monde', text: 'Des cartes NatureDex apparaissent sur une carte autour de toi. Marche jusqu\'à elles et attrape-les : elles rejoignent ta collection !', to: '/exploration' },
+        { Icon: Trees, title: 'Plus c\'est sauvage, plus c\'est rare', text: 'Forêts, marais et montagnes cachent bien plus de cartes rares, épiques et légendaires que la ville.', to: '/exploration' },
+        { Icon: MapPin, title: 'De vraies espèces locales', text: 'Seules apparaissent des espèces réellement observées près de toi. Nouvelles cartes toutes les 30 min, 10 captures par jour.', to: '/exploration' },
+        { Icon: Camera, title: 'Sur le terrain', text: 'Le mode photo reste là : photographie une vraie espèce pour gagner des graines et ta carte de terrain.', to: '/terrain' },
     ],
 };
 
