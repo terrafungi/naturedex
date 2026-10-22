@@ -116,13 +116,13 @@ export function avatarOf(user) {
 function clean(raw, HttpError) {
     const a = upgrade(raw);
     if (!a || typeof a !== 'object') throw new HttpError(400, 'Avatar invalide');
+    // Out-of-range colours (an old client computed some defaults as negative numbers) fall back to the first one.
     const index = (k) => {
         const v = Number(a[k]);
-        if (!Number.isInteger(v) || v < 0 || v >= OPTIONS[k]) throw new HttpError(400, 'Avatar invalide');
-        return v;
+        return Number.isInteger(v) && v >= 0 && v < OPTIONS[k] ? v : 0;
     };
-    if (!OPTIONS.hair.includes(a.hair)) throw new HttpError(400, 'Avatar invalide');
-    const out = { skin: index('skin'), hair: a.hair, hairColor: index('hairColor'), bg: index('bg') };
+    const hair = OPTIONS.hair.includes(a.hair) ? a.hair : OPTIONS.hair[0];
+    const out = { skin: index('skin'), hair, hairColor: index('hairColor'), bg: index('bg') };
     for (const slot of SLOTS) {
         const id = a[slot] ?? FALLBACK[slot];
         if (!ITEM[slot][id]) throw new HttpError(400, 'Cet objet n\'existe pas');

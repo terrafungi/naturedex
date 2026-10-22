@@ -70,8 +70,8 @@ export function defaultAvatar(name) {
     const h = hash(name);
     const hairs = Object.keys(HAIRS);
     return {
-        skin: h % SKINS.length, hair: hairs[(h >> 3) % hairs.length], hairColor: (h >> 6) % 6, bg: (h >> 9) % BGS.length,
-        shirt: ['foret', 'ciel', 'terre', 'feuille'][(h >> 12) % 4], hat: 'aucun', face: 'aucun', neck: 'aucun', pet: 'aucun',
+        skin: h % SKINS.length, hair: hairs[(h >>> 3) % hairs.length], hairColor: (h >>> 6) % 6, bg: (h >>> 9) % BGS.length,
+        shirt: ['foret', 'ciel', 'terre', 'feuille'][(h >>> 12) % 4], hat: 'aucun', face: 'aucun', neck: 'aucun', pet: 'aucun',
         pants: 'jean', shoes: 'baskets',
     };
 }
