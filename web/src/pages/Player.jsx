@@ -3,7 +3,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Camera, Frame, Lock, MessageCircle, Pencil, Star, UserPlus } from 'lucide-react';
 import { api } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
-import { AvatarFigure, defaultAvatar } from '../components/PlayerAvatar.jsx';
+import { defaultAvatar } from '../components/PlayerAvatar.jsx';
+import AvatarStage, { StageTitle } from '../components/AvatarStage.jsx';
 import ShowcaseCanvas, { VoteButton } from '../components/Showcase.jsx';
 import PatronBadge from '../components/PatronBadge.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
@@ -46,14 +47,11 @@ export default function Player() {
     return (
         <div className="max-w-3xl mx-auto px-5 py-10">
             <button onClick={() => history.back()} className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" />Retour</button>
-            <div className="mt-4 flex items-center gap-4">
-                <AvatarFigure avatar={player.avatar || defaultAvatar(player.username)} size={150} full animate className="drop-shadow-xl" />
-                <div className="min-w-0">
-                    <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Naturaliste depuis {new Date(player.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
-                    <h1 className="font-display text-4xl font-medium text-white truncate">{player.username}</h1>
-                    <div className="flex flex-wrap gap-2"><SeasonBadge badge={player.badge} className="mt-2" />{player.patron && <PatronBadge className="mt-2" />}</div>
-                </div>
-            </div>
+            <AvatarStage avatar={player.avatar || defaultAvatar(player.username)} height={400} className="mt-4 shadow-2xl shadow-black/40">
+                <StageTitle kicker={`Naturaliste depuis ${new Date(player.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`} name={player.username}>
+                    <SeasonBadge badge={player.badge} className="mt-2" />{player.patron && <PatronBadge className="mt-2" />}
+                </StageTitle>
+            </AvatarStage>
 
             {!player.me && (
                 <div className="mt-6 flex flex-wrap gap-3">

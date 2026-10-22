@@ -9,7 +9,7 @@ export const BGS = ['#2f6b4f', '#3a6f8f', '#8a5a9c', '#b5704a', '#5d7a3a', '#384
 export const HAIRS = { court: 'Court', meche: 'Mèche', boucles: 'Boucles', long: 'Long', chignon: 'Chignon', tresses: 'Tresses', rase: 'Ras' };
 export const SLOT_NAMES = { shirt: 'T-shirts', pants: 'Pantalons', shoes: 'Chaussures', hat: 'Chapeaux', face: 'Visage', neck: 'Cou', pet: 'Compagnons' };
 
-const SHIRTS = {
+export const SHIRTS = {
     foret: { base: '#2e7d4f' },
     ciel: { base: '#4a90c8' },
     terre: { base: '#c0643b' },
@@ -87,7 +87,7 @@ const PANTS = 'M27 122 L73 122 L72 158 L54 158 L50 134 L46 158 L28 158 Z';
 const SHORT = 'M27 122 L73 122 L72.5 140 L53 140 L50 131 L47 140 L27.5 140 Z';
 const SKIRT = 'M27 122 L73 122 L79 143 L21 143 Z';
 // cut: long, short (bare knees) or skirt; bib: overalls straps over the t-shirt.
-const PANTS_STYLES = {
+export const PANTS_STYLES = {
     jean: { color: '#34507a', cut: 'long', detail: 'jean' },
     short: { color: '#5b7aa8', cut: 'short', detail: 'jean' },
     cargo: { color: '#b59a6a', cut: 'long', detail: 'pockets' },
@@ -427,6 +427,36 @@ function Shoe({ id, skin }) {
         default: // baskets
             return <g><path d={DOME} fill="#e94b4b" /><path d="M-9 -1.2 H9" stroke="#fff" strokeWidth="1" />{laces('#fff')}{sole('#f3efe6')}</g>;
     }
+}
+
+/**
+ * Flat pictures used as textures by the 3D character: the front of the t-shirt (same framing as the
+ * full-body figure) and a tile of the pants fabric. `plain` keeps only the fabric, without the motif.
+ */
+export function ShirtArt({ id, plain = false }) {
+    const shirt = SHIRTS[id] || SHIRTS.foret;
+    const motif = <Motif kind={shirt.motif} ink={shirt.ink} />;
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="26 72 48 52" width="480" height="520" preserveAspectRatio="none">
+            {shirt.gradient && (
+                <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                    {shirt.gradient.map((c, i) => <stop key={c} offset={i / (shirt.gradient.length - 1)} stopColor={c} />)}
+                </linearGradient></defs>
+            )}
+            <rect x="20" y="60" width="60" height="70" fill={shirt.gradient ? 'url(#g)' : shirt.base} />
+            {!plain && (shirt.repeat ? <>{motif}<g transform="translate(0 26)">{motif}</g></> : <g transform="translate(50 97) scale(1.3) translate(-50 -89)">{motif}</g>)}
+        </svg>
+    );
+}
+
+export function PantsArt({ id }) {
+    const p = PANTS_STYLES[id] || PANTS_STYLES.jean;
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="26 122 48 36" width="480" height="360" preserveAspectRatio="none">
+            <rect x="20" y="115" width="60" height="50" fill={p.color} />
+            {p.detail !== 'jean' && p.detail !== 'pockets' && p.detail !== 'ranger' && p.detail !== 'stripe' && <PantsDetail detail={p.detail} />}
+        </svg>
+    );
 }
 
 /** `full`: whole character standing, pet at the feet (`size` is then the height). */

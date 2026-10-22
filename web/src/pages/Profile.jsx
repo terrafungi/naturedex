@@ -4,7 +4,8 @@ import { Award, Gavel, Layers, LogOut, Package, Pencil } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import PatronBadge from '../components/PatronBadge.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
-import { AvatarFigure, defaultAvatar } from '../components/PlayerAvatar.jsx';
+import { defaultAvatar } from '../components/PlayerAvatar.jsx';
+import AvatarStage, { StageTitle } from '../components/AvatarStage.jsx';
 import { RARITIES } from '../game.jsx';
 
 export default function Profile() {
@@ -28,17 +29,14 @@ export default function Profile() {
 
     return (
         <div className="max-w-3xl mx-auto px-5 py-10">
-            <div className="flex items-center gap-4">
-                <Link to="/avatar" className="relative shrink-0" aria-label="Modifier mon avatar">
-                    <AvatarFigure avatar={user.avatar || defaultAvatar(user.username)} size={150} full animate className="drop-shadow-xl" />
-                    <span className="absolute bottom-1 right-0 grid place-items-center w-8 h-8 rounded-full bg-[#4fd18b] text-[#05130d] ring-4 ring-[#0d1f16]"><Pencil className="w-4 h-4" /></span>
+            <AvatarStage avatar={user.avatar || defaultAvatar(user.username)} height={400} className="shadow-2xl shadow-black/40">
+                <StageTitle kicker="Naturaliste" name={user.username}>
+                    <SeasonBadge badge={me?.badge} className="mt-2" />{user.pass && <PatronBadge className="mt-2" />}
+                </StageTitle>
+                <Link to="/avatar" aria-label="Personnaliser mon avatar" className="absolute top-4 right-4 grid place-items-center w-11 h-11 rounded-full bg-[#4fd18b] text-[#05130d] shadow-lg shadow-black/30">
+                    <Pencil className="w-5 h-5" />
                 </Link>
-                <div className="min-w-0">
-                    <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Naturaliste</p>
-                    <h1 className="font-display text-4xl font-medium text-white truncate">{user.username}</h1>
-                    <div className="flex flex-wrap gap-2"><SeasonBadge badge={me?.badge} className="mt-2" />{user.pass && <PatronBadge className="mt-2" />}</div>
-                </div>
-            </div>
+            </AvatarStage>
 
             <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {stats.map(([label, value]) => (

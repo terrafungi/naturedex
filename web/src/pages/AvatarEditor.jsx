@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, Leaf, Lock } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Nugget } from '../components/Currency.jsx';
+import AvatarStage from '../components/AvatarStage.jsx';
 import { AvatarFigure, BGS, HAIRS, HAIR_COLORS, SKINS, SLOT_NAMES, defaultAvatar, rememberAvatar } from '../components/PlayerAvatar.jsx';
 
 function Section({ title, children }) {
@@ -37,23 +38,6 @@ function Choices({ items, field, draft, setDraft }) {
                     <span className="text-[11px] text-white/75 text-center leading-tight">{label}</span>
                 </button>
             ))}
-        </div>
-    );
-}
-
-// The preview leans toward the finger or the mouse, like a medallion in 3D.
-function Tilt({ children }) {
-    const [t, setT] = useState({ x: 0, y: 0 });
-    const move = (e) => {
-        const r = e.currentTarget.getBoundingClientRect();
-        setT({ x: ((e.clientX - r.left) / r.width - 0.5) * 2, y: ((e.clientY - r.top) / r.height - 0.5) * 2 });
-    };
-    return (
-        <div className="[perspective:600px] touch-none" onPointerMove={move} onPointerLeave={() => setT({ x: 0, y: 0 })}>
-            <div className="transition-transform duration-200 ease-out rounded-full"
-                style={{ transform: `rotateY(${t.x * 18}deg) rotateX(${-t.y * 18}deg)`, filter: `drop-shadow(${-t.x * 8}px ${12 - t.y * 6}px 14px rgba(0,0,0,.45))` }}>
-                {children}
-            </div>
         </div>
     );
 }
@@ -118,7 +102,9 @@ export default function AvatarEditor() {
             <Link to="/profil" className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" />Profil</Link>
             <h1 className="mt-3 font-display text-4xl text-white">Mon avatar</h1>
 
-            <div className="mt-6 flex justify-center"><Tilt><AvatarFigure avatar={draft} size={300} full animate className="drop-shadow-2xl" /></Tilt></div>
+            <AvatarStage avatar={draft} height={420} className="mt-6 shadow-2xl shadow-black/40">
+                <p className="pointer-events-none absolute bottom-3 inset-x-0 text-center text-xs font-semibold text-white/80 [text-shadow:0_1px_4px_rgba(0,0,0,.5)]">Fais-le tourner du doigt</p>
+            </AvatarStage>
 
             <div className="mt-6 flex flex-wrap gap-2">
                 {Object.entries(SLOT_NAMES).map(([slot, label]) => (
