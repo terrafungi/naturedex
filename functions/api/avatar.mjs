@@ -1,6 +1,6 @@
 /**
- * Avatar: a small drawn character (skin, hair, background) dressed with items in five slots —
- * t-shirt, hat, face, neck and a pet companion. Stored as JSON on the user and drawn in the browser.
+ * Avatar: a small drawn character (skin, hair, background) dressed with items in seven slots —
+ * t-shirt, hat, face, neck, pet companion, pants and shoes (the last two only show on the full body). Stored as JSON on the user and drawn in the browser.
  * Free items are worn by everyone; the others are bought once with pépites, and the Pass ones are
  * worn only while the Pass Naturaliste is active.
  * The drawings themselves live in web/src/components/PlayerAvatar.jsx, keyed by the same ids.
@@ -67,11 +67,24 @@ export const ITEMS = {
         paid('ecureuil', 'Écureuil', 250), paid('chouette', 'Chouette', 300), paid('renard', 'Renardeau', 350),
         paid('panda', 'Panda roux', 500), paid('dragon', 'Dragonnet', 800), pass('faon', 'Faon'),
     ],
+    pants: [
+        free('jean', 'Jean'), free('short', 'Short'), free('cargo', 'Pantalon cargo'), free('jupe', 'Jupe'),
+        paid('jogging', 'Jogging', 80), paid('velours', 'Velours côtelé', 100), paid('bermuda', 'Bermuda à fleurs', 120),
+        paid('salopette', 'Salopette', 150), paid('kilt', 'Kilt écossais', 180), paid('camouflage', 'Camouflage', 200),
+        paid('feuillage', 'Short feuillage', 220), paid('arcenciel', 'Arc-en-ciel', 300), paid('etoiles', 'Pantalon étoilé', 350),
+        pass('garde', 'Tenue de garde forestier'),
+    ],
+    shoes: [
+        free('baskets', 'Baskets'), free('rando', 'Chaussures de rando'), free('sandales', 'Sandales'),
+        paid('bottes', 'Bottes de pluie', 80), paid('sabots', 'Sabots', 100), paid('jaunes', 'Bottes jaunes', 100),
+        paid('coccinelle', 'Bottes coccinelle', 150), paid('palmes', 'Palmes', 150), paid('montantes', 'Baskets montantes', 180),
+        paid('grenouille', 'Chaussons grenouille', 220), paid('dorees', 'Baskets dorées', 400), pass('ailees', 'Baskets ailées'),
+    ],
 };
 export const SLOTS = Object.keys(ITEMS);
 const ITEM = Object.fromEntries(SLOTS.map((slot) => [slot, Object.fromEntries(ITEMS[slot].map((i) => [i.id, i]))]));
 // What a Pass item turns into when the Pass is over.
-const FALLBACK = { shirt: 'feuille', hat: 'aucun', face: 'aucun', neck: 'aucun', pet: 'aucun' };
+const FALLBACK = { shirt: 'feuille', hat: 'aucun', face: 'aucun', neck: 'aucun', pet: 'aucun', pants: 'jean', shoes: 'baskets' };
 const key = (slot, id) => `${slot}:${id}`;
 
 const OPTIONS = {

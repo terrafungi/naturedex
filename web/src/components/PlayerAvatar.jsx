@@ -7,7 +7,7 @@ export const SKINS = ['#ffe0c7', '#f6c9a0', '#e3a878', '#c98d5c', '#9c6440', '#6
 export const HAIR_COLORS = ['#2b1d16', '#5a3a22', '#8b5a2b', '#c98a3d', '#e8c770', '#b8452c', '#d9d4cc', '#4f7cc9'];
 export const BGS = ['#2f6b4f', '#3a6f8f', '#8a5a9c', '#b5704a', '#5d7a3a', '#384152'];
 export const HAIRS = { court: 'Court', meche: 'Mèche', boucles: 'Boucles', long: 'Long', chignon: 'Chignon', tresses: 'Tresses', rase: 'Ras' };
-export const SLOT_NAMES = { shirt: 'T-shirts', hat: 'Chapeaux', face: 'Visage', neck: 'Cou', pet: 'Compagnons' };
+export const SLOT_NAMES = { shirt: 'T-shirts', pants: 'Pantalons', shoes: 'Chaussures', hat: 'Chapeaux', face: 'Visage', neck: 'Cou', pet: 'Compagnons' };
 
 const SHIRTS = {
     foret: { base: '#2e7d4f' },
@@ -72,6 +72,7 @@ export function defaultAvatar(name) {
     return {
         skin: h % SKINS.length, hair: hairs[(h >> 3) % hairs.length], hairColor: (h >> 6) % 6, bg: (h >> 9) % BGS.length,
         shirt: ['foret', 'ciel', 'terre', 'feuille'][(h >> 12) % 4], hat: 'aucun', face: 'aucun', neck: 'aucun', pet: 'aucun',
+        pants: 'jean', shoes: 'baskets',
     };
 }
 
@@ -83,6 +84,25 @@ const TORSO = 'M12 104 C12 82 27 73 50 73 C73 73 88 82 88 104 Z';
 // Full-body figure: the head stays where it is in the bust, the body goes down to y 164.
 const FULL_TORSO = 'M30 76 C36 72.5 43 72 50 72 C57 72 64 72.5 70 76 C73 78 74 84 74 92 L73 124 L27 124 L26 92 C26 84 27 78 30 76 Z';
 const PANTS = 'M27 122 L73 122 L72 158 L54 158 L50 134 L46 158 L28 158 Z';
+const SHORT = 'M27 122 L73 122 L72.5 140 L53 140 L50 131 L47 140 L27.5 140 Z';
+const SKIRT = 'M27 122 L73 122 L79 143 L21 143 Z';
+// cut: long, short (bare knees) or skirt; bib: overalls straps over the t-shirt.
+const PANTS_STYLES = {
+    jean: { color: '#34507a', cut: 'long', detail: 'jean' },
+    short: { color: '#5b7aa8', cut: 'short', detail: 'jean' },
+    cargo: { color: '#b59a6a', cut: 'long', detail: 'pockets' },
+    jupe: { color: '#c0587a', cut: 'skirt', detail: 'pleats' },
+    jogging: { color: '#4a4f5a', cut: 'long', detail: 'stripe' },
+    velours: { color: '#8b5a2b', cut: 'long', detail: 'ribs' },
+    bermuda: { color: '#2aa6a0', cut: 'short', detail: 'flowers' },
+    salopette: { color: '#3c6aa8', cut: 'long', detail: 'jean', bib: true },
+    kilt: { color: '#b8322e', cut: 'skirt', detail: 'plaid' },
+    camouflage: { color: '#5b6b3a', cut: 'long', detail: 'camo' },
+    feuillage: { color: '#3f8a4a', cut: 'short', detail: 'leaves' },
+    arcenciel: { color: '#e94b4b', cut: 'long', detail: 'rainbow' },
+    etoiles: { color: '#1b2350', cut: 'long', detail: 'stars' },
+    garde: { color: '#4a5a32', cut: 'long', detail: 'ranger' },
+};
 const SLEEVE = 'M31 76 C25 78 22 84 21 92 L20 99 L29 100 L30 90 Z';
 const heart = (x, y, s = 1) => `M${x} ${y + 4 * s} C${x - 7 * s} ${y - s} ${x - 4 * s} ${y - 6 * s} ${x} ${y - 2.5 * s} C${x + 4 * s} ${y - 6 * s} ${x + 7 * s} ${y - s} ${x} ${y + 4 * s} Z`;
 const dots = (list, fill) => <g fill={fill}>{list.map(([x, y, r]) => <circle key={`${x},${y}`} cx={x} cy={y} r={r} />)}</g>;
@@ -312,6 +332,103 @@ function Pet({ id }) {
 }
 
 /** `animate`: the companion blinks and hops (big avatars only: profile, editor). */
+function PantsDetail({ detail }) {
+    switch (detail) {
+        case 'jean':
+            return <g fill="none" stroke="#e8b04a" strokeWidth="0.6" strokeDasharray="1.4 1"><path d="M31 125 Q33 131 39 131 M69 125 Q67 131 61 131 M50 124 V133" /></g>;
+        case 'pockets':
+            return <g fill="#00000022" stroke="#00000033" strokeWidth="0.5"><rect x="27.5" y="136" width="7" height="8" rx="1" /><rect x="65.5" y="136" width="7" height="8" rx="1" /></g>;
+        case 'pleats':
+            return <path d="M34 124 L31 143 M42 124 L41 143 M50 124 V143 M58 124 L59 143 M66 124 L69 143" stroke="#00000026" strokeWidth="0.8" />;
+        case 'stripe':
+            return <g><path d="M28.5 124 V158 M71.5 124 V158" stroke="#fff" strokeWidth="1.6" /><path d="M28 154 H46 M54 154 H72" stroke="#00000044" strokeWidth="2" /></g>;
+        case 'ribs':
+            return <path d={[30, 33, 36, 39, 42, 45, 55, 58, 61, 64, 67, 70].map((x) => `M${x} 124 V158`).join(' ')} stroke="#00000026" strokeWidth="0.9" />;
+        case 'flowers':
+            return <g>{[[33, 127], [44, 133], [58, 126], [67, 134], [37, 138], [62, 139], [50, 125]].map(([x, y]) => flower(x, y, '#fff7ee', 1.6))}</g>;
+        case 'plaid':
+            return <g><path d="M20 128 H80 M20 136 H80" stroke="#2a1414" strokeWidth="2.4" opacity="0.6" /><path d="M32 120 V145 M44 120 V145 M56 120 V145 M68 120 V145" stroke="#2a1414" strokeWidth="2.4" opacity="0.5" /><path d="M20 132 H80 M38 120 V145 M62 120 V145" stroke="#f2c230" strokeWidth="0.6" /></g>;
+        case 'camo':
+            return dots([[32, 128, 4], [44, 141, 3.5], [60, 127, 4.5], [66, 146, 4], [36, 152, 3.5], [58, 155, 3], [50, 124, 2.5]], '#3b4626');
+        case 'leaves':
+            return <g fill="#9fe08a">{[[33, 127, 30], [45, 134, -20], [57, 126, 60], [67, 134, 10]].map(([x, y, r]) => <ellipse key={x} cx={x} cy={y} rx="3.4" ry="1.6" transform={`rotate(${r} ${x} ${y})`} />)}</g>;
+        case 'rainbow':
+            return <g>{['#e94b4b', '#f2a53a', '#f2d64b', '#4caf6a', '#2fb6c4', '#7b5cd6'].map((c, i) => <rect key={c} x="20" y={122 + i * 6} width="60" height="6" fill={c} />)}</g>;
+        case 'stars':
+            return <g fill="#fff3b0">{[[32, 128], [42, 137], [60, 129], [67, 141], [35, 148], [64, 153], [50, 126]].map(([x, y]) => <path key={x} d={`M${x} ${y - 2} L${x + 0.6} ${y - 0.6} L${x + 2} ${y} L${x + 0.6} ${y + 0.6} L${x} ${y + 2} L${x - 0.6} ${y + 0.6} L${x - 2} ${y} L${x - 0.6} ${y - 0.6} Z`} />)}</g>;
+        case 'ranger':
+            return <g><rect x="27.5" y="134" width="7" height="9" rx="1" fill="#00000022" /><rect x="65.5" y="134" width="7" height="9" rx="1" fill="#00000022" /><circle cx="38" cy="130" r="3.2" fill="#e9c46a" /><ellipse cx="38" cy="130" rx="1.2" ry="2.2" fill="#3f6a2a" transform="rotate(30 38 130)" /></g>;
+        default:
+            return null;
+    }
+}
+
+/** Pants and bare legs, drawn under the t-shirt (only on the full body). */
+function Pants({ id, skin, uid }) {
+    const p = PANTS_STYLES[id] || PANTS_STYLES.jean;
+    const shape = p.cut === 'short' ? SHORT : p.cut === 'skirt' ? SKIRT : PANTS;
+    return (
+        <g>
+            {p.cut !== 'long' && <><rect x="31" y="134" width="12" height="25" rx="5" fill={skin} /><rect x="57" y="134" width="12" height="25" rx="5" fill={skin} /></>}
+            <clipPath id={`p${uid}`}><path d={shape} /></clipPath>
+            <path d={shape} fill={p.color} />
+            <g clipPath={`url(#p${uid})`}>
+                <PantsDetail detail={p.detail} />
+                <path d="M20 124.5 H80" stroke="#00000030" strokeWidth="1.4" />
+            </g>
+        </g>
+    );
+}
+
+/** Overalls bib and straps, over the t-shirt. */
+function PantsTop({ id }) {
+    const p = PANTS_STYLES[id];
+    if (!p?.bib) return null;
+    return (
+        <g>
+            <path d="M34 75.5 L39 104 M66 75.5 L61 104" stroke={p.color} strokeWidth="3.4" strokeLinecap="round" />
+            <path d="M37 104 L63 104 L64 124 L36 124 Z" fill={p.color} />
+            <rect x="44" y="108" width="12" height="8" rx="1.5" fill="#00000022" />
+            <circle cx="39.5" cy="105.5" r="1.3" fill="#e9c46a" /><circle cx="60.5" cy="105.5" r="1.3" fill="#e9c46a" />
+        </g>
+    );
+}
+
+const DOME = 'M-9 0 C-9 -7 9 -7 9 0 Z';
+const sole = (fill) => <rect x="-10" y="-0.5" width="20" height="3.5" rx="1.5" fill={fill} />;
+const laces = (stroke) => <path d="M-2.5 -4.5 L2.5 -3.5 M-2.5 -2.5 L2.5 -1.5" stroke={stroke} strokeWidth="0.8" strokeLinecap="round" />;
+const boot = (color, extra) => <g><rect x="-8" y="-17" width="16" height="17" rx="2.5" fill={color} /><path d={DOME} fill={color} />{extra}{sole('#2a2622')}<path d="M-8 -14 H8" stroke="#ffffff55" strokeWidth="1" /></g>;
+
+/** One shoe, around (0, 0) = the ground under the foot; the outer side is towards -x. */
+function Shoe({ id, skin }) {
+    switch (id) {
+        case 'rando':
+            return <g><rect x="-7" y="-10" width="14" height="10" rx="2" fill="#7a4a28" /><path d={DOME} fill="#7a4a28" />{laces('#f2a53a')}<path d="M-7 -7 L7 -7" stroke="#f2a53a" strokeWidth="0.8" />{sole('#3a2a1e')}</g>;
+        case 'sandales':
+            return <g><path d="M-8 0 C-8 -6 8 -6 8 0 Z" fill={skin} /><path d="M-7.5 -2.5 H7.5 M-5 -5 L5 -0.5" stroke="#8b5a2b" strokeWidth="1.6" />{sole('#c98a4a')}</g>;
+        case 'bottes':
+            return boot('#2f7a4a');
+        case 'jaunes':
+            return boot('#f2c230');
+        case 'coccinelle':
+            return boot('#d8322b', dots([[-4, -12, 1.4], [3, -9, 1.6], [-2, -4, 1.3], [4, -15, 1.1], [5, -3, 1.1]], '#1d1d1d'));
+        case 'sabots':
+            return <g><path d="M-10 0 C-10 -9 10 -9 10 0 Z" fill="#c98a4a" /><path d="M-6 -5 Q0 -7 6 -5" stroke="#8b5a2b" strokeWidth="0.8" fill="none" />{sole('#8b5a2b')}</g>;
+        case 'palmes':
+            return <g><path d="M-6 -3 L6 -3 L13 4 L-13 4 Z" fill="#f2c230" /><path d="M-4 0 L-6 4 M0 0 V4 M4 0 L6 4" stroke="#c99a1a" strokeWidth="0.7" /><path d="M-7 -1 C-7 -7 7 -7 7 -1 Z" fill="#2b3f6b" /></g>;
+        case 'montantes':
+            return <g><rect x="-7.5" y="-11" width="15" height="11" rx="2.5" fill="#2b3f6b" /><path d={DOME} fill="#2b3f6b" /><circle cx="-4" cy="-6" r="1.8" fill="#fff" />{laces('#fff')}{sole('#fff')}</g>;
+        case 'grenouille':
+            return <g><path d="M-10 0 C-10 -9 10 -9 10 0 Z" fill="#5fbf5f" /><circle cx="-3.5" cy="-7" r="2.6" fill="#5fbf5f" /><circle cx="3.5" cy="-7" r="2.6" fill="#5fbf5f" /><circle cx="-3.5" cy="-7.4" r="1.2" fill="#1d1410" /><circle cx="3.5" cy="-7.4" r="1.2" fill="#1d1410" /><path d="M-3 -2.5 Q0 -0.5 3 -2.5" stroke="#2f7a3a" strokeWidth="0.8" fill="none" />{sole('#3f8a4a')}</g>;
+        case 'dorees':
+            return <g><path d={DOME} fill="#e0b23a" /><path d="M-6 -4 Q-3 -6 0 -5.5" stroke="#fff6c8" strokeWidth="1.2" fill="none" />{laces('#fffbe6')}{sole('#fff')}</g>;
+        case 'ailees':
+            return <g><path d="M-8 -3 C-14 -6 -16 -11 -13 -12 C-12 -9 -10 -8 -7 -6 Z" fill="#fff" stroke="#e9c46a" strokeWidth="0.6" /><path d={DOME} fill="#f3efe6" />{laces('#e9c46a')}{sole('#e9c46a')}</g>;
+        default: // baskets
+            return <g><path d={DOME} fill="#e94b4b" /><path d="M-9 -1.2 H9" stroke="#fff" strokeWidth="1" />{laces('#fff')}{sole('#f3efe6')}</g>;
+    }
+}
+
 /** `full`: whole character standing, pet at the feet (`size` is then the height). */
 export function AvatarFigure({ avatar, size = 40, className = '', ring, animate = false, full = false }) {
     const uid = useId().replace(/:/g, '');
@@ -382,10 +499,9 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring, animate 
                 <g filter={v}><BackHair hair={a.hair} color={hairColor} /></g>
                 {full && (
                     <g filter={v}>
-                        <path d={PANTS} fill="#34507a" />
-                        <path d="M50 124 V134" stroke="#00000033" strokeWidth="1" />
-                        <ellipse cx="37" cy="160" rx="10" ry="4.5" fill="#4a3426" />
-                        <ellipse cx="63" cy="160" rx="10" ry="4.5" fill="#4a3426" />
+                        <Pants id={a.pants} skin={skin} uid={uid} />
+                        <g transform="translate(37 160)"><Shoe id={a.shoes} skin={skin} /></g>
+                        <g transform="translate(63 160) scale(-1 1)"><Shoe id={a.shoes} skin={skin} /></g>
                     </g>
                 )}
                 {full && <g filter={v}>{arm}<g transform="translate(100 0) scale(-1 1)">{arm}</g></g>}
@@ -398,6 +514,7 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring, animate 
                     <path d="M41 73.5 Q50 81 59 73.5" fill="none" stroke="#00000033" strokeWidth="1.6" />
                     {full && <path d="M27 121 H73" stroke="#00000026" strokeWidth="1.4" />}
                 </g>
+                {full && <g filter={v}><PantsTop id={a.pants} /></g>}
                 <g filter={v}><Neck id={a.neck} /></g>
                 <g filter={v}>
                     <circle cx="33" cy="48" r="4" fill={skin} />

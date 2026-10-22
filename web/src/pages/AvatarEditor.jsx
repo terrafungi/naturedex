@@ -58,6 +58,9 @@ function Tilt({ children }) {
     );
 }
 
+// Pants and shoes only show on the full body, so their tiles show the whole character.
+const LOWER = ['pants', 'shoes'];
+
 // T-shirts come in themes (plants, animals, mushrooms…); other slots are a single list.
 const groupByTheme = (items) => {
     const groups = new Map();
@@ -132,7 +135,8 @@ export default function AvatarEditor() {
                 {items.map((s) => (
                     <button key={s.id} onClick={() => setDraft({ ...draft, [tab]: s.id })}
                         className={`relative flex flex-col items-center gap-1 rounded-2xl p-2 transition-colors ${draft[tab] === s.id ? 'bg-[#4fd18b]/15 ring-1 ring-[#4fd18b]/50' : 'bg-white/5 hover:bg-white/10'}`}>
-                        <AvatarFigure avatar={{ ...draft, ...(tab === 'shirt' && { neck: 'aucun', pet: 'aucun' }), [tab]: s.id }} size={64} className={s.owned ? '' : 'opacity-80'} />
+                        <AvatarFigure avatar={{ ...draft, ...(tab === 'shirt' && { neck: 'aucun' }), ...(['shirt', ...LOWER].includes(tab) && { pet: 'aucun' }), [tab]: s.id }}
+                            full={LOWER.includes(tab)} size={LOWER.includes(tab) ? 104 : 64} className={s.owned ? '' : 'opacity-80'} />
                         <span className="text-xs text-white/85 text-center leading-tight">{s.name}</span>
                         <span className="text-[11px] font-semibold">
                             {s.owned ? <span className="text-[#a8f0c6]">{s.price ? 'Acheté' : s.pass ? 'Pass actif' : 'Gratuit'}</span>
