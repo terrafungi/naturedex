@@ -5,9 +5,12 @@ import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Check, Clock, Compass, Crosshair, LocateFixed, MapPin, Sparkles, X } from 'lucide-react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
+
+maplibregl.setWorkerUrl(workerUrl);
 
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const REFRESH_MOVE = 25; // m walked before asking the server again
@@ -138,11 +141,12 @@ export default function Exploration() {
             m.addLayer({ id: 'me-reach-line', type: 'line', source: 'me', filter: ['==', '$type', 'Polygon'], paint: { 'line-color': '#1f9d63', 'line-width': 1.5, 'line-dasharray': [2, 2] } });
             m.addLayer({ id: 'me-dot', type: 'circle', source: 'me', filter: ['==', '$type', 'Point'], paint: { 'circle-radius': 8, 'circle-color': '#2563eb', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
             m.loaded_ = true;
+            m.getContainer().querySelector('.maplibregl-compact-show')?.classList.remove('maplibregl-compact-show');
             setPos((p) => ({ ...p })); // draw the player now
         });
         map.current = m;
-        return () => { m.remove(); map.current = null; markers.current.clear(); };
     }, [pos]);
+    useEffect(() => () => { map.current?.remove(); map.current = null; markers.current.clear(); }, []);
 
     const radius = data?.catchRadius || 50;
     useEffect(() => {
@@ -207,7 +211,7 @@ export default function Exploration() {
             )}
 
             <div className="relative mt-3 h-[68vh] min-h-[380px] rounded-3xl overflow-hidden border border-white/10 bg-[#0e2a1d]">
-                <div ref={mapDiv} className="absolute inset-0" />
+                <div ref={mapDiv} className="w-full h-full" />
                 {!pos && (
                     <div className="absolute inset-0 grid place-items-center p-6 text-center">
                         {geoError
