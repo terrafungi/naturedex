@@ -7,6 +7,7 @@ import { useGame } from '../api.jsx';
 import AwardNotice from './AwardNotice.jsx';
 import GiftNotice from './GiftNotice.jsx';
 import NewsNotice from './NewsNotice.jsx';
+import InstallPrompt, { InstallLink } from './InstallPrompt.jsx';
 
 export const NAV = [
     { to: '/', label: 'Accueil', Icon: Home, end: true },
@@ -196,11 +197,13 @@ export default function Layout() {
             </main>
             <footer className={`border-t border-white/[0.07] px-4 pt-6 ${user ? 'pb-32' : 'pb-6'} text-center text-xs text-ink-soft`}>
                 NatureDex · Images et textes : <a className="underline hover:text-white" href="https://fr.wikipedia.org" target="_blank" rel="noreferrer">Wikipédia</a> & Wikimedia Commons (licences libres) · Données : Wikidata · <a className="underline hover:text-white" href="https://naturedex.fr/api/blog">Blog nature</a>
+                <div><InstallLink /></div>
             </footer>
             {user && <TabBar />}
             {user && <NewsNotice />}
             {user && <GiftNotice />}
             {user && <AwardNotice />}
+            <InstallPrompt raised={!!user} />
         </div>
     );
 }
