@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-    ArrowRight, BookOpen, Bone, Brain, Check, ExternalLink, Flame, Flower2, Globe2, Lightbulb, PawPrint, Play, RotateCcw, Shell, Target, Timer, X,
+    ArrowRight, BookOpen, Bone, Brain, Check, ExternalLink, Flame, Flower2, Globe2, Leaf, Lightbulb, PawPrint, Play, RotateCcw, Shell, Target, Timer, X,
 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
@@ -35,6 +35,16 @@ function Pips({ total, used, className = '' }) {
 }
 
 // ---------- home ----------
+
+function PassHint() {
+    const { user } = useGame();
+    if (user?.pass) return null;
+    return (
+        <Link to="/boutique" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#f4d88f] hover:underline">
+            <Leaf className="w-4 h-4" />Encore envie ? Le Pass Naturaliste donne 2 quiz de plus chaque jour.
+        </Link>
+    );
+}
 
 function Home({ state, onStart, busy, error }) {
     const [theme, setTheme] = useState('all');
@@ -102,6 +112,7 @@ function Home({ state, onStart, busy, error }) {
                 <div className="mt-8 rounded-3xl nd-glass p-6">
                     <div className="font-display text-2xl text-white">C'est tout pour aujourd'hui !</div>
                     <p className="text-ink-soft mt-1">Tu as joué tes {state.perDay} quiz. De nouvelles questions t'attendent demain : reviens pour garder ta série.</p>
+                    <PassHint />
                 </div>
             )}
 

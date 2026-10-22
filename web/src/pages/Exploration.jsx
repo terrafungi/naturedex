@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, Check, Clock, Compass, Crosshair, LocateFixed, MapPin, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Compass, Crosshair, Leaf, LocateFixed, MapPin, Sparkles, X } from 'lucide-react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
@@ -285,6 +285,7 @@ function SpawnSheet({ spawn, dist, radius, data, pos, onClose, onCaught }) {
     const [playing, setPlaying] = useState(false);
     const inReach = dist != null && dist <= radius;
     const capped = data.daily.caught >= data.daily.max;
+    const { user } = useGame();
     return (
         <>
             <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
@@ -308,7 +309,10 @@ function SpawnSheet({ spawn, dist, radius, data, pos, onClose, onCaught }) {
                     ) : spawn.state === 'fled' ? (
                         <p className="text-center text-white/60">Elle s'est enfuie… D'autres cartes arrivent bientôt.</p>
                     ) : capped ? (
-                        <p className="text-center text-white/70">Tu as attrapé {data.daily.max} cartes aujourd'hui : la nature se repose, reviens demain !</p>
+                        <div className="text-center">
+                            <p className="text-white/70">Tu as attrapé {data.daily.max} cartes aujourd'hui : la nature se repose, reviens demain !</p>
+                            {!user?.pass && <Link to="/boutique" className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-[#f4d88f] hover:underline"><Leaf className="w-4 h-4" />Le Pass Naturaliste donne 5 captures de plus par jour</Link>}
+                        </div>
                     ) : inReach ? (
                         <button onClick={() => setPlaying(true)} disabled={!!data.cooldownUntil} className="w-full nd-btn inline-flex justify-center items-center gap-2 px-6 py-3 rounded-full font-bold disabled:opacity-50">
                             <Sparkles className="w-5 h-5" />Attraper{spawn.tries ? ` (essai ${spawn.tries + 1}/${data.maxTries})` : ''}

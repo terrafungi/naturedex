@@ -479,3 +479,10 @@ CREATE TABLE IF NOT EXISTS explore_positions (
     at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     cooldown_until TIMESTAMPTZ
 );
+
+-- Pass Naturaliste (Stripe subscription): perks while pass_until is in the future
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_sub TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_until TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_cancel BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_association TEXT;
+CREATE INDEX IF NOT EXISTS users_pass_sub ON users (pass_until) WHERE pass_sub IS NOT NULL;

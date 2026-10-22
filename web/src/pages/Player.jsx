@@ -5,6 +5,7 @@ import { api } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { LeafLogo } from '../components/Layout.jsx';
 import ShowcaseCanvas, { VoteButton } from '../components/Showcase.jsx';
+import PatronBadge from '../components/PatronBadge.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
 import { FieldGrid, FieldViewer } from './Terrain.jsx';
 
@@ -50,7 +51,7 @@ export default function Player() {
                 <div className="min-w-0">
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Naturaliste depuis {new Date(player.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
                     <h1 className="font-display text-4xl font-medium text-white truncate">{player.username}</h1>
-                    <SeasonBadge badge={player.badge} className="mt-2" />
+                    <div className="flex flex-wrap gap-2"><SeasonBadge badge={player.badge} className="mt-2" />{player.patron && <PatronBadge className="mt-2" />}</div>
                 </div>
             </div>
 

@@ -11,6 +11,7 @@
  */
 import crypto from 'node:crypto';
 import { landCover } from './worldcover.mjs';
+import { PASS, passActive } from './shop.mjs';
 
 const PARIS_DAY = `(now() AT TIME ZONE 'Europe/Paris')::date`;
 const CELL = 0.0018; // degrees of latitude, ~200 m
@@ -20,6 +21,7 @@ const VIEW_RADIUS = 350; // m
 const CATCH_RADIUS = 50; // m, GPS is rarely better than ~15 m
 const MAX_TRIES = 3;
 const DAILY_CATCHES = 10;
+const dailyCatches = (user) => DAILY_CATCHES + (passActive(user) ? PASS.catches : 0);
 const MAX_SPEED = 45; // m/s; faster jumps (teleport, plane) put catching on cooldown
 const MAX_COOLDOWN = 2 * 3600; // s
 const EXCLUDED_TYPES = ['virus', 'bacteria', 'mold', 'fossil'];
@@ -293,7 +295,7 @@ export function exploreActions({ requireUser, inTransaction, HttpError, publicUs
                 habitat: habitat && { key: habitat.key, label: habitat.label, wild: Math.round(habitat.wild * 100) / 100 },
                 endsAt: new Date((slot + 1) * SLOT_MS).toISOString(),
                 cooldownUntil: cooldown?.toISOString() || null,
-                daily: { caught: await caughtToday(db, user.id), max: DAILY_CATCHES },
+                daily: { caught: await caughtToday(db, user.id), max: dailyCatches(user) },
                 catchRadius: CATCH_RADIUS,
                 maxTries: MAX_TRIES,
             };
@@ -316,8 +318,9 @@ export function exploreActions({ requireUser, inTransaction, HttpError, publicUs
 
             const result = await inTransaction(db, async (client) => {
                 await client.query(`SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
-                if (await caughtToday(client, user.id) >= DAILY_CATCHES) {
-                    throw new HttpError(429, `Tu as attrapé ${DAILY_CATCHES} cartes aujourd'hui : la nature se repose, reviens demain !`);
+                if (await caughtToday(client, user.id) >= dailyCatches(user)) {
+                    throw new HttpError(429, `Tu as attrapé ${dailyCatches(user)} cartes aujourd'hui : la nature se repose, reviens demain !`
+                        + (passActive(user) ? '' : ` Le Pass Naturaliste donne ${PASS.catches} captures de plus chaque jour.`));
                 }
                 const { rows: [row] } = await client.query(
                     `INSERT INTO explore_catches (user_id, spawn, card_id, habitat) VALUES ($1, $2, $3, $4)
@@ -345,7 +348,7 @@ export function exploreActions({ requireUser, inTransaction, HttpError, publicUs
                     `SELECT id, num, name, sci_name, type, rarity, views, image_url, thumb_url, extract, wiki_url, iucn, stats FROM cards WHERE id = $1`, [spawn.card.id]));
             }
             const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
-            return { ...result, card, maxTries: MAX_TRIES, user: await publicUser(db, fresh), daily: { caught: await caughtToday(db, user.id), max: DAILY_CATCHES } };
+            return { ...result, card, maxTries: MAX_TRIES, user: await publicUser(db, fresh), daily: { caught: await caughtToday(db, user.id), max: dailyCatches(user) } };
         },
     };
 }

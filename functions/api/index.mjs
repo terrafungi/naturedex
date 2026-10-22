@@ -17,7 +17,8 @@ import {
     buildQuiz, intro, isLate, publicQuestion,
 } from './quiz.mjs';
 import {
-    ASSOCIATIONS, DONATION_SHARE, PACKS, createCheckout, donationOf, getCheckout, stripeReady, stripeTestMode, verifyWebhook,
+    ASSOCIATIONS, DONATION_SHARE, PACKS, PASS, createCheckout, createPassCheckout, donationOf, getCheckout, getSubscription,
+    invoiceSubscription, passActive, periodEnd, setCancelAtPeriodEnd, stripeReady, stripeTestMode, verifyWebhook,
 } from './shop.mjs';
 import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLabel, seasonRollover } from './arena.mjs';
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
@@ -127,6 +128,8 @@ function chargeState(user, now = Date.now()) {
     return { charges, ticks, from, nextAt: charges >= MAX_CHARGES ? null : from + (ticks + 1) * CHARGE_MS };
 }
 
+const quizPerDay = (user) => QUIZ_PER_DAY + (passActive(user) ? PASS.quizzes : 0);
+
 async function publicUser(db, user) {
     const { rows } = await db.query(
         `SELECT COUNT(*)::int AS discovered, COALESCE(SUM(count), 0)::int AS owned,
@@ -155,7 +158,8 @@ async function publicUser(db, user) {
         nextDailyAt: nextDaily > Date.now() ? new Date(nextDaily).toISOString() : null,
         recycleValue: RECYCLE_VALUE,
         social: await socialCounts(db, user.id),
-        quizPerDay: QUIZ_PER_DAY,
+        quizPerDay: quizPerDay(user),
+        pass: passActive(user) ? { until: user.pass_until, cancelled: user.pass_cancel } : null,
         newsSeen: user.news_seen,
         joinedAt: user.created_at,
         ...rows[0],
@@ -568,7 +572,7 @@ async function badgeCounts(db, user, pub) {
     return {
         '/booster': (pub.nextDailyAt ? 0 : 1) + (pub.charges >= pub.maxCharges ? 1 : 0),
         '/jardin': garden.ready,
-        '/quiz': Math.max(0, QUIZ_PER_DAY - s.quizPlayed),
+        '/quiz': Math.max(0, quizPerDay(user) - s.quizPlayed),
         '/defis': challenges.filter((c) => !c.claimed && c.progress >= c.goal).length,
         '/trophees': trophies.filter((t) => !t.claimed && t.progress >= t.goal).length,
         '/inviter': Math.min(inv.ready, Math.max(0, INVITE_CAP - inv.rewarded)),
@@ -742,7 +746,8 @@ function quizStreak(days, today) {
     return streak;
 }
 
-async function quizState(db, userId) {
+async function quizState(db, user) {
+    const userId = user.id;
     const day = await parisDay(db);
     const [{ rows: today }, { rows: active }, { rows: days }, { rows: kinds }, { rows: [totals] }] = await Promise.all([
         db.query(`SELECT id, theme, score, coins, nuggets, status, jsonb_array_length(questions) AS total, finished_at
@@ -764,8 +769,8 @@ async function quizState(db, userId) {
     ]);
     return {
         day,
-        perDay: QUIZ_PER_DAY,
-        left: Math.max(0, QUIZ_PER_DAY - today.length),
+        perDay: quizPerDay(user),
+        left: Math.max(0, quizPerDay(user) - today.length),
         today,
         active: active[0] || null,
         streak: quizStreak(days.map((r) => r.day), day),
@@ -921,16 +926,54 @@ async function refreshPurchase(db, p) {
 }
 
 const shapePurchase = (p) => ({
-    id: p.id, pack: p.pack, label: PACKS[p.pack]?.label || p.pack, amount: p.amount_cents, donation: p.donation_cents,
+    id: p.id, pack: p.pack, label: PACKS[p.pack]?.label || (p.pack === 'pass' ? `${PASS.label} (1 mois)` : p.pack), amount: p.amount_cents, donation: p.donation_cents,
     association: p.association, coins: p.coins, nuggets: p.nuggets, status: p.status, createdAt: p.created_at, paidAt: p.paid_at,
 });
+
+// Pass Naturaliste: Stripe is the source of truth. Copy the paid period end onto the player and
+// store each paid invoice once as a `pass` purchase (donation counter, Mécène trophy).
+async function syncPass(db, sub) {
+    const userId = Number(sub.metadata?.user_id);
+    if (!userId) return null;
+    const end = periodEnd(sub);
+    const live = ['active', 'trialing'].includes(sub.status); // past_due: wait for the payment
+    await db.query(
+        `UPDATE users SET pass_sub = $2, pass_association = COALESCE($3, pass_association), pass_cancel = $4,
+                          pass_until = CASE WHEN $5::timestamptz IS NOT NULL THEN $5::timestamptz ELSE pass_until END
+         WHERE id = $1`,
+        [userId, sub.status === 'canceled' ? null : sub.id, sub.metadata?.association || null, !!sub.cancel_at_period_end,
+            live && end ? new Date(end * 1000).toISOString() : null]);
+    const inv = sub.latest_invoice;
+    if (inv && typeof inv === 'object' && inv.status === 'paid' && inv.amount_paid > 0) {
+        const association = ASSOCIATIONS[sub.metadata?.association] ? sub.metadata.association : 'lpo';
+        await db.query(
+            `INSERT INTO purchases (user_id, username, pack, amount_cents, currency, donation_cents, association, stripe_session, stripe_payment, livemode, status, paid_at)
+             SELECT id, username, 'pass', $2, $3, $4, $5, $6, $6, $7, 'paid', now() FROM users WHERE id = $1
+             ON CONFLICT (stripe_session) DO NOTHING`,
+            [userId, inv.subtotal, String(inv.currency || 'eur'), donationOf(PASS.price), association, inv.id, !!inv.livemode]);
+    }
+    return userId;
+}
+
+const refreshPass = async (db, subId) => syncPass(db, await getSubscription(subId));
+
+// Safety net without webhooks: renew (or let lapse) passes whose period just ended.
+async function refreshDuePasses(db) {
+    const { rows } = await db.query(`SELECT pass_sub FROM users WHERE pass_sub IS NOT NULL AND pass_until < now() + interval '1 hour' LIMIT 20`);
+    for (const r of rows) await refreshPass(db, r.pass_sub).catch((err) => console.error('pass refresh', r.pass_sub, err.message));
+}
 
 async function stripeWebhook(event) {
     const raw = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : event.body || '';
     const payload = verifyWebhook(raw, event.headers?.['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
     if (!payload) return json({ error: 'Signature invalide' }, 400);
     const session = payload.data?.object;
-    if (payload.type === 'checkout.session.completed' || payload.type === 'checkout.session.async_payment_succeeded') {
+    if (payload.type === 'checkout.session.completed' && session.mode === 'subscription') {
+        if (session.subscription) await refreshPass(getPool(), session.subscription);
+    } else if (payload.type === 'invoice.paid' || payload.type.startsWith('customer.subscription.')) {
+        const subId = payload.type === 'invoice.paid' ? invoiceSubscription(session) : session.id;
+        if (subId) await refreshPass(getPool(), typeof subId === 'string' ? subId : subId.id);
+    } else if (payload.type === 'checkout.session.completed' || payload.type === 'checkout.session.async_payment_succeeded') {
         await grantPurchase(getPool(), session);
     } else if (payload.type === 'checkout.session.expired') {
         await getPool().query(`UPDATE purchases SET status = 'expired' WHERE stripe_session = $1 AND status = 'pending'`, [session.id]);
@@ -1197,10 +1240,11 @@ const actions = {
     async claimDaily(db, body, event) {
         const user = await requireUser(db, event);
         const { rows } = await db.query(
-            `UPDATE users SET coins = coins + $2, last_daily = now()
+            `UPDATE users SET coins = coins + $2 + CASE WHEN pass_until > now() THEN $4 ELSE 0 END,
+                              nuggets = nuggets + CASE WHEN pass_until > now() THEN $5 ELSE 0 END, last_daily = now()
              WHERE id = $1 AND (last_daily IS NULL OR last_daily < now() - make_interval(secs => $3))
              RETURNING *`,
-            [user.id, DAILY_COINS, DAILY_COOLDOWN_MS / 1000]
+            [user.id, DAILY_COINS, DAILY_COOLDOWN_MS / 1000, PASS.dailyCoins, PASS.dailyNuggets]
         );
         if (!rows[0]) throw new HttpError(429, 'Bonus déjà récupéré, reviens plus tard');
         return { user: await publicUser(db, rows[0]) };
@@ -1549,7 +1593,7 @@ const actions = {
     async player(db, body, event) {
         const user = await requireUser(db, event);
         const { rows: [p] } = await db.query(
-            `SELECT u.id, u.username, u.created_at, u.id = $1 AS me,
+            `SELECT u.id, u.username, u.created_at, u.id = $1 AS me, COALESCE(u.pass_until > now(), false) AS patron,
                     (SELECT COUNT(*)::int FROM user_cards WHERE user_id = u.id) AS discovered,
                     (SELECT COALESCE(SUM(count), 0)::int FROM user_cards WHERE user_id = u.id) AS owned,
                     (SELECT COUNT(*)::int FROM trophy_claims WHERE user_id = u.id) AS trophies,
@@ -2306,7 +2350,7 @@ const actions = {
 
     async quiz(db, body, event) {
         const user = await requireUser(db, event);
-        return quizState(db, user.id);
+        return quizState(db, user);
     },
 
     async quizStart(db, body, event) {
@@ -2318,7 +2362,10 @@ const actions = {
             if (active) return active.id; // finish the running quiz first
             const day = await parisDay(client);
             const { rows: [{ played }] } = await client.query(`SELECT COUNT(*)::int AS played FROM quizzes WHERE user_id = $1 AND day = $2`, [user.id, day]);
-            if (played >= QUIZ_PER_DAY) throw new HttpError(429, `Tu as joué tes ${QUIZ_PER_DAY} quiz du jour. Reviens demain pour de nouvelles questions !`);
+            if (played >= quizPerDay(user)) {
+                throw new HttpError(429, `Tu as joué tes ${quizPerDay(user)} quiz du jour. Reviens demain pour de nouvelles questions !`
+                    + (passActive(user) ? '' : ` Avec le Pass Naturaliste, tu as ${PASS.quizzes} quiz de plus chaque jour.`));
+            }
             const { rows: seenRows } = await client.query(`SELECT card_id, at FROM quiz_seen WHERE user_id = $1`, [user.id]);
             const seen = new Map(seenRows.map((r) => [r.card_id, new Date(r.at).getTime()]));
             const questions = await buildQuiz(db, theme, seen);
@@ -2416,6 +2463,7 @@ const actions = {
                 `SELECT * FROM purchases WHERE user_id = $1 AND status = 'pending' AND stripe_session IS NOT NULL
                  AND created_at > now() - interval '2 days' ORDER BY id DESC LIMIT 3`, [user.id]);
             await Promise.all(pending.map((p) => refreshPurchase(db, p).catch((err) => console.error('refresh', p.id, err.message))));
+            if (user.pass_sub) await refreshPass(db, user.pass_sub).catch((err) => console.error('pass refresh', err.message));
         }
         const live = !stripeTestMode();
         const [{ rows: totals }, { rows: mine }, { rows: bought }] = await Promise.all([
@@ -2437,6 +2485,7 @@ const actions = {
                 id, ...a, donated: byAssoc[id]?.donated || 0, purchases: byAssoc[id]?.purchases || 0,
             })),
             totalDonated: totals.reduce((sum, t) => sum + t.donated, 0),
+            pass: { ...PASS, donation: donationOf(PASS.price), dailyBase: DAILY_COINS, quizBase: QUIZ_PER_DAY, catchBase: 10 },
             purchases: mine.map(shapePurchase),
             user: await publicUser(db, await requireUser(db, event)),
         };
@@ -2483,6 +2532,42 @@ const actions = {
         return { purchase: shapePurchase(now), user: await publicUser(db, await requireUser(db, event)) };
     },
 
+    async passCheckout(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!stripeReady()) throw new HttpError(503, 'Le paiement n\'est pas encore activé');
+        if (!ASSOCIATIONS[body.association]) throw new HttpError(400, 'Choisis une association');
+        if (body.consent !== true) throw new HttpError(400, 'Confirme l\'activation immédiate du Pass');
+        if (passActive(user) && user.pass_sub) throw new HttpError(409, 'Ton Pass Naturaliste est déjà actif');
+        const origin = SITE_ORIGINS.includes(event.headers?.origin) ? event.headers.origin : SITE_ORIGINS[0];
+        try {
+            const session = await createPassCheckout({ userId: user.id, association: body.association, username: user.username, origin });
+            return { url: session.url };
+        } catch {
+            throw new HttpError(502, 'Le service de paiement ne répond pas, réessaie plus tard');
+        }
+    },
+
+    // Back from Stripe Checkout: the session must belong to this player.
+    async passConfirm(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!stripeReady()) throw new HttpError(503, 'Le paiement n\'est pas encore activé');
+        const session = await getCheckout(String(body.session || '')).catch(() => null);
+        if (!session || session.mode !== 'subscription' || Number(session.metadata?.user_id) !== user.id) throw new HttpError(404, 'Abonnement introuvable');
+        if (session.status === 'complete' && session.subscription) await refreshPass(db, session.subscription);
+        const fresh = await requireUser(db, event);
+        return { active: passActive(fresh), user: await publicUser(db, fresh) };
+    },
+
+    // Cancel = stop renewing; perks stay until the end of the paid month. `resume` undoes it.
+    async passCancel(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!user.pass_sub) throw new HttpError(404, 'Aucun abonnement en cours');
+        const sub = await setCancelAtPeriodEnd(user.pass_sub, body.resume !== true).catch(() => null);
+        if (!sub) throw new HttpError(502, 'Le service de paiement ne répond pas, réessaie plus tard');
+        await refreshPass(db, sub.id);
+        return { user: await publicUser(db, await requireUser(db, event)) };
+    },
+
     async recycle(db, body, event) {
         const user = await requireUser(db, event);
         const cardId = body.cardId ? Number(body.cardId) : null; // null = every duplicate
@@ -2526,7 +2611,10 @@ export const handler = async (event) => {
     if (event.source === 'schedule') {
         await settleAuctions(getPool());
         await seasonRollover(getPool(), inTransaction);
-        if (stripeReady() && new Date().getUTCMinutes() % 5 === 0) await refreshPendingPurchases(getPool());
+        if (stripeReady() && new Date().getUTCMinutes() % 5 === 0) {
+            await refreshPendingPurchases(getPool());
+            await refreshDuePasses(getPool()).catch((err) => console.error('refreshDuePasses', err));
+        }
         await showcaseWeekRollover(getPool()).catch((err) => console.error('showcaseWeekRollover', err));
         await Promise.all([
             blogTick(getPool()).catch((err) => console.error('blogTick', err)),

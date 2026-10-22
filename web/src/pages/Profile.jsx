@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Award, Gavel, Layers, LogOut, Package } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
+import PatronBadge from '../components/PatronBadge.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
 import { LeafLogo } from '../components/Layout.jsx';
 import { RARITIES } from '../game.jsx';
@@ -32,7 +33,7 @@ export default function Profile() {
                 <div className="min-w-0">
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Naturaliste</p>
                     <h1 className="font-display text-4xl font-medium text-white truncate">{user.username}</h1>
-                    <SeasonBadge badge={me?.badge} className="mt-2" />
+                    <div className="flex flex-wrap gap-2"><SeasonBadge badge={me?.badge} className="mt-2" />{user.pass && <PatronBadge className="mt-2" />}</div>
                 </div>
             </div>
 

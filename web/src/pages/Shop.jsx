@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Check, CheckCircle2, ExternalLink, FlaskConical, HeartHandshake, Info, Loader2, Lock, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
+import { Brain, CalendarCheck, Check, CheckCircle2, Compass, ExternalLink, FlaskConical, HeartHandshake, Info, Leaf, Loader2, Lock, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
 import InviteBanner from '../components/InviteBanner.jsx';
 import { api, useGame } from '../api.jsx';
 import { Amount, Nugget, Seed } from '../components/Currency.jsx';
@@ -117,6 +117,112 @@ function Associations({ list, pick, setPick, share }) {
     );
 }
 
+const longDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+
+// Back from the Pass checkout: confirm with the server (which asks Stripe).
+function usePassReturn(onDone) {
+    const [params, setParams] = useSearchParams();
+    const session = params.get('pass');
+    const [state, setState] = useState(session ? 'checking' : null);
+    useEffect(() => {
+        if (!session) return;
+        let stop = false;
+        (async () => {
+            for (let i = 0; i < 8 && !stop; i++) {
+                try {
+                    const res = await api('passConfirm', { session });
+                    if (res.active) { onDone(res.user); setState('active'); setParams({}, { replace: true }); return; }
+                } catch (err) {
+                    setState(err.message); return;
+                }
+                await new Promise((r) => setTimeout(r, 2500));
+            }
+            if (!stop) setState('slow');
+        })();
+        return () => { stop = true; };
+    }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
+    return [state, setState];
+}
+
+function PassCard({ shop, user, assoc, ret, onUser }) {
+    const p = shop.pass;
+    const mine = user?.pass;
+    const [consent, setConsent] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const perks = [
+        [CalendarCheck, <>Bonus du jour doublé : <Amount seeds={p.dailyBase + p.dailyCoins} /> + <Amount nuggets={p.dailyNuggets} /></>],
+        [Compass, <><b className="text-white">{p.catchBase + p.catches} captures</b> par jour en Exploration au lieu de {p.catchBase}</>],
+        [Brain, <><b className="text-white">{p.quizBase + p.quizzes} quiz</b> par jour au lieu de {p.quizBase}</>],
+        [Leaf, <>Badge <b className="text-white">Mécène</b> à côté de ton pseudo</>],
+        [HeartHandshake, <><b className="text-[#a8f0c6]">{euros(p.donation)} chaque mois</b> pour {assoc.name}</>],
+    ];
+    const run = async (fn) => {
+        setBusy(true); setError('');
+        try { await fn(); } catch (err) { setError(err.message); }
+        setBusy(false);
+    };
+    const subscribe = () => run(async () => {
+        const { url } = await api('passCheckout', { association: assoc.id, consent });
+        window.location.assign(url);
+        await new Promise(() => {}); // keep the spinner while leaving
+    });
+    const toggle = (resume) => run(async () => {
+        if (!resume && !window.confirm(`Arrêter le renouvellement ? Tu gardes tes avantages jusqu'au ${longDate(mine.until)}.`)) return;
+        const { user: u } = await api('passCancel', { resume });
+        onUser(u);
+    });
+    return (
+        <div className="relative mt-10 rounded-3xl p-5 sm:p-7 ring-1 ring-[#e9c46a]/50 bg-[radial-gradient(120%_120%_at_0%_0%,rgba(233,196,106,0.18),rgba(79,209,139,0.06)_55%,rgba(255,255,255,0.02))] shadow-[0_0_60px_-25px_#e9c46a]">
+            <span className="absolute -top-3 left-6 rounded-full bg-[#e9c46a] text-[#2a1c00] text-[11px] font-extrabold uppercase tracking-wider px-3 py-1">Abonnement</span>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h2 className="font-display text-3xl text-white flex items-center gap-2"><Leaf className="w-7 h-7 text-[#e9c46a]" />{p.label}</h2>
+                    <p className="mt-1 text-white/70">Plus de jeu chaque jour, et un vrai coup de pouce régulier à la nature.</p>
+                </div>
+                <p className="font-display text-white"><span className="text-4xl font-bold tabular-nums">{euros(p.price)}</span><span className="text-white/60"> / mois</span></p>
+            </div>
+            <ul className="mt-5 grid sm:grid-cols-2 gap-x-6 gap-y-3">
+                {perks.map(([Icon, text], i) => (
+                    <li key={i} className="flex items-start gap-3 text-white/85"><Icon className="w-5 h-5 mt-0.5 text-[#e9c46a] shrink-0" /><span className="flex flex-wrap items-center gap-x-1.5">{text}</span></li>
+                ))}
+            </ul>
+            {ret === 'checking' && <p className="mt-5 flex items-center gap-2 text-white/85"><Loader2 className="w-5 h-5 animate-spin text-[#a8f0c6]" />Activation du Pass auprès de Stripe…</p>}
+            {ret === 'slow' && <p className="mt-5 text-white/80">Le paiement n'est pas encore confirmé. S'il a été accepté, ton Pass s'activera tout seul dans quelques minutes.</p>}
+            {ret && !['checking', 'slow', 'active'].includes(ret) && <p className="mt-5 text-sm font-semibold text-[#ffb4a2]">{ret}</p>}
+            {mine ? (
+                <div className="mt-6 rounded-2xl bg-[#4fd18b]/10 ring-1 ring-[#4fd18b]/30 p-4 flex flex-wrap items-center gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-[#4fd18b] shrink-0" />
+                    <p className="flex-1 min-w-[12rem] text-white/90">
+                        {ret === 'active' && <b className="text-white">Merci, ton Pass est actif ! </b>}
+                        {mine.cancelled
+                            ? <>Pass actif jusqu'au <b className="text-white">{longDate(mine.until)}</b>, sans renouvellement.</>
+                            : <>Pass actif, renouvelé le <b className="text-white">{longDate(mine.until)}</b>.</>}
+                    </p>
+                    <button onClick={() => toggle(mine.cancelled)} disabled={busy}
+                        className={`px-4 py-2 rounded-full text-sm font-bold ${mine.cancelled ? 'nd-cta-gold' : 'ring-1 ring-white/20 text-white/80 hover:bg-white/5'} disabled:opacity-40`}>
+                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : mine.cancelled ? 'Reprendre l\'abonnement' : 'Résilier'}
+                    </button>
+                </div>
+            ) : (
+                <>
+                    <label className="mt-6 flex items-start gap-3 text-sm text-white/80 cursor-pointer">
+                        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#4fd18b] shrink-0" />
+                        <span>Je demande l'activation immédiate du Pass et je reconnais perdre mon droit de rétractation de 14 jours. L'abonnement se renouvelle chaque mois et je peux le résilier à tout moment ici, en un clic.</span>
+                    </label>
+                    <p className="mt-3 text-xs text-white/55 flex gap-2"><Info className="w-4 h-4 shrink-0" />Si tu as moins de 18 ans, demande l'accord d'un parent avant de t'abonner.</p>
+                    <button onClick={subscribe} disabled={!consent || busy || !shop.ready}
+                        className="mt-5 w-full sm:w-auto nd-cta-gold inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full font-bold disabled:opacity-40 disabled:pointer-events-none">
+                        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
+                        {shop.ready ? `S'abonner · ${euros(p.price)} / mois` : 'Paiement bientôt disponible'}
+                    </button>
+                </>
+            )}
+            {error && <p className="mt-3 text-sm font-semibold text-[#ffb4a2]">{error}</p>}
+        </div>
+    );
+}
+
 function PackCard({ pack, assoc, selected, onSelect }) {
     const used = pack.once && !pack.available;
     return (
@@ -181,7 +287,7 @@ function Checkout({ shop, pack, assoc }) {
 }
 
 export default function Shop() {
-    const { setUser } = useGame();
+    const { user, setUser } = useGame();
     const [shop, setShop] = useState(null);
     const [error, setError] = useState('');
     const [pick, setPickState] = useState(() => localStorage.getItem(PICK_KEY) || 'lpo');
@@ -190,7 +296,8 @@ export default function Shop() {
 
     const load = useCallback(() => api('shop').then((s) => { setShop(s); setUser(s.user); }).catch((err) => setError(err.message)), [setUser]);
     useEffect(() => { load(); }, [load]);
-    const [ret, setRet] = useReturn((user) => { setUser(user); load(); });
+    const [ret, setRet] = useReturn((u) => { setUser(u); load(); });
+    const [passRet] = usePassReturn((u) => { setUser(u); load(); });
 
     if (!shop) return <div className="py-32 text-center font-display text-xl text-ink-soft">{error || 'Chargement…'}</div>;
     const assoc = shop.associations.find((a) => a.id === pick) || shop.associations[0];
@@ -232,7 +339,9 @@ export default function Shop() {
             <h2 className="mt-10 font-display text-2xl text-white"><span className="text-white/40 mr-2">1.</span>Choisis ton association</h2>
             <div className="mt-4"><Associations list={shop.associations} pick={assoc.id} setPick={setPick} share={shop.donationShare} /></div>
 
-            <h2 className="mt-10 font-display text-2xl text-white"><span className="text-white/40 mr-2">2.</span>Choisis ton pack</h2>
+            <PassCard shop={shop} user={user} assoc={assoc} ret={passRet} onUser={setUser} />
+
+            <h2 className="mt-10 font-display text-2xl text-white"><span className="text-white/40 mr-2">2.</span>Ou choisis un pack</h2>
             <p className="mt-1 text-sm text-ink-soft">Les graines ouvrent des boosters, les pépites servent aux enchères.</p>
             <div className="mt-5 grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {shop.packs.map((p) => <PackCard key={p.id} pack={p} assoc={assoc} selected={p.id === packId} onSelect={() => setPackId(p.id)} />)}

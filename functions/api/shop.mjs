@@ -33,6 +33,17 @@ export const PACKS = {
     naturalist: { label: 'Pack du naturaliste', coins: 7000, nuggets: 1500, price: 1299, best: true },
 };
 
+// Monthly subscription (Stripe Billing). Perks last until the paid period ends, even after
+// cancelling. Every paid month is also stored as a `pass` purchase, so the donation counts.
+export const PASS = {
+    label: 'Pass Naturaliste', price: 399,
+    dailyCoins: 100, // on top of the daily bonus
+    dailyNuggets: 40,
+    catches: 5, // extra exploration catches a day
+    quizzes: 2, // extra quizzes a day
+};
+export const passActive = (user) => !!user?.pass_until && new Date(user.pass_until).getTime() > Date.now();
+
 // Stripe tax code, required when Managed Payments is on: "electronically supplied services".
 const TAX_CODE = process.env.STRIPE_TAX_CODE || 'txcd_10000000';
 
@@ -98,6 +109,37 @@ export function createCheckout({ purchaseId, pack, association, username, origin
 }
 
 export const getCheckout = (id) => stripe('GET', `checkout/sessions/${encodeURIComponent(id)}`);
+
+export function createPassCheckout({ userId, association, username, origin }) {
+    const a = ASSOCIATIONS[association];
+    const meta = { kind: 'pass', user_id: userId, association, username };
+    return stripe('POST', 'checkout/sessions', {
+        mode: 'subscription',
+        locale: 'fr',
+        client_reference_id: `pass:${userId}`,
+        line_items: {
+            0: {
+                quantity: 1,
+                price_data: {
+                    currency: 'eur',
+                    unit_amount: PASS.price,
+                    recurring: { interval: 'month' },
+                    product_data: { tax_code: TAX_CODE, name: `${PASS.label} NatureDex (mensuel)` },
+                },
+            },
+        },
+        metadata: meta,
+        subscription_data: { description: `${PASS.label} : dont ${euros(donationOf(PASS.price))} par mois pour ${a.name}. Compte joueur : ${username}.`, metadata: meta },
+        success_url: `${origin}/boutique?pass={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/boutique?annule=1`,
+    });
+}
+
+export const getSubscription = (id) => stripe('GET', `subscriptions/${encodeURIComponent(id)}?expand[]=latest_invoice`);
+export const setCancelAtPeriodEnd = (id, cancel) => stripe('POST', `subscriptions/${encodeURIComponent(id)}`, { cancel_at_period_end: cancel });
+// Moved to the subscription items in recent API versions.
+export const periodEnd = (sub) => sub.current_period_end ?? sub.items?.data?.[0]?.current_period_end ?? null;
+export const invoiceSubscription = (inv) => inv.subscription ?? inv.parent?.subscription_details?.subscription ?? null;
 
 // Stripe-Signature: t=timestamp,v1=hex(hmac_sha256(secret, `${t}.${body}`))
 export function verifyWebhook(rawBody, header, secret, toleranceSec = 300) {
