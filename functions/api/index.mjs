@@ -23,6 +23,7 @@ import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLa
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 import { blogRoute, blogTick, latestPosts } from './blog.mjs';
+import { speciesRoute } from './species.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -2495,6 +2496,14 @@ export const handler = async (event) => {
         } catch (error) {
             console.error('blog', error);
             return { statusCode: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '60' }, body: 'Blog momentanément indisponible' };
+        }
+    }
+    if (event.requestContext?.http?.method === 'GET' && /^\/(api\/)?(especes(\/|$)|sitemap(-pages)?\.xml$)/.test(event.rawPath || '')) {
+        try {
+            return await speciesRoute(getPool(), event.rawPath, event.queryStringParameters || {});
+        } catch (error) {
+            console.error('species', error);
+            return { statusCode: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '60' }, body: 'Page momentanément indisponible' };
         }
     }
     if (share) {

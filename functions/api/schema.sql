@@ -375,3 +375,6 @@ CREATE INDEX IF NOT EXISTS showcase_awards_unclaimed_idx ON showcase_awards (use
 -- Nouveautés
 -- Id of the last « Nouveautés » pop-up the player closed (shown once per account, on any device).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS news_seen TEXT;
+
+-- public species pages: group listings and "nearby in popularity" links
+CREATE INDEX IF NOT EXISTS cards_type_views_idx ON cards (type, views);

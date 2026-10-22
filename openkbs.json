@@ -19,6 +19,7 @@
   "site": "./site",
   "spa": "/index.html",
   "redirects": {
+    "canonicalHost": "apex",
     "rules": [
       {
         "from": "/blog",
@@ -28,6 +29,21 @@
       {
         "from": "/blog/*",
         "to": "/api/blog/:splat",
+        "status": 301
+      },
+      {
+        "from": "/especes",
+        "to": "/api/especes",
+        "status": 301
+      },
+      {
+        "from": "/especes/*",
+        "to": "/api/especes/:splat",
+        "status": 301
+      },
+      {
+        "from": "/sitemap.xml",
+        "to": "/api/sitemap.xml",
         "status": 301
       }
     ]

@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#05130d">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NatureDex — collectionne la nature</title>
-    <meta name="description" content="Ouvre des boosters et collectionne des milliers d'espèces réelles : animaux, plantes, champignons, bactéries, virus, fossiles. Les cartes les plus rares sont les espèces les plus populaires sur Wikipédia.">
+    <title>NatureDex — jeu de cartes à collectionner : 60 000 espèces du vivant</title>
+    <meta name="description" content="Jeu gratuit : ouvre des boosters et collectionne plus de 60 000 espèces réelles (animaux, plantes, champignons, bactéries, virus, fossiles). Quiz du jour, échanges, combats et 20 % des achats reversés à la nature.">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <link rel="canonical" href="https://naturedex.fr/">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="NatureDex">
     <meta property="og:url" content="https://naturedex.fr/">
@@ -14,17 +16,50 @@
     <meta property="og:image" content="https://naturedex.fr/og.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Cartes NatureDex d'espèces animales et végétales">
     <meta property="og:locale" content="fr_FR">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="NatureDex : collectionne 60 106 espèces du vivant">
+    <meta name="twitter:description" content="Ouvre des boosters, fais le quiz du jour, échange avec tes amis. Cartes tirées de Wikipédia, 20 % des achats reversés à des associations nature.">
     <meta name="twitter:image" content="https://naturedex.fr/og.png">
     <link rel="alternate" type="application/rss+xml" title="Blog nature NatureDex" href="https://naturedex.fr/api/blog/rss.xml">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500..900;1,500..700&family=Plus+Jakarta+Sans:ital,wght@0,400..800;1,400..600&display=swap" rel="stylesheet">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "Organization", "@id": "https://naturedex.fr/#org", "name": "NatureDex", "url": "https://naturedex.fr/",
+                "logo": "https://naturedex.fr/favicon.svg", "image": "https://naturedex.fr/og.png"
+            },
+            {
+                "@type": "WebSite", "@id": "https://naturedex.fr/#site", "name": "NatureDex", "url": "https://naturedex.fr/", "inLanguage": "fr-FR",
+                "publisher": { "@id": "https://naturedex.fr/#org" }
+            },
+            {
+                "@type": ["VideoGame", "WebApplication"], "name": "NatureDex", "url": "https://naturedex.fr/", "inLanguage": "fr-FR",
+                "description": "Jeu de cartes à collectionner gratuit : plus de 60 000 espèces réelles tirées de Wikipédia, boosters, quiz du jour, échanges et combats.",
+                "image": "https://naturedex.fr/og.png", "genre": ["Jeu de cartes à collectionner", "Jeu éducatif"],
+                "gamePlatform": "Navigateur web", "applicationCategory": "GameApplication", "operatingSystem": "Tous (navigateur web)",
+                "playMode": ["SinglePlayer", "MultiPlayer"], "isAccessibleForFree": true,
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+                "publisher": { "@id": "https://naturedex.fr/#org" }
+            }
+        ]
+    }
+    </script>
 </head>
 <body>
-    <div id="root"></div>
+    <!-- Readable without JavaScript (crawlers, link previews, AI assistants); React replaces it on load. -->
+    <div id="root"><main style="max-width:680px;margin:0 auto;padding:18vh 20px 40px;text-align:center;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#a3b5a9;line-height:1.6">
+        <h1 style="font-family:'Playfair Display',Georgia,serif;color:#fff;font-weight:600;font-size:2.4rem;margin:0 0 .4em">NatureDex, le jeu de cartes du vivant</h1>
+        <p>Collectionne plus de 60 000 espèces réelles — mammifères, oiseaux, insectes, plantes, champignons, bactéries, virus et fossiles. Chaque carte vient de Wikipédia et sa rareté dépend de la popularité de l'espèce.</p>
+        <p>Ouvre des boosters gratuits, fais le quiz nature du jour, cultive ton jardin, échange et combats avec tes amis. 20 % de chaque achat est reversé à la LPO, au WWF France ou à Humanité &amp; Biodiversité.</p>
+        <p><a href="/connexion?mode=register" style="color:#e9c46a">Créer mon compte gratuit</a> · <a href="/api/especes" style="color:#a8f0c6">Toutes les espèces</a> · <a href="/api/blog" style="color:#a8f0c6">Blog nature</a></p>
+    </main></div>
     <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

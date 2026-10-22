@@ -98,6 +98,11 @@ function Intro({ catalog }) {
                     <strong className="text-[#f4d88f]">20 % de chaque achat</strong> en boutique est reversé à l'association nature de ton choix : LPO, WWF France ou Humanité & Biodiversité. Le jeu reste jouable gratuitement.
                 </p>
             </div>
+
+            <p className="mt-4 text-sm text-ink-soft">
+                Avant de jouer, explore <a href="/api/especes" className="text-[#a8f0c6] underline underline-offset-2 hover:text-white">l'encyclopédie des espèces</a> ou
+                lis <a href="/api/blog" className="text-[#a8f0c6] underline underline-offset-2 hover:text-white">le blog nature</a>.
+            </p>
         </section>
     );
 }

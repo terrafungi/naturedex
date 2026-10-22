@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://naturedex.fr/api/blog/sitemap.xml
+Sitemap: https://naturedex.fr/api/sitemap.xml

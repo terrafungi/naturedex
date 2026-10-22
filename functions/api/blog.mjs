@@ -5,8 +5,9 @@
  * Pages are server-rendered HTML under /api/blog (naturedex.fr/blog 301s there) for SEO.
  */
 
-const SITE = 'https://naturedex.fr';
-const BLOG = `${SITE}/api/blog`;
+export const SITE = 'https://naturedex.fr';
+export const BLOG = `${SITE}/api/blog`;
+export const SPECIES = `${SITE}/api/especes`;
 const UA = 'NatureDexBlog/1.0 (https://naturedex.fr)'; // Wikimedia asks for a contact URL
 const MODEL = 'gemini-3.5-flash';
 const FREE_FALLBACK_MODEL = 'gemini-flash-latest';
@@ -14,8 +15,8 @@ const LAUNCH_POSTS = 16; // first batch, one per category, generated one per min
 const DAILY_HOUR = 8; // Paris hour from which the daily article is written
 const DAILY_ATTEMPTS = 3;
 const PAGE_SIZE = 12;
-const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const jsonLd = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
+export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+export const jsonLd = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
 
 // type filters reuse the card catalogue types; `topic` steers the angle of the article
 export const CATEGORIES = {
@@ -84,7 +85,7 @@ async function wikiText(wikiUrl) {
 }
 
 // Commons file page of an upload.wikimedia.org / thumb URL, for the image credit link.
-function commonsPage(url) {
+export function commonsPage(url) {
     const path = String(url).split('?')[0];
     const m = /\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/]+)/.exec(path);
     return m ? `https://commons.wikimedia.org/wiki/File:${m[1]}` : 'https://commons.wikimedia.org/';
@@ -329,10 +330,13 @@ export async function blogTick(db) {
 
 /* ---------- public data ---------- */
 
+// Public species page (served by species.mjs); the slug is cosmetic, the id is the key.
+export const speciesUrl = (c) => `${SPECIES}/${c.id}-${slugify(c.name)}`;
+
 const POST_COLS = `id, slug, category, title, description, excerpt, image_url, image_alt, published_at, tags, (body->>'words')::int AS words`;
 const postUrl = (slug) => `${BLOG}/${slug}`;
 // Wikimedia only serves standard thumbnail widths (330, 500, 960…); card images are stored at 960px.
-const thumb = (url, w = 500) => String(url).replace(/\/(\d+)px-([^/?]+)/, `/${w}px-$2`);
+export const thumb = (url, w = 500) => String(url).replace(/\/(\d+)px-([^/?]+)/, `/${w}px-$2`);
 
 export async function latestPosts(db, limit = 3) {
     const { rows } = await db.query(`SELECT ${POST_COLS} FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC LIMIT $1`, [limit]);
@@ -344,7 +348,7 @@ export async function latestPosts(db, limit = 3) {
 
 /* ---------- HTML pages ---------- */
 
-const dateFr = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+export const dateFr = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
 const CSS = `
 :root{--night:#05130d;--deep:#10261b;--ink:#eef5ef;--soft:#a3b5a9;--forest:#4fd18b;--mint:#a8f0c6;--brass:#e9c46a}
 *{box-sizing:border-box}html{background:var(--night);color-scheme:dark}
@@ -394,7 +398,7 @@ footer{margin-top:70px;border-top:1px solid rgb(255 255 255/.08);padding:30px 0 
 .join{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
 `;
 
-function layout({ title, description, canonical, image, type = 'website', head = '', body, prev, next }) {
+export function layout({ title, description, canonical, image, type = 'website', head = '', body, prev, next, tag = 'Blog nature', robots = 'index, follow, max-image-preview:large' }) {
     return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -403,7 +407,7 @@ function layout({ title, description, canonical, image, type = 'website', head =
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
 <link rel="canonical" href="${esc(canonical)}">
-<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="robots" content="${robots}">
 <meta name="theme-color" content="#05130d">
 <link rel="icon" href="${SITE}/favicon.svg" type="image/svg+xml">
 <link rel="alternate" type="application/rss+xml" title="Blog NatureDex" href="${BLOG}/rss.xml">
@@ -426,21 +430,21 @@ ${head}
 </head>
 <body>
 <header class="top"><div class="wrap">
-<a class="brand" href="${SITE}/"><img src="${SITE}/favicon.svg" alt="" width="34" height="34"><b>NatureDex</b><span>Blog nature</span></a>
-<nav class="nav"><a href="${BLOG}">Tous les articles</a></nav>
+<a class="brand" href="${SITE}/"><img src="${SITE}/favicon.svg" alt="" width="34" height="34"><b>NatureDex</b><span>${esc(tag)}</span></a>
+<nav class="nav"><a href="${BLOG}">Blog</a> · <a href="${SPECIES}">Espèces</a></nav>
 <a class="cta" href="${SITE}/connexion?mode=register">Jouer gratuitement</a>
 </div></header>
 ${body}
 <footer><div class="wrap join">
 <span>© ${new Date().getFullYear()} NatureDex · Articles rédigés à partir de Wikipédia et de médias scientifiques, sources citées sous chaque article · Images : Wikimedia Commons (licences libres)</span>
-<span><a href="${BLOG}">Blog</a> · <a href="${BLOG}/rss.xml">RSS</a> · <a href="${SITE}/">NatureDex</a></span>
+<span><a href="${BLOG}">Blog</a> · <a href="${SPECIES}">Toutes les espèces</a> · <a href="${BLOG}/rss.xml">RSS</a> · <a href="${SITE}/">NatureDex</a></span>
 </div></footer>
 </body>
 </html>`;
 }
 
-const html = (body, status = 200, maxAge = 600) => ({ statusCode: status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': `public, max-age=${maxAge}` }, body });
-const xml = (body) => ({ statusCode: 200, headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=900' }, body });
+export const html = (body, status = 200, maxAge = 600) => ({ statusCode: status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': `public, max-age=${maxAge}` }, body });
+export const xml = (body) => ({ statusCode: 200, headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=900' }, body });
 
 const card = (p, big = false) => `<a class="post${big ? ' big' : ''}" href="${postUrl(p.slug)}">
 <img src="${esc(thumb(p.image_url, big ? 960 : 500))}" alt="${esc(p.image_alt || p.title)}" loading="${big ? 'eager' : 'lazy'}" width="500" height="313">
@@ -508,8 +512,8 @@ async function postPage(db, slug) {
 ${b.keyFacts?.length ? `<aside class="box gold"><h2 style="font-size:1.3rem">À retenir</h2><ul>${b.keyFacts.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></aside>` : ''}
 ${b.sections.map(section).join('\n')}
 ${cards.length ? `<section class="box"><h2 style="font-size:1.3rem">${cards.length > 1 ? 'Ces espèces' : 'Cette espèce'} dans NatureDex</h2>
-<p class="meta">Collectionne les cartes de ${cards.length > 1 ? 'ces espèces' : 'cette espèce'} en ouvrant des boosters gratuits.</p>
-<div class="cards">${cards.map((c) => `<a href="${SITE}/carte/${c.id}"><img src="${esc(thumb(c.thumb_url, 330))}" alt="${esc(c.name)}" loading="lazy" width="330" height="330"><span>${esc(c.name)}</span></a>`).join('')}</div></section>` : ''}
+<p class="meta">Leur fiche complète, et leur carte à collectionner en ouvrant des boosters gratuits.</p>
+<div class="cards">${cards.map((c) => `<a href="${speciesUrl(c)}"><img src="${esc(thumb(c.thumb_url, 330))}" alt="${esc(c.name)}" loading="lazy" width="330" height="330"><span>${esc(c.name)}</span></a>`).join('')}</div></section>` : ''}
 ${b.faq?.length ? `<section><h2>Questions fréquentes</h2>${b.faq.map((f) => `<details open><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join('')}</section>` : ''}
 <section class="sources"><h2 style="font-size:1.3rem">Sources</h2><ul>${p.sources.map((s) => `<li>${esc(s.publisher)} : <a href="${esc(s.url)}" rel="noopener" target="_blank">${esc(s.title)}</a></li>`).join('')}</ul>
 <p class="meta">Article rédigé avec l'aide d'une IA à partir de ces sources, puis publié par NatureDex.</p></section>
