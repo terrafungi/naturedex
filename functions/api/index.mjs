@@ -24,6 +24,7 @@ import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s
 import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 import { blogRoute, blogTick, latestPosts } from './blog.mjs';
 import { speciesRoute } from './species.mjs';
+import { speciesEnrichTick } from './species-enrich.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -2483,7 +2484,10 @@ export const handler = async (event) => {
         await seasonRollover(getPool(), inTransaction);
         if (stripeReady() && new Date().getUTCMinutes() % 5 === 0) await refreshPendingPurchases(getPool());
         await showcaseWeekRollover(getPool()).catch((err) => console.error('showcaseWeekRollover', err));
-        await blogTick(getPool()).catch((err) => console.error('blogTick', err));
+        await Promise.all([
+            blogTick(getPool()).catch((err) => console.error('blogTick', err)),
+            speciesEnrichTick(getPool()).catch((err) => console.error('speciesEnrich', err)),
+        ]);
         return { ok: true };
     }
     if (event.requestContext?.http?.method === 'OPTIONS') {

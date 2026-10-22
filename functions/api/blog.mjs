@@ -53,7 +53,7 @@ const NATURE_WORDS = /animal|animaux|espèce|oiseau|plante|arbre|forêt|océan|m
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const SEASONS = ['hiver', 'hiver', 'printemps', 'printemps', 'printemps', 'été', 'été', 'été', 'automne', 'automne', 'automne', 'hiver'];
 
-const fetchText = async (url, ms = 8000) => {
+export const fetchText = async (url, ms = 8000) => {
     const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: '*/*' }, signal: AbortSignal.timeout(ms), redirect: 'follow' });
     if (!res.ok) throw new Error(`${res.status} ${url}`);
     return res.text();
@@ -92,7 +92,7 @@ export function commonsPage(url) {
 }
 
 // Psychoactive species are welcome topics, but written as information, never as a how-to.
-const DRUGS = /psilocyb|hallucinog|psychotrop|psychoacti|enth[ée]og|narcoti|mescalin|cannabino|\bLSD\b|opiac|opioïd|cocaïn|ayahuasca/i;
+export const DRUGS = /psilocyb|hallucinog|psychotrop|psychoacti|enth[ée]og|narcoti|mescalin|cannabino|\bLSD\b|opiac|opioïd|cocaïn|ayahuasca/i;
 
 // Popular cards for a category, never already featured in a post.
 async function pickCards(db, cat) {

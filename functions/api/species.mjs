@@ -1,15 +1,18 @@
 /**
  * Public species directory for SEO: one server-rendered page per card (naturedex.fr/especes
  * 301s to /api/especes), browsable by group, plus the site-wide sitemap index.
- * Only species with a real Wikipédia text are indexable; the others stay reachable but
- * noindex, so Google never sees thousands of near-empty pages.
+ * Only species with a real text are indexable — a long enough Wikipédia intro, or a fiche
+ * written from the full Wikipédia articles by species-enrich.mjs; the others stay reachable
+ * but noindex, so Google never sees thousands of near-empty pages.
  */
 import { BLOG, SITE, SPECIES, commonsPage, dateFr, esc, html, jsonLd, layout, slugify, speciesUrl, thumb, xml } from './blog.mjs';
 
 const PAGE_SIZE = 60;
 const SITEMAP_SIZE = 10000;
 const MIN_EXTRACT = 200; // characters of Wikipédia text for a page to be worth indexing
-const INDEXABLE = `length(coalesce(extract, '')) >= ${MIN_EXTRACT}`;
+// cards c; the enriched text is looked up by id, so this works in any query on cards
+const INDEXABLE = `(length(coalesce(c.extract, '')) >= ${MIN_EXTRACT}
+    OR EXISTS (SELECT 1 FROM species_texts t WHERE t.card_id = c.id AND t.status = 'ok'))`;
 
 const TYPES = {
     mammal: ['Mammifère', 'Mammifères'], bird: ['Oiseau', 'Oiseaux'], reptile: ['Reptile & amphibien', 'Reptiles & amphibiens'],
@@ -31,6 +34,7 @@ const CSS = `<style>
 .sci{font-style:italic;color:var(--soft);font-size:1.15rem;margin:-.3em 0 .8em}
 .facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:18px 0}
 .facts div{padding:10px 14px;border-radius:14px;background:rgb(255 255 255/.04);border:1px solid rgb(255 255 255/.09)}
+.keys{padding-left:1.2em}.keys li{margin:.3em 0}
 .facts dt{font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--soft)}.facts dd{margin:2px 0 0;font-weight:700;color:#fff}
 .types{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin:22px 0}
 .types a{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-radius:16px;text-decoration:none;color:#fff;font-weight:700;background:rgb(255 255 255/.04);border:1px solid rgb(255 255 255/.1)}
@@ -59,7 +63,7 @@ function summary(text, max = 158) {
 async function hubPage(db) {
     const [{ rows: counts }, { rows: stars }] = await Promise.all([
         db.query(`SELECT type, count(*)::int AS n FROM cards GROUP BY type ORDER BY n DESC`),
-        db.query(`SELECT id, name, sci_name, thumb_url FROM cards WHERE ${INDEXABLE} ORDER BY views DESC LIMIT 24`),
+        db.query(`SELECT id, name, sci_name, thumb_url FROM cards c WHERE ${INDEXABLE} ORDER BY views DESC LIMIT 24`),
     ]);
     const total = counts.reduce((a, r) => a + r.n, 0);
     const title = `Encyclopédie des espèces : ${total.toLocaleString('fr-FR')} animaux, plantes et champignons | NatureDex`;
@@ -110,7 +114,8 @@ async function typePage(db, type, page) {
 }
 
 async function speciesPage(db, id, slug) {
-    const { rows: [c] } = await db.query(`SELECT * FROM cards WHERE id = $1`, [id]);
+    const { rows: [c] } = await db.query(`SELECT c.*, t.body AS enriched, t.sources AS enriched_sources, t.updated_at AS enriched_at
+        FROM cards c LEFT JOIN species_texts t ON t.card_id = c.id AND t.status = 'ok' WHERE c.id = $1`, [id]);
     if (!c) return null;
     const url = speciesUrl(c);
     if (slug !== slugify(c.name)) return { statusCode: 301, headers: { Location: url, 'Cache-Control': 'public, max-age=86400' }, body: '' };
@@ -123,8 +128,10 @@ async function speciesPage(db, id, slug) {
     const [typeLabel, typePlural] = TYPES[c.type] || [c.type, c.type];
     const sci = c.sci_name && c.sci_name !== c.name ? c.sci_name : '';
     const s = c.stats || {};
-    const indexable = String(c.extract || '').length >= MIN_EXTRACT;
     const extract = String(c.extract || '').trim();
+    // the written fiche replaces the intro only when the intro alone is too short
+    const rich = extract.length < MIN_EXTRACT ? c.enriched : null;
+    const indexable = extract.length >= MIN_EXTRACT || !!rich;
     const facts = [
         ['Groupe', `<a href="${typeUrl(c.type)}">${esc(typeLabel)}</a>`],
         sci && ['Nom scientifique', `<i>${esc(sci)}</i>`],
@@ -139,7 +146,7 @@ async function speciesPage(db, id, slug) {
     ].filter(Boolean);
     const paragraphs = extract.split(/\n+/).map((t) => t.trim()).filter(Boolean);
     const title = `${c.name}${sci ? ` (${sci})` : ''} : fiche espèce, photo${c.iucn ? ' et statut' : ''} | NatureDex`;
-    const description = summary(extract) || `${c.name}${sci ? ` (${sci})` : ''} : ${typeLabel.toLowerCase()} de l'encyclopédie NatureDex, avec photo, nom scientifique et carte à collectionner.`;
+    const description = summary(rich ? rich.intro : extract) || `${c.name}${sci ? ` (${sci})` : ''} : ${typeLabel.toLowerCase()} de l'encyclopédie NatureDex, avec photo, nom scientifique et carte à collectionner.`;
     const image = thumb(c.image_url || c.thumb_url, 960);
     const body = `<main class="wrap">
 <p class="crumbs"><a href="${SITE}/">NatureDex</a> › <a href="${SPECIES}">Espèces</a> › <a href="${typeUrl(c.type)}">${esc(typePlural)}</a> › ${esc(c.name)}</p>
@@ -151,9 +158,9 @@ async function speciesPage(db, id, slug) {
 <h1>${esc(c.name)}</h1>
 ${sci ? `<p class="sci">${esc(sci)}</p>` : ''}
 <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
-<h2 style="margin-top:.6em">Présentation</h2>
+${rich ? enrichedBody(c, rich) : `<h2 style="margin-top:.6em">Présentation</h2>
 ${paragraphs.length ? paragraphs.map((t) => `<p>${esc(t)}</p>`).join('') : `<p>${esc(c.name)} fait partie des ${esc(typePlural.toLowerCase())} de NatureDex.</p>`}
-<p class="meta">Source : <a href="${esc(c.wiki_url)}" rel="noopener" target="_blank">article « ${esc(c.name)} » sur Wikipédia</a> (licence CC BY-SA).</p>
+<p class="meta">Source : <a href="${esc(c.wiki_url)}" rel="noopener" target="_blank">article « ${esc(c.name)} » sur Wikipédia</a> (licence CC BY-SA).</p>`}
 </div>
 </article>
 ${posts.length ? `<section><h2>À lire sur le blog</h2><ul>${posts.map((p) => `<li><a href="${BLOG}/${esc(p.slug)}">${esc(p.title)}</a> <span class="meta">· ${dateFr(p.published_at)}</span></li>`).join('')}</ul></section>` : ''}
@@ -162,6 +169,7 @@ ${related.length ? `<section><h2>Autres ${esc(typePlural.toLowerCase())}</h2><di
 </main>`;
     const head = jsonLd({
         '@context': 'https://schema.org', '@type': 'WebPage', url, name: title, description, inLanguage: 'fr-FR', primaryImageOfPage: image,
+        ...(rich ? { dateModified: new Date(c.enriched_at).toISOString(), citation: (c.enriched_sources || []).map((d) => d.url) } : {}),
         isPartOf: { '@type': 'WebSite', name: 'NatureDex', url: `${SITE}/` },
         about: {
             '@type': 'Taxon', name: sci || c.name, ...(sci ? { alternateName: c.name } : {}), image, url,
@@ -174,9 +182,20 @@ ${related.length ? `<section><h2>Autres ${esc(typePlural.toLowerCase())}</h2><di
     }), 200, 86400);
 }
 
+// Fiche written from the Wikipédia articles (species-enrich.mjs), with its sources cited.
+function enrichedBody(c, rich) {
+    const sources = c.enriched_sources?.length ? c.enriched_sources : [{ publisher: 'Wikipédia', title: c.name, url: c.wiki_url }];
+    return `<p class="lead" style="font-size:1.12rem">${esc(rich.intro)}</p>
+${rich.facts?.length ? `<h2>À retenir</h2><ul class="keys">${rich.facts.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+${(rich.sections || []).map((s) => `<h2>${esc(s.h2)}</h2>${s.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('')}`).join('\n')}
+<h2>Sources</h2>
+<ul>${sources.map((d) => `<li><a href="${esc(d.url)}" rel="noopener" target="_blank">${esc(d.publisher)} : « ${esc(d.title)} »</a> (licence CC BY-SA)</li>`).join('')}</ul>
+<p class="meta">Fiche rédigée par NatureDex avec l'aide d'une IA, uniquement à partir des articles ci-dessus, qui sont sous licence CC BY-SA ; elle est diffusée sous la même licence.</p>`;
+}
+
 // Sitemap index for the whole site: home page + blog sitemap + species sitemaps.
 async function sitemapIndex(db) {
-    const { rows: [{ n }] } = await db.query(`SELECT count(*)::int AS n FROM cards WHERE ${INDEXABLE}`);
+    const { rows: [{ n }] } = await db.query(`SELECT count(*)::int AS n FROM cards c WHERE ${INDEXABLE}`);
     const parts = [`${SITE}/api/sitemap-pages.xml`, `${BLOG}/sitemap.xml`];
     for (let i = 0; i * SITEMAP_SIZE < n; i++) parts.push(`${SPECIES}/sitemap-${i + 1}.xml`);
     return xml(`<?xml version="1.0" encoding="UTF-8"?>
@@ -197,11 +216,12 @@ ${urls.map((loc) => `<url><loc>${esc(loc)}</loc></url>`).join('\n')}
 
 async function speciesSitemap(db, n) {
     const { rows } = await db.query(
-        `SELECT id, name, image_url, thumb_url FROM cards WHERE ${INDEXABLE} ORDER BY id LIMIT ${SITEMAP_SIZE} OFFSET ${(n - 1) * SITEMAP_SIZE}`);
+        `SELECT id, name, image_url, thumb_url, (SELECT t.updated_at FROM species_texts t WHERE t.card_id = c.id AND t.status = 'ok') AS lastmod
+         FROM cards c WHERE ${INDEXABLE} ORDER BY id LIMIT ${SITEMAP_SIZE} OFFSET ${(n - 1) * SITEMAP_SIZE}`);
     if (!rows.length) return null;
     return xml(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-${rows.map((c) => `<url><loc>${esc(speciesUrl(c))}</loc><image:image><image:loc>${esc(thumb(c.image_url || c.thumb_url, 960))}</image:loc></image:image></url>`).join('\n')}
+${rows.map((c) => `<url><loc>${esc(speciesUrl(c))}</loc>${c.lastmod ? `<lastmod>${new Date(c.lastmod).toISOString().slice(0, 10)}</lastmod>` : ''}<image:image><image:loc>${esc(thumb(c.image_url || c.thumb_url, 960))}</image:loc></image:image></url>`).join('\n')}
 </urlset>`);
 }
 

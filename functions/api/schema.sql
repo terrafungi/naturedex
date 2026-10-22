@@ -378,3 +378,17 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS news_seen TEXT;
 
 -- public species pages: group listings and "nearby in popularity" links
 CREATE INDEX IF NOT EXISTS cards_type_views_idx ON cards (type, views);
+
+-- species pages: original fiche written from the full Wikipédia articles (FR + EN) when the intro is too short
+CREATE TABLE IF NOT EXISTS species_texts (
+    card_id     INTEGER PRIMARY KEY REFERENCES cards(id) ON DELETE CASCADE,
+    status      TEXT NOT NULL DEFAULT 'working', -- working | ok | thin | failed | quota
+    attempts    INTEGER NOT NULL DEFAULT 0,
+    body        JSONB,
+    sources     JSONB,
+    model       TEXT,
+    error       TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS species_texts_status_idx ON species_texts (status, updated_at);
