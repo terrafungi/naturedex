@@ -28,6 +28,7 @@ import { speciesRoute } from './species.mjs';
 import { speciesEnrichTick } from './species-enrich.mjs';
 import { fieldActions } from './field.mjs';
 import { exploreActions } from './explore.mjs';
+import { AVATAR_SQL, avatarActions, avatarOf } from './avatar.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -160,6 +161,7 @@ async function publicUser(db, user) {
         social: await socialCounts(db, user.id),
         quizPerDay: quizPerDay(user),
         pass: passActive(user) ? { until: user.pass_until, cancelled: user.pass_cancel } : null,
+        avatar: avatarOf(user),
         newsSeen: user.news_seen,
         joinedAt: user.created_at,
         ...rows[0],
@@ -1593,7 +1595,7 @@ const actions = {
     async player(db, body, event) {
         const user = await requireUser(db, event);
         const { rows: [p] } = await db.query(
-            `SELECT u.id, u.username, u.created_at, u.id = $1 AS me, COALESCE(u.pass_until > now(), false) AS patron,
+            `SELECT u.id, u.username, u.created_at, u.id = $1 AS me, COALESCE(u.pass_until > now(), false) AS patron, ${AVATAR_SQL('u')} AS avatar,
                     (SELECT COUNT(*)::int FROM user_cards WHERE user_id = u.id) AS discovered,
                     (SELECT COALESCE(SUM(count), 0)::int FROM user_cards WHERE user_id = u.id) AS owned,
                     (SELECT COUNT(*)::int FROM trophy_claims WHERE user_id = u.id) AS trophies,
@@ -2604,6 +2606,7 @@ const actions = {
 Object.assign(actions, arenaActions({ requireUser, inTransaction, HttpError, publicUser, parisDay }));
 Object.assign(actions, fieldActions({ requireUser, inTransaction, HttpError, publicUser }));
 Object.assign(actions, exploreActions({ requireUser, inTransaction, HttpError, publicUser }));
+Object.assign(actions, avatarActions({ requireUser, inTransaction, HttpError, publicUser }));
 
 const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest']);
 

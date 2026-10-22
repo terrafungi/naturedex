@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Award, Brain, Crown, EyeOff, Gem, HeartHandshake, Layers, Medal, Users, Globe2, Swords } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.jsx';
+import PlayerAvatar from '../components/PlayerAvatar.jsx';
 import SeasonBadge from '../components/SeasonBadge.jsx';
 
 const profile = (name) => `/joueur/${encodeURIComponent(name)}`;
@@ -33,13 +34,9 @@ function Pill({ active, onClick, children }) {
     );
 }
 
-function Avatar({ name, color, size = 'w-10 h-10 text-base' }) {
-    return (
-        <span className={`grid place-items-center shrink-0 rounded-full font-display font-semibold text-[#10261a] ${size}`}
-            style={{ background: `radial-gradient(circle at 35% 30%, ${color}, color-mix(in oklab, ${color} 50%, black))` }}>
-            {name.slice(0, 1).toUpperCase()}
-        </span>
-    );
+const AVATAR_SIZES = { 'w-16': 64, 'w-12': 48, 'w-9': 36 };
+function Avatar({ name, color, size = 'w-10' }) {
+    return <PlayerAvatar name={name} size={AVATAR_SIZES[size.split(' ')[0]] || 40} ring={color} />;
 }
 
 // 2nd · 1st · 3rd, the winner standing tallest.

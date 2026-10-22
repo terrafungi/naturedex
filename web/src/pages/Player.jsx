@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Camera, Frame, Lock, MessageCircle, Pencil, Star, UserPlus } from 'lucide-react';
 import { api } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
-import { LeafLogo } from '../components/Layout.jsx';
+import { AvatarFigure, defaultAvatar } from '../components/PlayerAvatar.jsx';
 import ShowcaseCanvas, { VoteButton } from '../components/Showcase.jsx';
 import PatronBadge from '../components/PatronBadge.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
@@ -47,7 +47,7 @@ export default function Player() {
         <div className="max-w-3xl mx-auto px-5 py-10">
             <button onClick={() => history.back()} className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" />Retour</button>
             <div className="mt-4 flex items-center gap-4">
-                <span className="grid place-items-center w-16 h-16 shrink-0 rounded-full nd-glass"><LeafLogo className="w-9 h-9" /></span>
+                <AvatarFigure avatar={player.avatar || defaultAvatar(player.username)} size={88} />
                 <div className="min-w-0">
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Naturaliste depuis {new Date(player.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
                     <h1 className="font-display text-4xl font-medium text-white truncate">{player.username}</h1>

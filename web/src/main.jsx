@@ -16,6 +16,7 @@ import Showcases from './pages/Showcases.jsx';
 import CardPage from './pages/CardPage.jsx';
 import Challenges from './pages/Challenges.jsx';
 import Profile from './pages/Profile.jsx';
+import AvatarEditor from './pages/AvatarEditor.jsx';
 import Player from './pages/Player.jsx';
 import Trophies from './pages/Trophies.jsx';
 import Leaderboard from './pages/Leaderboard.jsx';
@@ -63,6 +64,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/boutique" element={<Private><Shop /></Private>} />
                         <Route path="/amis" element={<Private><Friends /></Private>} />
                         <Route path="/profil" element={<Private><Profile /></Private>} />
+                        <Route path="/avatar" element={<Private><AvatarEditor /></Private>} />
                         <Route path="/joueur/:username" element={<Private><Player /></Private>} />
                         <Route path="/collection" element={<Private><Collection /></Private>} />
                         <Route path="/vitrine" element={<Private><ShowcaseEditor /></Private>} />

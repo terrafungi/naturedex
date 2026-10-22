@@ -2,18 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, MessageCircle, Send, UserPlus } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
+import PlayerAvatar from '../components/PlayerAvatar.jsx';
 
 const MAX = 1000;
 const POLL_MS = 5000;
-
-function Avatar({ name, className = 'w-10 h-10 text-base' }) {
-    const hue = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
-    return (
-        <span className={`grid place-items-center rounded-full font-display font-bold shrink-0 text-white ${className}`} style={{ background: `hsl(${hue} 45% 32%)` }}>
-            {name.slice(0, 1).toUpperCase()}
-        </span>
-    );
-}
 
 // 14:05 today, "hier", or 12 oct.
 function when(iso) {
@@ -43,7 +35,7 @@ function Conversations({ data, active }) {
                     <li key={c.username}>
                         <Link to={`/messages/${encodeURIComponent(c.username)}`}
                             className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-colors ${active === c.username ? 'bg-[#4fd18b]/12 ring-1 ring-[#4fd18b]/25' : 'hover:bg-white/5'}`}>
-                            <Avatar name={c.username} />
+                            <PlayerAvatar name={c.username} />
                             <span className="min-w-0 flex-1">
                                 <span className="flex items-baseline gap-2">
                                     <span className={`truncate ${c.unread ? 'font-bold text-white' : 'font-semibold text-white/90'}`}>{c.username}</span>
@@ -64,7 +56,7 @@ function Conversations({ data, active }) {
                     <div className="px-2 flex flex-wrap gap-1.5">
                         {friends.map((f) => (
                             <Link key={f} to={`/messages/${encodeURIComponent(f)}`} className="flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full bg-white/5 hover:bg-white/10 text-sm font-semibold text-white">
-                                <Avatar name={f} className="w-6 h-6 text-xs" />{f}
+                                <PlayerAvatar name={f} size={24} />{f}
                             </Link>
                         ))}
                     </div>
@@ -133,7 +125,7 @@ function Thread({ username, onActivity }) {
         <div className="flex flex-col h-full">
             <div className="flex items-center gap-3 px-3 py-3 border-b border-white/10">
                 <button onClick={() => navigate('/messages')} className="lg:hidden grid place-items-center w-9 h-9 rounded-full hover:bg-white/10 text-white" aria-label="Retour aux conversations"><ArrowLeft className="w-5 h-5" /></button>
-                <Avatar name={name} className="w-9 h-9 text-sm" />
+                <PlayerAvatar name={name} size={36} />
                 <p className="font-display text-lg font-semibold text-white truncate">{name}</p>
             </div>
             <div ref={scroller} className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1.5">

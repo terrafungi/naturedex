@@ -486,3 +486,14 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_until TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_cancel BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_association TEXT;
 CREATE INDEX IF NOT EXISTS users_pass_sub ON users (pass_until) WHERE pass_sub IS NOT NULL;
+
+-- Avatar: a drawn character ({ skin, hair, hairColor, acc, bg, shirt }); null = generated from the username
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar JSONB;
+-- paid t-shirts bought with pépites (free ones are never stored)
+CREATE TABLE IF NOT EXISTS user_shirts (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    shirt       TEXT NOT NULL,
+    price       INTEGER NOT NULL,
+    bought_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, shirt)
+);
