@@ -7,7 +7,7 @@ export const NEWS = {
     title: 'Nouveau : Sur le terrain',
     items: [
         { Icon: Camera, title: 'Photographie la vraie nature', text: "Prends en photo une plante, un animal ou un champignon : l'IA reconnaît l'espèce et ta photo devient une carte de terrain unique.", to: '/terrain' },
-        { Icon: Sprout, title: 'De 30 à 150 graines', text: "Selon la rareté de l'espèce, 5 observations récompensées par jour, et la carte offerte si tu ne l'as pas encore.", to: '/terrain' },
+        { Icon: Sprout, title: 'De 30 à 150 graines', text: "Selon la rareté de l'espèce, 5 observations récompensées par jour. La carte, elle, se trouve toujours dans les boosters !", to: '/terrain' },
         { Icon: Sparkles, title: 'Sois le premier', text: 'Première observation NatureDex d\'une espèce ? +50 graines et ton pseudo sur l\'observation n°1.', to: '/terrain' },
         { Icon: Users, title: 'Le carnet de la communauté', text: 'Découvre les photos des autres naturalistes, et les tiennes sur la fiche de chaque espèce.', to: '/terrain' },
     ],

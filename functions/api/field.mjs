@@ -1,8 +1,8 @@
 /**
  * « Sur le terrain »: a player photographs a real species, the AI identifies it among the
  * NatureDex cards, and once the player confirms, the photo becomes their personal field card
- * (one per species, replaceable by a better photo). Rewards: graines by rarity, the regular card
- * if it was missing, a bonus for the very first observation of a species — 5 rewarded photos a day.
+ * (one per species, replaceable by a better photo). Rewards: graines by rarity (the regular card
+ * is never given: it still has to be found in boosters), a bonus for the very first observation of a species — 5 rewarded photos a day.
  * The photo is resized in the browser; the server stores it under media/terrain/ (CloudFront).
  */
 import crypto from 'node:crypto';
@@ -250,11 +250,10 @@ export function fieldActions({ requireUser, inTransaction, HttpError, publicUser
                     ({ rows: [{ number }] } = await client.query(`SELECT coalesce(max(number), 0) + 1 AS number FROM observations WHERE card_id = $1`, [cardId]));
                     firstEver = number === 1;
                 }
-                let reward = 0, gaveCard = false;
+                let reward = 0;
+                const gaveCard = false; // a photo never unlocks the card: it has to be found in boosters
                 if (rewardable) {
                     reward = Math.round((REWARDS[card.rarity] || REWARDS.common) * (pending.captive ? 0.5 : 1)) + (firstEver ? FIRST_BONUS : 0);
-                    const { rowCount } = await client.query(`INSERT INTO user_cards (user_id, card_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [user.id, cardId]);
-                    gaveCard = rowCount > 0;
                     await client.query(`UPDATE users SET coins = coins + $2 WHERE id = $1`, [user.id, reward]);
                 }
                 await client.query(
