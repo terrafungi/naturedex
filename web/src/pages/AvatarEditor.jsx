@@ -58,6 +58,13 @@ function Tilt({ children }) {
     );
 }
 
+// T-shirts come in themes (plants, animals, mushrooms…); other slots are a single list.
+const groupByTheme = (items) => {
+    const groups = new Map();
+    for (const it of items) groups.set(it.theme || null, [...(groups.get(it.theme || null) || []), it]);
+    return [...groups];
+};
+
 export default function AvatarEditor() {
     const { user, setUser } = useGame();
     const navigate = useNavigate();
@@ -108,7 +115,7 @@ export default function AvatarEditor() {
             <Link to="/profil" className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" />Profil</Link>
             <h1 className="mt-3 font-display text-4xl text-white">Mon avatar</h1>
 
-            <div className="mt-6 flex justify-center"><Tilt><AvatarFigure avatar={draft} size={176} animate className="shadow-2xl shadow-black/40" /></Tilt></div>
+            <div className="mt-6 flex justify-center"><Tilt><AvatarFigure avatar={draft} size={300} full animate className="drop-shadow-2xl" /></Tilt></div>
 
             <div className="mt-6 flex flex-wrap gap-2">
                 {Object.entries(SLOT_NAMES).map(([slot, label]) => (
@@ -118,8 +125,11 @@ export default function AvatarEditor() {
                     </button>
                 ))}
             </div>
+            {groupByTheme(data.items[tab]).map(([theme, items]) => (
+            <div key={theme || tab}>
+            {theme && <h3 className="mt-5 mb-2 text-xs uppercase tracking-[0.2em] font-bold text-white/50">{theme}</h3>}
             <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2.5">
-                {data.items[tab].map((s) => (
+                {items.map((s) => (
                     <button key={s.id} onClick={() => setDraft({ ...draft, [tab]: s.id })}
                         className={`relative flex flex-col items-center gap-1 rounded-2xl p-2 transition-colors ${draft[tab] === s.id ? 'bg-[#4fd18b]/15 ring-1 ring-[#4fd18b]/50' : 'bg-white/5 hover:bg-white/10'}`}>
                         <AvatarFigure avatar={{ ...draft, [tab]: s.id }} size={64} className={s.owned ? '' : 'opacity-80'} />
@@ -133,6 +143,8 @@ export default function AvatarEditor() {
                     </button>
                 ))}
             </div>
+            </div>
+            ))}
 
             <Section title="Coiffure"><Choices items={HAIRS} field="hair" draft={draft} setDraft={setDraft} /></Section>
             <Section title="Couleur des cheveux"><Swatches colors={HAIR_COLORS} value={draft.hairColor} onPick={(i) => setDraft({ ...draft, hairColor: i })} /></Section>

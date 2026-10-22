@@ -47,7 +47,7 @@ export default function Player() {
         <div className="max-w-3xl mx-auto px-5 py-10">
             <button onClick={() => history.back()} className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" />Retour</button>
             <div className="mt-4 flex items-center gap-4">
-                <AvatarFigure avatar={player.avatar || defaultAvatar(player.username)} size={88} animate />
+                <AvatarFigure avatar={player.avatar || defaultAvatar(player.username)} size={150} full animate className="drop-shadow-xl" />
                 <div className="min-w-0">
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Naturaliste depuis {new Date(player.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
                     <h1 className="font-display text-4xl font-medium text-white truncate">{player.username}</h1>

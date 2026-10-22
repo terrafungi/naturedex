@@ -30,8 +30,8 @@ export default function Profile() {
         <div className="max-w-3xl mx-auto px-5 py-10">
             <div className="flex items-center gap-4">
                 <Link to="/avatar" className="relative shrink-0" aria-label="Modifier mon avatar">
-                    <AvatarFigure avatar={user.avatar || defaultAvatar(user.username)} size={88} animate />
-                    <span className="absolute -bottom-1 -right-1 grid place-items-center w-8 h-8 rounded-full bg-[#4fd18b] text-[#05130d] ring-4 ring-[#0d1f16]"><Pencil className="w-4 h-4" /></span>
+                    <AvatarFigure avatar={user.avatar || defaultAvatar(user.username)} size={150} full animate className="drop-shadow-xl" />
+                    <span className="absolute bottom-1 right-0 grid place-items-center w-8 h-8 rounded-full bg-[#4fd18b] text-[#05130d] ring-4 ring-[#0d1f16]"><Pencil className="w-4 h-4" /></span>
                 </Link>
                 <div className="min-w-0">
                     <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Naturaliste</p>

@@ -10,16 +10,38 @@ import { passActive } from './shop.mjs';
 const free = (id, name) => ({ id, name, price: 0 });
 const paid = (id, name, price) => ({ id, name, price });
 const pass = (id, name) => ({ id, name, price: 0, pass: true });
+const theme = (name, items) => items.map((i) => ({ ...i, theme: name }));
 
 export const ITEMS = {
+    // T-shirts are grouped by theme in the editor.
     shirt: [
-        free('foret', 'Forêt'), free('ciel', 'Ciel'), free('terre', 'Terre'), free('feuille', 'Feuille'),
-        paid('rayures', 'Marinière', 80), paid('sapin', 'Sapin', 100), paid('champignon', 'Amanite', 120),
-        paid('carreaux', 'Chemise à carreaux', 120), paid('abeille', 'Abeille', 150), paid('salopette', 'Salopette', 150),
-        paid('coccinelle', 'Coccinelle', 180), paid('tournesol', 'Tournesol', 180), paid('ocean', 'Océan', 200),
-        paid('papillon', 'Papillon', 200), paid('flocons', 'Pull d\'hiver', 220), paid('camouflage', 'Camouflage', 250),
-        paid('nuit', 'Nuit étoilée', 300), paid('arcenciel', 'Arc-en-ciel', 350), paid('aurore', 'Aurore boréale', 400),
-        paid('legende', 'Légende', 600), pass('mecene', 'Mécène'),
+        ...theme('Basiques', [
+            free('foret', 'Forêt'), free('ciel', 'Ciel'), free('terre', 'Terre'), paid('rayures', 'Marinière', 80),
+            paid('carreaux', 'Chemise à carreaux', 120), paid('salopette', 'Salopette', 150), paid('flocons', 'Pull d\'hiver', 220),
+            paid('camouflage', 'Camouflage', 250),
+        ]),
+        ...theme('Plantes', [
+            free('feuille', 'Feuille'), paid('trefle', 'Trèfle', 80), paid('sapin', 'Sapin', 100), paid('fougere', 'Fougère', 120),
+            paid('chene', 'Feuille de chêne', 120), paid('cactus', 'Cactus', 150), paid('lavande', 'Lavande', 150),
+            paid('tournesol', 'Tournesol', 180), paid('monstera', 'Monstera', 200), paid('cerisier', 'Fleurs de cerisier', 250),
+        ]),
+        ...theme('Animaux', [
+            paid('abeille', 'Abeille', 150), paid('coccinelle', 'Coccinelle', 180), paid('t_grenouille', 'Grenouille', 180),
+            paid('papillon', 'Papillon', 200), paid('empreintes', 'Empreintes', 200), paid('t_herisson', 'Hérisson', 220),
+            paid('ours', 'Ours', 220), paid('baleine', 'Baleine', 250), paid('t_chouette', 'Chouette', 250),
+            paid('t_renard', 'Renard', 280), paid('zebre', 'Zèbre', 300), paid('leopard', 'Léopard', 300),
+            paid('t_panda', 'Panda roux', 350), paid('loup', 'Loup et lune', 400),
+        ]),
+        ...theme('Champignons', [
+            paid('champignon', 'Amanite', 120), paid('cepe', 'Cèpe', 150), paid('girolle', 'Girolles', 180),
+            paid('morille', 'Morille', 220), paid('champis', 'Forêt de champignons', 350),
+        ]),
+        ...theme('Nature', [
+            paid('ocean', 'Océan', 200), paid('montagne', 'Montagne', 200), paid('automne', 'Feuilles d\'automne', 220),
+            paid('nuit', 'Nuit étoilée', 300), paid('coucher', 'Coucher de soleil', 300), paid('arcenciel', 'Arc-en-ciel', 350),
+            paid('aurore', 'Aurore boréale', 400),
+        ]),
+        ...theme('Prestige', [paid('legende', 'Légende', 600), pass('mecene', 'Mécène')]),
     ],
     hat: [
         free('aucun', 'Aucun'), free('casquette', 'Casquette'), free('explorateur', 'Explorateur'), free('bandana', 'Bandana'),

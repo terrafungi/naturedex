@@ -14,24 +14,54 @@ const SHIRTS = {
     ciel: { base: '#4a90c8' },
     terre: { base: '#c0643b' },
     feuille: { base: '#3f9a63', motif: 'leaf', ink: '#d9f5c4' },
-    rayures: { base: '#f3efe6', motif: 'stripes', ink: '#2b3f6b' },
+    rayures: { base: '#f3efe6', motif: 'stripes', ink: '#2b3f6b', repeat: true },
     sapin: { base: '#1f5138', motif: 'tree', ink: '#7fd39a' },
-    champignon: { base: '#c8352c', motif: 'dots', ink: '#fff7ee' },
-    carreaux: { base: '#b8322e', motif: 'plaid', ink: '#2a1414' },
-    abeille: { base: '#f2c230', motif: 'bee', ink: '#2a2118' },
+    champignon: { base: '#c8352c', motif: 'dots', ink: '#fff7ee', repeat: true },
+    carreaux: { base: '#b8322e', motif: 'plaid', ink: '#2a1414', repeat: true },
+    abeille: { base: '#f2c230', motif: 'bee', ink: '#2a2118', repeat: true },
     salopette: { base: '#f3efe6', motif: 'overalls', ink: '#3c6aa8' },
-    coccinelle: { base: '#d8322b', motif: 'ladybug', ink: '#1d1d1d' },
+    coccinelle: { base: '#d8322b', motif: 'ladybug', ink: '#1d1d1d', repeat: true },
     tournesol: { base: '#2f7a4a', motif: 'sunflower', ink: '#ffd23f' },
-    ocean: { base: '#1d6fa5', motif: 'waves', ink: '#9fe0ff' },
+    ocean: { base: '#1d6fa5', motif: 'waves', ink: '#9fe0ff', repeat: true },
     papillon: { base: '#a98ad8', motif: 'butterfly', ink: '#ffd36e' },
-    flocons: { base: '#b8323a', motif: 'snow', ink: '#ffffff' },
-    camouflage: { base: '#5b6b3a', motif: 'camo', ink: '#3b4626' },
-    nuit: { base: '#1b2350', motif: 'stars', ink: '#fff3b0' },
+    flocons: { base: '#b8323a', motif: 'snow', ink: '#ffffff', repeat: true },
+    camouflage: { base: '#5b6b3a', motif: 'camo', ink: '#3b4626', repeat: true },
+    nuit: { base: '#1b2350', motif: 'stars', ink: '#fff3b0', repeat: true },
     arcenciel: { gradient: ['#e94b4b', '#f2a53a', '#f2d64b', '#4fc16b', '#4a90e2', '#8a5ad8'] },
     aurore: { gradient: ['#1fae7a', '#2fb6c4', '#7b5cd6'], motif: 'aurora', ink: '#e8fff6' },
     legende: { gradient: ['#f7d774', '#d9a531', '#a8741a'], motif: 'star', ink: '#fffbe6' },
     mecene: { base: '#173d2b', motif: 'patron', ink: '#e9c46a' },
+    trefle: { base: '#2f8a4a', motif: 'clover', ink: '#b8f0a0' },
+    fougere: { base: '#1f5a3a', motif: 'fern', ink: '#8fd88a' },
+    chene: { base: '#c97a2a', motif: 'oak', ink: '#ffe2a8' },
+    cactus: { base: '#ecd3a6', motif: 'cactus', ink: '#4caf6a' },
+    lavande: { base: '#efe9f7', motif: 'lavender', ink: '#8a5ad8', repeat: true },
+    monstera: { base: '#f3efe6', motif: 'monstera', ink: '#2f8a4a' },
+    cerisier: { base: '#f8dde4', motif: 'blossom', ink: '#ef7fa0', repeat: true },
+    t_grenouille: { base: '#e8f4d8', motif: 'pet:grenouille' },
+    empreintes: { base: '#5a7a4a', motif: 'paws', ink: '#e8f0d8', repeat: true },
+    t_herisson: { base: '#e9dcc0', motif: 'pet:herisson' },
+    ours: { base: '#7fb070', motif: 'bear', ink: '#5a3a22' },
+    baleine: { base: '#bfe3f5', motif: 'whale', ink: '#2a6fb0' },
+    t_chouette: { base: '#2b3f6b', motif: 'pet:chouette' },
+    t_renard: { base: '#1f4a3a', motif: 'pet:renard' },
+    zebre: { base: '#f3efe6', motif: 'zebra', ink: '#1d1d1d', repeat: true },
+    leopard: { base: '#e8b24a', motif: 'leopard', ink: '#4a2a12', repeat: true },
+    t_panda: { base: '#f3efe6', motif: 'pet:panda' },
+    loup: { base: '#1b2350', motif: 'wolf', ink: '#fff3b0' },
+    cepe: { base: '#3f6a3a', motif: 'porcini', ink: '#8b4a1d' },
+    girolle: { base: '#2a4a2a', motif: 'chanterelle', ink: '#f2a53a' },
+    morille: { base: '#e8dcc0', motif: 'morel', ink: '#8b6a3a' },
+    champis: { base: '#2f5a3a', motif: 'mushrooms', ink: '#fff7ee', repeat: true },
+    montagne: { base: '#8fc4e8', motif: 'mountain', ink: '#4a5a7a' },
+    automne: { base: '#6b3a1d', motif: 'autumn', ink: '#f2a53a', repeat: true },
+    coucher: { gradient: ['#f2a53a', '#e94b6b', '#6b3fa0'], motif: 'sunset', ink: '#ffd36e' },
 };
+const OAK = 'M0 10 L0 6 C-3 6 -6 5 -5 2 C-8 1 -8 -2 -5 -3 C-7 -6 -4 -8 -2 -7 C-2 -10 2 -10 2 -7 C4 -8 7 -6 5 -3 C8 -2 8 1 5 2 C6 5 3 6 0 6';
+// Chest pictures are drawn around (0, 0), about 20 units wide, and placed on the chest.
+const chest = (children) => <g transform="translate(50 89)">{children}</g>;
+const paw = (x, y, r, ink) => <g key={`${x},${y}`} transform={`translate(${x} ${y}) rotate(${r})`} fill={ink}><ellipse cx="0" cy="1.5" rx="2.6" ry="2.2" />{[[-2.6, -1.6], [-0.9, -3], [0.9, -3], [2.6, -1.6]].map(([a, b]) => <circle key={a} cx={a} cy={b} r="0.95" />)}</g>;
+const mushroom = (x, y, cap, k) => <g key={k}><rect x={x - 1.1} y={y} width="2.2" height="3.4" rx="0.8" fill="#fff3dc" /><path d={`M${x - 3.4} ${y + 0.4} C${x - 3.4} ${y - 3.6} ${x + 3.4} ${y - 3.6} ${x + 3.4} ${y + 0.4} Z`} fill={cap} /></g>;
 
 const hash = (s) => [...String(s || '')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 
@@ -50,6 +80,10 @@ const LEGACY_ACC = { lunettes: 'face', jumelles: 'neck', casquette: 'hat', explo
 const upgrade = (a) => (a && 'acc' in a ? { ...a, [LEGACY_ACC[a.acc] || 'hat']: LEGACY_ACC[a.acc] ? a.acc : 'aucun' } : a);
 
 const TORSO = 'M12 104 C12 82 27 73 50 73 C73 73 88 82 88 104 Z';
+// Full-body figure: the head stays where it is in the bust, the body goes down to y 164.
+const FULL_TORSO = 'M30 76 C36 72.5 43 72 50 72 C57 72 64 72.5 70 76 C73 78 74 84 74 92 L73 124 L27 124 L26 92 C26 84 27 78 30 76 Z';
+const PANTS = 'M27 122 L73 122 L72 158 L54 158 L50 134 L46 158 L28 158 Z';
+const SLEEVE = 'M31 76 C25 78 22 84 21 92 L20 99 L29 100 L30 90 Z';
 const heart = (x, y, s = 1) => `M${x} ${y + 4 * s} C${x - 7 * s} ${y - s} ${x - 4 * s} ${y - 6 * s} ${x} ${y - 2.5 * s} C${x + 4 * s} ${y - 6 * s} ${x + 7 * s} ${y - s} ${x} ${y + 4 * s} Z`;
 const dots = (list, fill) => <g fill={fill}>{list.map(([x, y, r]) => <circle key={`${x},${y}`} cx={x} cy={y} r={r} />)}</g>;
 const flower = (x, y, petal, r = 2.2) => (
@@ -87,6 +121,46 @@ function Motif({ kind, ink }) {
                 {[22, 34, 46, 58, 70, 82].map((x) => <path key={x} d={`M${x} 90.5 l3 -1.8 l3 1.8 l-3 1.8 Z`} fill="#b8323a" />)}</g>;
         case 'camo':
             return <g><path d="M18 86 C24 80 32 84 30 90 C26 95 18 93 18 86 Z M44 78 C52 75 58 80 54 85 C48 88 40 84 44 78 Z M62 90 C68 84 78 88 76 95 C70 100 60 97 62 90 Z M34 98 C40 95 48 99 44 103 L32 104 Z" fill={ink} /><path d="M26 78 C30 76 34 79 31 82 C28 83 25 81 26 78 Z M60 80 C64 78 70 80 67 84 C63 85 59 83 60 80 Z M48 92 C52 90 56 93 53 96 C50 97 46 95 48 92 Z" fill="#8a8a5a" /></g>;
+        case 'clover':
+            return chest(<g fill={ink}><path d="M0 0 Q3 6 2 10" fill="none" stroke={ink} strokeWidth="1.3" />{[0, 90, 180, 270].map((r) => <path key={r} d={heart(0, -4.6, 1.1)} transform={`rotate(${r})`} />)}</g>);
+        case 'fern':
+            return chest(<g fill={ink}><path d="M0 10 Q2 0 -1 -10" fill="none" stroke={ink} strokeWidth="1.1" />{[7, 4, 1, -2, -5, -8].map((y, i) => [-1, 1].map((d) => <ellipse key={`${y}${d}`} cx={d * (4.2 - i * 0.5)} cy={y} rx={3.6 - i * 0.45} ry="1.3" transform={`rotate(${d * -22} ${d * (4.2 - i * 0.5)} ${y})`} />))}</g>);
+        case 'oak':
+            return chest(<g><path d={OAK} fill={ink} /><path d="M0 9 V-7 M0 -1 L-4 -3 M0 2 L4 0 M0 -4 L3 -6" stroke="#c97a2a" strokeWidth="0.7" fill="none" /></g>);
+        case 'cactus':
+            return chest(<g><path d="M-3 3 H-7 V-4 M3 0 H7 V-6" fill="none" stroke={ink} strokeWidth="3.4" strokeLinecap="round" /><rect x="-3.2" y="-9" width="6.4" height="19" rx="3.2" fill={ink} /><path d="M-1 -5 V7 M1.2 -3 V5" stroke="#2f7a4a" strokeWidth="0.5" />{flower(0, -10, '#ff8fb1', 1.8)}<rect x="-12" y="9.5" width="24" height="1.4" rx="0.7" fill="#c9a26a" /></g>);
+        case 'lavender':
+            return <g>{[20, 34, 48, 62, 76].map((x, i) => <g key={x}><path d={`M${x} ${94 + (i % 2) * 2} V${80 + (i % 2) * 2}`} stroke="#6aa86a" strokeWidth="0.9" />{[0, 2, 4, 6].map((d) => <g key={d}><circle cx={x - 0.9} cy={80 + (i % 2) * 2 + d} r="1.1" fill={ink} /><circle cx={x + 0.9} cy={81 + (i % 2) * 2 + d} r="1.1" fill={ink} /></g>)}</g>)}</g>;
+        case 'monstera':
+            return chest(<g><path d="M0 10 L0 6" stroke="#2f7a4a" strokeWidth="1.3" /><path d="M0 8 C-12 5 -12 -9 0 -10 C12 -9 12 5 0 8 Z" fill={ink} /><path d="M-10 -2 L-4 -1 M-9 4 L-3 2 M10 -2 L4 -1 M9 4 L3 2 M-6 -8 L-2 -4 M6 -8 L2 -4 M0 7 V-9" stroke="#f3efe6" strokeWidth="1.2" /></g>);
+        case 'blossom':
+            return <g>{[[24, 80], [40, 86], [58, 79], [74, 87], [30, 96], [50, 97], [68, 99]].map(([x, y]) => flower(x, y, ink, 2.8))}</g>;
+        case 'paws':
+            return <g>{[[28, 82, -20], [38, 92, -10], [54, 80, 10], [64, 90, 20], [76, 99, 10], [24, 100, -30]].map(([x, y, r]) => paw(x, y, r, ink))}</g>;
+        case 'bear':
+            return chest(<g><circle cx="-6" cy="-6" r="3.5" fill={ink} /><circle cx="6" cy="-6" r="3.5" fill={ink} /><circle cx="0" cy="0" r="8" fill={ink} /><ellipse cx="0" cy="3" rx="4" ry="3" fill="#c9a27a" /><ellipse cx="0" cy="1.6" rx="1.6" ry="1.1" fill="#1d1410" />{eye(-3, -2.5, 1)}{eye(3, -2.5, 1)}</g>);
+        case 'whale':
+            return chest(<g><path d="M-1 -5 Q-2 -9 -4 -10 M-1 -5 Q0 -9 2 -10" fill="none" stroke={ink} strokeWidth="0.9" /><path d="M-11 2 C-11 -5 3 -6 7 0 C9 2 10 -3 12 -5 C12 -1 11 3 8 4 C4 8 -11 8 -11 2 Z" fill={ink} /><path d="M-10 3 C-6 7 2 7 6 4 C2 5 -6 5 -10 3 Z" fill="#e8f6ff" />{eye(-6, 0, 0.9)}</g>);
+        case 'zebra':
+            return <g fill="none" stroke={ink} strokeWidth="2.6">{[16, 28, 40, 52, 64, 76, 88].map((x) => <path key={x} d={`M${x} 72 q4 6 0 12 q-4 6 0 12 q4 6 0 12`} />)}</g>;
+        case 'leopard':
+            return <g>{[[24, 80], [40, 86], [56, 79], [72, 85], [30, 96], [48, 99], [66, 97], [84, 96]].map(([x, y]) => <g key={`${x}${y}`}><circle cx={x} cy={y} r="3" fill="none" stroke={ink} strokeWidth="1.4" strokeDasharray="4 2" /><circle cx={x} cy={y} r="1.1" fill="#b87a2a" /></g>)}</g>;
+        case 'wolf':
+            return chest(<g><circle cx="3" cy="-3" r="7.5" fill={ink} /><path d="M-10 10 L-9 2 C-9 -2 -7 -4 -5 -5 L-3 -10 L-2 -5.5 C0 -5 1.5 -3 0.5 -1 L-1.5 0 C-0.5 4 0.5 7 0.5 10 Z" fill="#0e1430" /><path d="M-12 10 H12" stroke="#0e1430" strokeWidth="1.2" /></g>);
+        case 'porcini':
+            return chest(<g><path d="M-4 0 C-5 5 -5 9 -3 10 L3 10 C5 9 5 5 4 0 Z" fill="#f2e3c0" /><path d="M-10 1 C-10 -9 10 -9 10 1 Z" fill={ink} /><path d="M-6 -5 Q-3 -7 0 -6.5" fill="none" stroke="#ffffff55" strokeWidth="1.2" /></g>);
+        case 'chanterelle':
+            return chest(<g fill={ink}>{[[-6, 3, 0.9], [0, -2, 1.1], [6, 3.5, 0.85]].map(([x, y, k]) => <path key={x} d="M-4.5 -3 Q0 -0.8 4.5 -3 L1.2 6 L-1.2 6 Z" transform={`translate(${x} ${y}) scale(${k})`} />)}</g>);
+        case 'morel':
+            return chest(<g><rect x="-3" y="3" width="6" height="7" rx="2" fill="#f2e3c0" /><path d="M0 -10 C6 -8 7 2 5 4 L-5 4 C-7 2 -6 -8 0 -10 Z" fill={ink} />{[[-2, -5], [2, -5], [-3, -1], [1, -1], [4, -1.5], [-1, 2], [3, 2], [-4, 2], [0, -8]].map(([x, y]) => <ellipse key={`${x}${y}`} cx={x} cy={y} rx="1.2" ry="1.5" fill="#5a3f1d" />)}</g>);
+        case 'mushrooms':
+            return <g>{[[24, 82, '#d8322b'], [40, 90, '#b8742a'], [56, 81, '#f2a53a'], [72, 89, '#d8322b'], [32, 98, '#8b4a1d'], [62, 99, '#c9a26a'], [84, 98, '#f2a53a']].map(([x, y, c]) => mushroom(x, y, c, `${x}${y}`))}</g>;
+        case 'mountain':
+            return chest(<g><circle cx="6" cy="-6" r="3" fill="#ffd36e" /><path d="M-12 9 L-4 -6 L1 2 L5 -3 L12 9 Z" fill={ink} /><path d="M-4 -6 L-6.6 -1.2 L-4.6 -2.4 L-2.6 -1 Z M5 -3 L3.2 0 L5 -0.8 L6.6 0.4 Z" fill="#fff" /></g>);
+        case 'autumn':
+            return <g>{[[24, 82, 20, '#f2a53a'], [42, 88, -30, '#e05a2a'], [60, 80, 40, '#f2d64b'], [76, 90, -10, '#e05a2a'], [30, 98, -50, '#f2d64b'], [52, 99, 10, '#f2a53a'], [70, 100, 60, '#b8452c']].map(([x, y, r, c]) => <path key={`${x}${y}`} d={OAK} fill={c} transform={`translate(${x} ${y}) rotate(${r}) scale(0.5)`} />)}</g>;
+        case 'sunset':
+            return <g><path d="M38 96 A12 12 0 0 1 62 96 Z" fill={ink} /><path d="M20 96 H80" stroke="#6b3fa0" strokeWidth="1.2" /><path d="M42 84 q1.5 -1.5 3 0 q1.5 -1.5 3 0 M54 81 q1.2 -1.2 2.4 0 q1.2 -1.2 2.4 0" fill="none" stroke="#3b1d4a" strokeWidth="0.8" /></g>;
         case 'stars':
             return <g fill={ink}><path d="M60 80 a6 6 0 1 0 5 9 a5 5 0 1 1 -5 -9 Z" />{[[30, 84], [40, 92], [36, 80], [72, 94], [50, 98], [24, 96]].map(([x, y]) => <circle key={`${x}${y}`} cx={x} cy={y} r="1" />)}</g>;
         case 'aurora':
@@ -96,7 +170,7 @@ function Motif({ kind, ink }) {
         case 'patron':
             return <g><path d="M50 97 C39 92 40 81 52 78 C60 85 59 93 50 97 Z M50 97 C51 90 52 85 52 78" fill={ink} stroke="#173d2b" strokeWidth="0.7" /><path d="M38 73.5 Q50 82 62 73.5" fill="none" stroke={ink} strokeWidth="1.6" /></g>;
         default:
-            return null;
+            return kind?.startsWith('pet:') ? <g transform="translate(50 89) scale(0.95)"><Pet id={kind.slice(4)} /></g> : null;
     }
 }
 
@@ -238,7 +312,8 @@ function Pet({ id }) {
 }
 
 /** `animate`: the companion blinks and hops (big avatars only: profile, editor). */
-export function AvatarFigure({ avatar, size = 40, className = '', ring, animate = false }) {
+/** `full`: whole character standing, pet at the feet (`size` is then the height). */
+export function AvatarFigure({ avatar, size = 40, className = '', ring, animate = false, full = false }) {
     const uid = useId().replace(/:/g, '');
     const a = upgrade(avatar) || defaultAvatar('');
     const skin = SKINS[a.skin] || SKINS[0];
@@ -246,12 +321,21 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring, animate 
     const shirt = SHIRTS[a.shirt] || SHIRTS.foret;
     const fill = shirt.gradient ? `url(#g${uid})` : shirt.base;
     const v = `url(#v${uid})`;
+    const motif = <Motif kind={shirt.motif} ink={shirt.ink} />;
+    const arm = (
+        <g>
+            <path d="M24 98 L22 115" stroke={skin} strokeWidth="6.5" strokeLinecap="round" />
+            <circle cx="22" cy="117" r="4" fill={skin} />
+            <path d={SLEEVE} fill={fill} />
+        </g>
+    );
     return (
-        <svg viewBox="0 0 100 100" width={size} height={size} className={`shrink-0 rounded-full ${animate ? 'nd-animated' : ''} ${className}`}
+        <svg viewBox={full ? '-10 -2 120 180' : '0 0 100 100'} width={full ? Math.round(size * 120 / 180) : size} height={size}
+            className={`shrink-0 ${full ? '' : 'rounded-full'} ${animate ? 'nd-animated' : ''} ${className}`}
             style={ring ? { boxShadow: `0 0 0 2px ${ring}` } : undefined} role="img" aria-label="Avatar">
             <defs>
-                <clipPath id={`c${uid}`}><circle cx="50" cy="50" r="50" /></clipPath>
-                <clipPath id={`t${uid}`}><path d={TORSO} /></clipPath>
+                <clipPath id={`c${uid}`}>{full ? <rect x="-10" y="-2" width="120" height="180" /> : <circle cx="50" cy="50" r="50" />}</clipPath>
+                <clipPath id={`t${uid}`}><path d={full ? FULL_TORSO : TORSO} /></clipPath>
                 {/* Clay-like volume: a soft highlight from the top left, a shade along the bottom right, and a
                     small drop shadow so each layer (hat, pet, scarf…) stands out from the one beneath. */}
                 <filter id={`v${uid}`} x="-15%" y="-15%" width="130%" height="130%" colorInterpolationFilters="sRGB">
@@ -283,14 +367,36 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring, animate 
                 )}
             </defs>
             <g clipPath={`url(#c${uid})`}>
-                <rect width="100" height="100" fill={BGS[a.bg] || BGS[0]} />
-                <rect width="100" height="100" fill={`url(#b${uid})`} />
+                {full ? (
+                    <>
+                        <circle cx="50" cy="82" r="58" fill={BGS[a.bg] || BGS[0]} />
+                        <circle cx="50" cy="82" r="58" fill={`url(#b${uid})`} />
+                        <ellipse cx="50" cy="163" rx="30" ry="4" fill="#00000030" />
+                    </>
+                ) : (
+                    <>
+                        <rect width="100" height="100" fill={BGS[a.bg] || BGS[0]} />
+                        <rect width="100" height="100" fill={`url(#b${uid})`} />
+                    </>
+                )}
                 <g filter={v}><BackHair hair={a.hair} color={hairColor} /></g>
+                {full && (
+                    <g filter={v}>
+                        <path d={PANTS} fill="#34507a" />
+                        <path d="M50 124 V134" stroke="#00000033" strokeWidth="1" />
+                        <ellipse cx="37" cy="160" rx="10" ry="4.5" fill="#4a3426" />
+                        <ellipse cx="63" cy="160" rx="10" ry="4.5" fill="#4a3426" />
+                    </g>
+                )}
+                {full && <g filter={v}>{arm}<g transform="translate(100 0) scale(-1 1)">{arm}</g></g>}
                 <g filter={v}>
                     <rect x="43" y="58" width="14" height="18" rx="5" fill={skin} />
-                    <path d={TORSO} fill={fill} />
-                    <g clipPath={`url(#t${uid})`}><Motif kind={shirt.motif} ink={shirt.ink} /></g>
+                    <path d={full ? FULL_TORSO : TORSO} fill={fill} />
+                    <g clipPath={`url(#t${uid})`}>
+                        {full && shirt.repeat ? <>{motif}<g transform="translate(0 26)">{motif}</g></> : full ? <g transform="translate(50 97) scale(1.3) translate(-50 -89)">{motif}</g> : motif}
+                    </g>
                     <path d="M41 73.5 Q50 81 59 73.5" fill="none" stroke="#00000033" strokeWidth="1.6" />
+                    {full && <path d="M27 121 H73" stroke="#00000026" strokeWidth="1.4" />}
                 </g>
                 <g filter={v}><Neck id={a.neck} /></g>
                 <g filter={v}>
@@ -308,7 +414,7 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring, animate 
                 <path d="M45.5 55.5 Q50 59.5 54.5 55.5" fill="none" stroke="#7a3b2a" strokeWidth="1.5" strokeLinecap="round" />
                 <g filter={v}><Face id={a.face} hairColor={hairColor} /></g>
                 <g filter={v}><Hat id={a.hat} /></g>
-                {a.pet && a.pet !== 'aucun' && <g filter={v}><g className="nd-pet-hop"><g transform="translate(73 79) scale(1.3)"><Pet id={a.pet} /></g></g></g>}
+                {a.pet && a.pet !== 'aucun' && <g filter={v}><g className="nd-pet-hop"><g transform={full ? 'translate(88 148) scale(1.5)' : 'translate(73 79) scale(1.3)'}><Pet id={a.pet} /></g></g></g>}
             </g>
         </svg>
     );
