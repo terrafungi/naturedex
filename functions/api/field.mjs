@@ -21,6 +21,7 @@ const MIN_CONFIDENCE = 0.3;
 
 const MODEL = 'gemini-3.5-flash';
 const FREE_MODELS = [MODEL, 'gemini-flash-latest', 'gemini-flash-lite-latest'];
+const PAID_MODEL = 'gemini-3.5-flash-lite'; // paid fallback only, about 5× cheaper than MODEL
 const FIELD_CARD = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, c.iucn, c.stats`;
 
 const photoUrl = (key, small = false) => `${SITE}/${small ? key.replace(/\.jpg$/, '-s.jpg') : key}`;
@@ -72,7 +73,7 @@ async function identify(photo, where) {
     const key = process.env.GEMINI_API_KEY;
     const endpoints = [
         ...(key ? FREE_MODELS.map((m) => ({ name: `free:${m}`, url: `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, headers: { 'x-goog-api-key': key } })) : []),
-        { name: 'openkbs', url: `https://proxy.openkbs.com/v1/google/models/${MODEL}:generateContent`, headers: { Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` } },
+        { name: 'openkbs', url: `https://proxy.openkbs.com/v1/google/models/${PAID_MODEL}:generateContent`, headers: { Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` } },
     ];
     const body = JSON.stringify({
         contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'image/jpeg', data: photo.toString('base64') } }, { text: PROMPT(where) }] }],
