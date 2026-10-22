@@ -182,8 +182,13 @@ export default function Layout() {
         <div className="min-h-screen flex flex-col">
             <header className={`${home ? 'absolute' : 'sticky bg-[#05130d]/75 backdrop-blur-xl border-b border-white/[0.07]'} top-0 inset-x-0 z-40`}>
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-3">
-                    <Brand compact={!!user} />
-                    {user && <Wallet user={user} />}
+                    <Brand compact={!!user || pathname !== '/connexion'} />
+                    {user ? <Wallet user={user} /> : pathname !== '/connexion' && (
+                        <nav className="flex items-center gap-1 sm:gap-2 shrink-0">
+                            <Link to="/connexion?mode=login" className="px-3 py-2 rounded-full text-sm font-semibold text-white/85 hover:text-white hover:bg-white/10 transition-colors">Connexion</Link>
+                            <Link to="/connexion?mode=register" className="nd-cta-gold px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap">S'inscrire</Link>
+                        </nav>
+                    )}
                 </div>
             </header>
             <main className={`flex-1 ${user ? 'pb-28' : ''}`}>

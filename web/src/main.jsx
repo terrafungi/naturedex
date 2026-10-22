@@ -29,8 +29,8 @@ import Shop from './pages/Shop.jsx';
 import Combat from './pages/Combat.jsx';
 import Battle from './pages/Battle.jsx';
 
-// Sign-up is mandatory: every page (home included) needs an account, so a first
-// visit lands on the sign-up form (Auth switches to log-in for returning players).
+// Every page but the home needs an account; visitors are sent to the sign-up form
+// (Auth switches to log-in for returning players).
 function Private({ children }) {
     const { user, ready } = useGame();
     const { search } = useLocation();
@@ -39,13 +39,23 @@ function Private({ children }) {
     return user ? children : <Navigate to={`/connexion${search}`} replace />;
 }
 
+// The home is public: visitors get the presentation of the game, players their home.
+// Invite links (/?parrain=…) still go straight to the sign-up form.
+function Home() {
+    const { user, ready } = useGame();
+    const { search } = useLocation();
+    if (!ready) return <div className="py-32 text-center font-display text-xl text-ink-soft">Chargement…</div>;
+    if (!user && new URLSearchParams(search).has('parrain')) return <Navigate to={`/connexion${search}`} replace />;
+    return <Landing />;
+}
+
 createRoot(document.getElementById('root')).render(
     <StrictMode>
         <BrowserRouter>
             <GameProvider>
                 <Routes>
                     <Route element={<Layout />}>
-                        <Route path="/" element={<Private><Landing /></Private>} />
+                        <Route path="/" element={<Home />} />
                         <Route path="/connexion" element={<Auth />} />
                         <Route path="/booster" element={<Private><Boosters /></Private>} />
                         <Route path="/exploration" element={<Private><Suspense fallback={<div className="py-32 text-center font-display text-xl text-ink-soft">Chargement de la carte…</div>}><Exploration /></Suspense></Private>} />

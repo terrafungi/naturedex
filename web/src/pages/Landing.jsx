@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useInView } from 'motion/react';
-import { ArrowRight, Award, BookOpen, Brain, CalendarCheck, Camera, ChevronRight, Clock, Compass, Eye, Frame, Gavel, GalleryVerticalEnd, Gem, HeartHandshake, Leaf, Shield, Shirt, Sprout, Swords, Users, Zap } from 'lucide-react';
+import { AnimatePresence, motion, useInView } from 'motion/react';
+import { ArrowRight, Award, BookOpen, Brain, CalendarCheck, Camera, ChevronRight, Clock, Compass, Dices, Eye, Frame, Gavel, GalleryVerticalEnd, Gem, HeartHandshake, Leaf, PackageOpen, Shield, Shirt, Sparkles, Sprout, Swords, Users, Zap } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard, TypeBadge } from '../components/Card.jsx';
 import { ChallengeCard, SAMPLE_CHALLENGES } from '../components/Challenge.jsx';
+import { Pack } from '../components/Pack.jsx';
+import BoosterOpening from '../components/BoosterOpening.jsx';
 import AvatarStage from '../components/AvatarStage.jsx';
 import PatronBadge from '../components/PatronBadge.jsx';
 import { defaultAvatar } from '../components/PlayerAvatar.jsx';
@@ -19,7 +21,17 @@ const RARITY_TIERS = {
     secret: 'Les 50 espèces stars',
 };
 
+// Same odds as the server draw (functions/api).
+const SLOTS = [
+    ...Array(4).fill({ common: 70, uncommon: 30 }),
+    { uncommon: 80, rare: 17, epic: 3 },
+    { rare: 70, epic: 22, legendary: 8 },
+];
+
 const EASE = [0.16, 1, 0.3, 1];
+const SIGNUP = '/connexion?mode=register';
+// In-page anchors (the router does not scroll to #hash by itself).
+const jump = (id) => (e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); };
 
 // Deterministic shuffle so the page looks the same on every visit.
 const scramble = (list) => [...list].sort((a, b) => ((a.id * 2654435761) % 4294967296) - ((b.id * 2654435761) % 4294967296));
@@ -62,8 +74,26 @@ function useShowcase(catalog) {
         const featured = [];
         for (let k = 0; k < 6; k++) for (const lane of lanes) if (lane[k]) featured.push(lane[k]);
 
-        return { ladder, types, featured, top: of('legendary').slice(0, 6) };
+        const pools = Object.fromEntries(Object.keys(RARITIES).map((r) => [r, cards.filter((c) => c.rarity === r)]));
+
+        return { ladder, types, pools, featured, top: of('legendary').slice(0, 6) };
     }, [catalog]);
+}
+
+function drawDemo(pools) {
+    const picked = new Set();
+    return SLOTS.map((weights) => {
+        let roll = Math.random() * 100;
+        let rarity = Object.keys(weights).at(-1);
+        for (const [r, w] of Object.entries(weights)) {
+            if ((roll -= w) < 0) { rarity = r; break; }
+        }
+        const pool = pools[rarity]?.length ? pools[rarity] : pools.common;
+        let card;
+        for (let i = 0; i < 8 && (!card || picked.has(card.id)); i++) card = pool[Math.floor(Math.random() * pool.length)];
+        picked.add(card.id);
+        return card;
+    });
 }
 
 function Pill({ children, className = '' }) {
@@ -106,13 +136,14 @@ function SectionTitle({ kicker, children, sub, center }) {
 /* ---------- hero (mockup) ---------- */
 
 function Hero() {
+    const { user } = useGame();
     const fade = (delay) => ({ initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.9, delay, ease: EASE } });
     return (
         <section className="relative isolate overflow-hidden">
             <motion.div className="nd-hero-bg" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 2.4, ease: EASE }} />
             <div className="max-w-6xl mx-auto px-5 sm:px-6 pt-36 sm:pt-44 pb-14 sm:pb-24 min-h-[640px] sm:min-h-[760px] md:min-h-[min(88vh,860px)] flex flex-col justify-end">
                 <motion.div {...fade(0)}>
-                    <Link to="/exploration" className="inline-flex items-center gap-2 rounded-full nd-glass pl-1.5 pr-3.5 py-1.5 text-xs font-semibold text-white/90 hover:bg-white/10 transition-colors">
+                    <Link to={user ? '/exploration' : '#fonctionnalites'} onClick={user ? undefined : jump('fonctionnalites')} className="inline-flex items-center gap-2 rounded-full nd-glass pl-1.5 pr-3.5 py-1.5 text-xs font-semibold text-white/90 hover:bg-white/10 transition-colors">
                         <span className="rounded-full bg-[#4fd18b] text-[#05130d] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">Nouveau</span>
                         Exploration sur la carte · Avatar 3D<ChevronRight className="w-3.5 h-3.5 text-white/60" />
                     </Link>
@@ -125,11 +156,11 @@ function Hero() {
                 </motion.p>
                 <motion.div {...fade(0.4)} className="mt-8 flex items-end justify-between gap-4">
                     <div className="flex flex-col sm:flex-row gap-3">
-                        <Link to="/exploration" className="nd-cta-gold group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-bold text-sm sm:text-base whitespace-nowrap">
-                            <Compass className="w-5 h-5" />Partir en exploration<ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                        <Link to={user ? '/exploration' : SIGNUP} className="nd-cta-gold group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-bold text-sm sm:text-base whitespace-nowrap">
+                            <Compass className="w-5 h-5" />{user ? 'Partir en exploration' : 'Jouer gratuitement'}<ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                         </Link>
-                        <Link to="/booster" className="nd-cta-glass group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-semibold text-sm sm:text-base text-white whitespace-nowrap">
-                            <GalleryVerticalEnd className="w-5 h-5 text-[#a8f0c6]" />Ouvrir un booster<ChevronRight className="w-4 h-4 text-white/60 transition-transform group-hover:translate-x-0.5" />
+                        <Link to={user ? '/booster' : '#demo'} onClick={user ? undefined : jump('demo')} className="nd-cta-glass group inline-flex items-center gap-2.5 pl-4 pr-3 sm:pl-5 sm:pr-4 py-3 sm:py-3.5 rounded-full font-semibold text-sm sm:text-base text-white whitespace-nowrap">
+                            <GalleryVerticalEnd className="w-5 h-5 text-[#a8f0c6]" />{user ? 'Ouvrir un booster' : 'Essayer un booster'}<ChevronRight className="w-4 h-4 text-white/60 transition-transform group-hover:translate-x-0.5" />
                         </Link>
                     </div>
                     <p className="shrink-0 text-right text-[8px] min-[400px]:text-[9px] sm:text-[11px] font-semibold uppercase tracking-[0.22em] sm:tracking-[0.28em] leading-[2] text-white/70 pb-1">
@@ -159,14 +190,15 @@ const FEATURES = [
 ];
 
 function Features() {
+    const { user } = useGame();
     return (
-        <section className="max-w-6xl mx-auto px-5 sm:px-6 pt-8 pb-14">
+        <section id="fonctionnalites" className="scroll-mt-20 max-w-6xl mx-auto px-5 sm:px-6 pt-8 pb-14">
             <h2 className="font-display text-[1.7rem] sm:text-4xl font-medium text-white">Bien plus que des boosters</h2>
             <p className="mt-1 text-ink-soft">Tout ce que tu peux faire dans NatureDex.</p>
             <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {FEATURES.map((f, i) => (
                     <Reveal key={f.to} delay={(i % 4) * 0.06} className={i < 2 ? 'col-span-2' : ''}>
-                        <Link to={f.to} className="group relative flex flex-col h-full rounded-2xl nd-glass p-4 sm:p-5 overflow-hidden ring-1 ring-white/5 hover:ring-white/25 hover:-translate-y-0.5 transition">
+                        <Link to={user ? f.to : SIGNUP} className="group relative flex flex-col h-full rounded-2xl nd-glass p-4 sm:p-5 overflow-hidden ring-1 ring-white/5 hover:ring-white/25 hover:-translate-y-0.5 transition">
                             <span className="absolute -right-10 -top-10 w-32 h-32 rounded-full opacity-25 blur-2xl transition-opacity group-hover:opacity-45" style={{ background: f.color }} aria-hidden />
                             <span className="flex items-center gap-2">
                                 <span className="grid place-items-center w-10 h-10 rounded-xl" style={{ background: `${f.color}22`, color: f.color }}><f.Icon className="w-5 h-5" /></span>
@@ -201,8 +233,8 @@ function PassSection() {
     const stage = useRef(null);
     // three.js is only downloaded once the section comes into view.
     const seen = useInView(stage, { once: true, margin: '200px' });
-    const avatar = { ...(user.avatar || defaultAvatar(user.username)), ...PASS_LOOK };
-    const mine = user.pass;
+    const avatar = { ...(user?.avatar || defaultAvatar(user?.username || 'naturedex')), ...PASS_LOOK };
+    const mine = user?.pass;
     return (
         <section id="pass" className="px-5 sm:px-6 py-10 scroll-mt-20">
             <Reveal>
@@ -211,7 +243,7 @@ function PassSection() {
                     <div ref={stage} className="p-4 sm:p-6 md:pr-0">
                         {seen ? (
                             <AvatarStage avatar={avatar} height={400} className="shadow-2xl shadow-black/40">
-                                <span className="pointer-events-none absolute top-4 left-4 rounded-full bg-black/45 backdrop-blur px-3 py-1 text-[11px] font-bold text-[#f4d88f]">Tenue du Pass, sur ton avatar</span>
+                                <span className="pointer-events-none absolute top-4 left-4 rounded-full bg-black/45 backdrop-blur px-3 py-1 text-[11px] font-bold text-[#f4d88f]">{user ? 'Tenue du Pass, sur ton avatar' : 'La tenue exclusive du Pass'}</span>
                             </AvatarStage>
                         ) : <div className="h-[400px] rounded-3xl bg-white/5" />}
                     </div>
@@ -235,10 +267,10 @@ function PassSection() {
                             </div>
                         ) : (
                             <div className="mt-7 flex flex-wrap items-center gap-4">
-                                <Link to="/boutique" className="nd-cta-gold group inline-flex items-center gap-2 px-5 sm:px-6 py-3.5 rounded-full font-bold whitespace-nowrap">
+                                <Link to={user ? '/boutique' : SIGNUP} className="nd-cta-gold group inline-flex items-center gap-2 px-5 sm:px-6 py-3.5 rounded-full font-bold whitespace-nowrap">
                                     <Leaf className="w-5 h-5" />Prendre le Pass · 3,99 €/mois<ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                                 </Link>
-                                <span className="text-xs text-white/55">Sans engagement,<br />résiliable en un clic.</span>
+                                <span className="text-xs text-white/55">{user ? <>Sans engagement,<br />résiliable en un clic.</> : <>Crée ton compte gratuit,<br />puis active le Pass en boutique.</>}</span>
                             </div>
                         )}
                     </div>
@@ -406,6 +438,60 @@ function DailyChallenges() {
     );
 }
 
+function Demo({ show }) {
+    const [cards, setCards] = useState(null);
+    const [last, setLast] = useState(null);
+    const open = () => setCards(drawDemo(show.pools));
+    function close() {
+        setLast([...cards].sort((a, b) => RARITIES[b.rarity].order - RARITIES[a.rarity].order)[0]);
+        setCards(null);
+    }
+
+    return (
+        <section id="demo" className="px-5 py-24 scroll-mt-16">
+            <Reveal>
+                <div className="relative isolate overflow-hidden max-w-7xl mx-auto rounded-[2.5rem] nd-glass nd-ring px-6 sm:px-14 py-14 grid md:grid-cols-[1.2fr_1fr] gap-10 items-center">
+                    <Aurora className="-z-10 opacity-60" />
+                    <div>
+                        <Pill><Dices className="w-3.5 h-3.5 text-[#a8f0c6]" />Sans compte</Pill>
+                        <h2 className="mt-5 font-display text-4xl sm:text-6xl font-semibold tracking-[-0.01em] text-white leading-[1]">
+                            Essaie un booster<br /><span className="nd-grad-text">tout de suite.</span>
+                        </h2>
+                        <p className="mt-5 text-lg text-ink-soft max-w-md">Les mêmes chances que dans le vrai jeu. Touche le paquet, retourne les cartes… et croise les doigts pour une Légendaire.</p>
+                        <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold">
+                            {[['uncommon', '4 Communes ou Peu communes'], ['rare', '1 Rare garantie'], ['legendary', '8 % de Légendaire']].map(([r, label]) => (
+                                <span key={r} className="rounded-full px-3 py-1.5 border" style={{ color: RARITIES[r].color, background: `${RARITIES[r].color}18`, borderColor: `${RARITIES[r].color}55` }}>
+                                    {RARITIES[r].symbol} {label}
+                                </span>
+                            ))}
+                        </div>
+                        <button onClick={open} className="nd-btn mt-8 inline-flex items-center gap-2.5 px-7 py-4 rounded-2xl font-bold text-lg">
+                            <PackageOpen className="w-5 h-5" />Ouvrir un booster d'essai
+                        </button>
+                        {last && (
+                            <p className="mt-4 text-sm text-ink-soft">Ton dernier tirage : <b style={{ color: RARITIES[last.rarity].color }}>{last.name}</b> ({RARITIES[last.rarity].label}). Crée un compte pour garder tes cartes !</p>
+                        )}
+                    </div>
+                    <div className="relative flex justify-center py-6">
+                        <div className="nd-halo absolute left-1/2 top-1/2 w-[280px] h-[280px] -translate-x-1/2 -translate-y-1/2" />
+                        <motion.button onClick={open} aria-label="Ouvrir un booster d'essai"
+                            className="relative w-[200px] sm:w-[230px] cursor-pointer"
+                            animate={{ y: [0, -16, 0], rotate: [-4, 3, -4] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+                            whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}>
+                            <div className="drop-shadow-[0_40px_50px_rgba(40,0,90,0.6)]"><Pack /></div>
+                        </motion.button>
+                    </div>
+                </div>
+            </Reveal>
+            <AnimatePresence>
+                {cards && (
+                    <BoosterOpening key={cards.map((c) => c.id).join()} demo cards={cards} canOpenAgain onAgain={open} onClose={close} />
+                )}
+            </AnimatePresence>
+        </section>
+    );
+}
+
 function Rarity({ show }) {
     const { user } = useGame();
     const max = show.top[0]?.views || 1;
@@ -516,8 +602,39 @@ function Types({ show }) {
     );
 }
 
+function FinalCta() {
+    return (
+        <section className="px-5 pb-24">
+            <Reveal>
+                <div className="relative isolate overflow-hidden max-w-7xl mx-auto rounded-[2.5rem] px-8 sm:px-16 py-16 grid md:grid-cols-[1.4fr_1fr] gap-10 items-center bg-[linear-gradient(135deg,#0d3321,#0a2418_50%,#3a2c0c)]">
+                    <Aurora className="-z-10" />
+                    <div className="nd-rays absolute -right-40 top-1/2 w-[700px] h-[700px] -translate-y-1/2 -z-10" />
+                    <div>
+                        <Sparkles className="w-8 h-8 text-amber-300" />
+                        <h2 className="mt-4 font-display text-4xl sm:text-6xl font-semibold tracking-[-0.01em] text-white leading-[1]">Ton premier booster<br /><span className="nd-grad-text">t'attend.</span></h2>
+                        <p className="mt-5 text-white/70 text-lg max-w-md">Crée ton compte en 10 secondes, avec un pseudo et un mot de passe. 10 ouvertures gratuites t'attendent, rechargées toutes les heures.</p>
+                        <div className="mt-8 flex flex-wrap gap-3">
+                            <Link to="/connexion?mode=register" className="nd-btn inline-flex items-center gap-2.5 px-7 py-4 rounded-2xl font-bold text-lg">
+                                <PackageOpen className="w-5 h-5" />Commencer la collection
+                            </Link>
+                            <Link to="/connexion" className="inline-flex items-center gap-2 px-6 py-4 rounded-2xl nd-glass text-white font-semibold hover:bg-white/10 transition-colors">
+                                Se connecter
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="flex justify-center">
+                        <motion.div className="w-[200px] sm:w-[230px]" animate={{ y: [0, -14, 0], rotate: [6, 2, 6] }} transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}>
+                            <div className="drop-shadow-[0_40px_50px_rgba(0,0,0,0.5)]"><Pack /></div>
+                        </motion.div>
+                    </div>
+                </div>
+            </Reveal>
+        </section>
+    );
+}
+
 export default function Landing() {
-    const { catalog } = useGame();
+    const { user, catalog } = useGame();
     const show = useShowcase(catalog);
 
     return (
@@ -525,6 +642,7 @@ export default function Landing() {
             <Hero />
             {show ? <Featured cards={show.featured} /> : <div className="h-[420px]" />}
             <Features />
+            {!user && show && <Demo show={show} />}
             <PassSection />
             <BlogPosts />
             <DailyChallenges />
@@ -534,6 +652,7 @@ export default function Landing() {
                     <Types show={show} />
                 </>
             )}
+            {!user && <FinalCta />}
         </div>
     );
 }
