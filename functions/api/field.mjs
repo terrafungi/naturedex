@@ -19,9 +19,10 @@ const THREATENED = new Set(['VU', 'EN', 'CR', 'EW']); // location kept at countr
 const MAX_PHOTO = 3_000_000; // bytes, after the browser resize (~1600 px JPEG is far below)
 const MIN_CONFIDENCE = 0.3;
 
-const MODEL = 'gemini-3.5-flash';
-const FREE_MODELS = [MODEL, 'gemini-flash-latest', 'gemini-flash-lite-latest'];
-const PAID_MODEL = 'gemini-3.5-flash-lite'; // paid fallback only, about 5× cheaper than MODEL
+// Cheapest vision models first: the "lite" line costs about 20× less than gemini-3.5-flash.
+const MODEL = 'gemini-flash-lite-latest';
+const FREE_MODELS = [MODEL, 'gemini-3.5-flash-lite'];
+const PAID_MODEL = MODEL; // cheapest model in the OpenKBS proxy catalog
 const FIELD_CARD = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, c.iucn, c.stats`;
 
 const photoUrl = (key, small = false) => `${SITE}/${small ? key.replace(/\.jpg$/, '-s.jpg') : key}`;
