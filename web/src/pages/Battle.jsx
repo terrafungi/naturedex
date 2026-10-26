@@ -6,7 +6,7 @@ import { api, useGame } from '../api.jsx';
 import { TYPES } from '../game.jsx';
 import { ABILITIES, Avatar, HpBar, MultTag, PROFILES, Stats, TypeChip, matchup } from '../components/Fighter.jsx';
 import { Reward } from './Combat.jsx';
-import { sfx } from '../sfx.js';
+import { music, sfx } from '../sfx.js';
 
 const STEP_MS = 650;
 const INTENT_ICON = { attack: Swords, special: Sparkles, guard: Shield, switch: RefreshCw };
@@ -202,6 +202,7 @@ export default function Battle() {
     useEffect(() => {
         api('battle', { id }).then(({ battle: b }) => { setBattle(b); show(b); if (b.status !== 'active') setModal(true); }).catch((e) => setError(e.message));
     }, [id]);
+    useEffect(() => music.duck(), []);
     useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' }); }, [log]);
 
     async function replay(events, view) {

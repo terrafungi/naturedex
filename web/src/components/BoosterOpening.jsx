@@ -7,7 +7,7 @@ import { RARITIES } from '../game.jsx';
 import { Pack } from './Pack.jsx';
 import ShareButton from './ShareButton.jsx';
 import { FavoriteStar } from './Favorite.jsx';
-import { sfx } from '../sfx.js';
+import { music, sfx } from '../sfx.js';
 
 // Each rarity step adds an effect: halo → shockwave + sparks → light rays + tinted backdrop →
 // flash + screen shake → rainbow everything. `charge` is the suspense before the card flips.
@@ -209,7 +209,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
         const t = setTimeout(sfx.newCard, 380);
         return () => clearTimeout(t);
     }, [stage, revealed, index, cards]);
-    useEffect(() => () => sfx.stop(), []);
+    useEffect(() => { const release = music.duck(); return () => { release(); sfx.stop(); }; }, []);
 
     function next(side = -1) {
         // big pulls keep their suspense: no skipping the charge

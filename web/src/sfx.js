@@ -1,34 +1,43 @@
-// Game sound effects, synthesised with the Web Audio API (no audio files to download).
-// Every sound is a short recipe of oscillators and filtered noise through a shared reverb.
-// Muting is remembered in localStorage; browsers only allow audio after a first tap, so the
-// context is created lazily and resumed on the first pointer/key event.
+// Game audio, synthesised with the Web Audio API (no audio files to download): short sound
+// effects (recipes of oscillators and filtered noise through a shared reverb), a generative
+// ambient soundtrack, and phone vibrations on the big moments. The three settings are remembered
+// in localStorage; browsers only allow audio after a first tap, so the context is created lazily
+// and resumed on the first pointer/key event.
 import { useSyncExternalStore } from 'react';
 
-const KEY = 'nd-sound';
-let muted = typeof localStorage !== 'undefined' && localStorage.getItem(KEY) === 'off';
+const DEFAULTS = { sound: true, music: true, vibrate: true };
+const read = (k) => { try { const v = localStorage.getItem(`nd-${k}`); return v ? v === 'on' : DEFAULTS[k]; } catch { return DEFAULTS[k]; } };
+let prefs = typeof window === 'undefined' ? DEFAULTS : { sound: read('sound'), music: read('music'), vibrate: read('vibrate') };
 const listeners = new Set();
 
-export function setMuted(v) {
-    muted = v;
-    try { localStorage.setItem(KEY, v ? 'off' : 'on'); } catch { /* private mode */ }
-    if (v) stopAll();
+export function setPref(k, v) {
+    prefs = { ...prefs, [k]: v };
+    try { localStorage.setItem(`nd-${k}`, v ? 'on' : 'off'); } catch { /* private mode */ }
+    if (k === 'sound' && !v) stopAll();
+    if (k === 'music') music.refresh();
     listeners.forEach((l) => l());
 }
-export const useMuted = () => useSyncExternalStore((l) => (listeners.add(l), () => listeners.delete(l)), () => muted, () => true);
+export const usePrefs = () => useSyncExternalStore((l) => (listeners.add(l), () => listeners.delete(l)), () => prefs, () => DEFAULTS);
+// Android vibrates; iPhones ignore navigator.vibrate (Safari has no vibration API).
+export const canVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator;
+const buzz = (pattern) => { if (prefs.vibrate && canVibrate && pattern) try { navigator.vibrate(pattern); } catch { /* blocked */ } };
 
-let ctx, master, wet, noiseBuf;
-const live = new Set(); // sources still playing, so long sounds (charge) can be cut
+let ctx, master, wet, noiseBuf, musicBus;
+const live = new Set(); // sound-effect sources still playing, so long sounds (charge) can be cut
 
-function audio() {
-    if (muted || typeof window === 'undefined') return null;
+function context() {
+    if (typeof window === 'undefined') return null;
     if (!ctx) {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return null;
         ctx = new AC();
         const comp = ctx.createDynamicsCompressor();
         comp.threshold.value = -14; comp.ratio.value = 4;
+        comp.connect(ctx.destination);
         master = ctx.createGain(); master.gain.value = 0.9;
-        master.connect(comp).connect(ctx.destination);
+        master.connect(comp);
+        musicBus = ctx.createGain(); musicBus.gain.value = 0;
+        musicBus.connect(comp);
         // small hall: exponentially decaying stereo noise as the impulse response
         const len = ctx.sampleRate * 1.8, ir = ctx.createBuffer(2, len, ctx.sampleRate);
         for (let c = 0; c < 2; c++) {
@@ -38,12 +47,26 @@ function audio() {
         const verb = ctx.createConvolver(); verb.buffer = ir;
         wet = ctx.createGain(); wet.gain.value = 0.32;
         wet.connect(verb).connect(master);
+        // the music gets its own, longer reverb so it sits further back
+        const len2 = ctx.sampleRate * 4, ir2 = ctx.createBuffer(2, len2, ctx.sampleRate);
+        for (let c = 0; c < 2; c++) {
+            const d = ir2.getChannelData(c);
+            for (let i = 0; i < len2; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len2) ** 2.5;
+        }
+        const verb2 = ctx.createConvolver(); verb2.buffer = ir2;
+        musicWet = ctx.createGain(); musicWet.gain.value = 0.9;
+        musicWet.connect(verb2).connect(musicBus);
         noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
         const d = noiseBuf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     }
-    if (ctx.state === 'suspended') ctx.resume();
     return ctx;
+}
+let musicWet;
+function audio() {
+    const c = prefs.sound ? context() : null;
+    if (c?.state === 'suspended') c.resume();
+    return c;
 }
 if (typeof window !== 'undefined') {
     const unlock = () => { if (ctx?.state === 'suspended') ctx.resume(); };
@@ -115,7 +138,21 @@ const sparkle = (start, n, base = 2200, spread = 2600, gain = 0.035) => {
 };
 const hz = (m) => 440 * 2 ** ((m - 69) / 12);
 
-function play(fn) { return (...a) => { if (audio()) fn(...a); }; }
+// `vib`: vibration pattern (ms), or a function of the same arguments returning one
+function play(fn, vib) {
+    return (...a) => {
+        buzz(typeof vib === 'function' ? vib(...a) : vib);
+        if (audio()) fn(...a);
+    };
+}
+// heartbeats of the legendary/secret suspense: same timing as the sound
+function heartbeats(d) {
+    const out = [1, 49];
+    let t = 0.05, gap = 0.55;
+    while (t < d - 0.2) { out.push(45, 115, 35, Math.round((gap - 0.195) * 1000)); t += gap; gap = Math.max(0.28, gap * 0.82); }
+    return out;
+}
+const REVEAL_VIB = { rare: 25, epic: [40, 60, 40], legendary: [70, 50, 70, 50, 160], secret: [100, 60, 100, 60, 100, 60, 400] };
 
 export const sfx = {
     tap: play(() => tone({ f: 900, to: 600, dur: 0.06, type: 'triangle', gain: 0.08, reverb: 0 })),
@@ -126,7 +163,7 @@ export const sfx = {
         noise({ start: 0.05, dur: 0.22, filter: 'highpass', f: 3000, gain: 0.2, reverb: 0.1 });
         boom(0.02, 0.35, 90);
         sparkle(0.18, 6, 2600, 2000, 0.03);
-    }),
+    }, 25),
 
     // card tossed aside / dealt: airy swish
     swish: play((pan = -0.3) => noise({ dur: 0.28, f: 700, sweep: 3200, q: 1.4, gain: 0.4, attack: 0.06, reverb: 0.1, pan })),
@@ -151,7 +188,7 @@ export const sfx = {
         if (level >= 5) {
             for (let t = d * 0.35; t < d - 0.05; t += 0.06) noise({ start: t, dur: 0.08, filter: 'lowpass', f: 500, gain: 0.05 + 0.2 * (t / d), reverb: 0.2 });
         }
-    }),
+    }, (level, ms) => level >= 4 && heartbeats(ms / 1000)),
 
     // the card shows its face: one recipe per rarity, each bigger than the last
     reveal: play((rarity) => {
@@ -193,45 +230,154 @@ export const sfx = {
             tone({ f: hz(72), dur: 0.3, type: 'triangle', gain: 0.3, reverb: 0.25 });
             tone({ f: hz(79), start: 0.04, dur: 0.25, type: 'sine', gain: 0.12, reverb: 0.25 });
         }
-    }),
+    }, (rarity) => REVEAL_VIB[rarity]),
 
     // « Nouveau ! » badge pops up
     newCard: play(() => { tone({ f: hz(84), to: hz(96), dur: 0.12, type: 'square', gain: 0.06, reverb: 0.3 }); bell(hz(96), 0.08, 0.12, 0.6); }),
 
     // seeds / nuggets / prize collected
-    coin: play(() => { tone({ f: hz(83), dur: 0.09, type: 'square', gain: 0.1, reverb: 0.2 }); tone({ f: hz(88), start: 0.08, dur: 0.5, type: 'square', gain: 0.1, reverb: 0.3 }); }),
+    coin: play(() => { tone({ f: hz(83), dur: 0.09, type: 'square', gain: 0.1, reverb: 0.2 }); tone({ f: hz(88), start: 0.08, dur: 0.5, type: 'square', gain: 0.1, reverb: 0.3 }); }, 20),
 
     // garden: seed pressed into the soil, watering drops
     plant: play(() => { tone({ f: 140, to: 70, dur: 0.15, gain: 0.5, reverb: 0 }); noise({ start: 0.02, dur: 0.18, filter: 'lowpass', f: 1200, sweep: 300, gain: 0.15, reverb: 0.1 }); bell(hz(84), 0.12, 0.05, 0.5); }),
     water: play(() => [0, 0.09, 0.16, 0.27].forEach((s, i) => tone({ f: 700 + i * 180, to: 1500 + i * 250, start: s, dur: 0.08, gain: 0.09, reverb: 0.4, pan: (i % 2 ? 0.3 : -0.3) }))),
 
     // quiz
-    correct: play(() => { bell(hz(76), 0, 0.12, 0.8); bell(hz(83), 0.1, 0.13, 1.1); }),
-    wrong: play(() => { tone({ f: 220, to: 150, dur: 0.35, type: 'sawtooth', gain: 0.16, reverb: 0.1 }); tone({ f: 233, to: 155, dur: 0.35, type: 'sawtooth', gain: 0.12, reverb: 0.1 }); }),
+    correct: play(() => { bell(hz(76), 0, 0.12, 0.8); bell(hz(83), 0.1, 0.13, 1.1); }, 25),
+    wrong: play(() => { tone({ f: 220, to: 150, dur: 0.35, type: 'sawtooth', gain: 0.16, reverb: 0.1 }); tone({ f: 233, to: 155, dur: 0.35, type: 'sawtooth', gain: 0.12, reverb: 0.1 }); }, [60, 40, 60]),
 
     // battle
     attack: play((pan) => noise({ dur: 0.18, f: 900, sweep: 3500, q: 1.2, gain: 0.5, attack: 0.03, reverb: 0.1, pan })),
     special: play((pan) => {
         noise({ dur: 0.45, f: 500, sweep: 6000, q: 3, gain: 0.18, attack: 0.08, reverb: 0.4, pan });
         [72, 76, 79, 84].forEach((m, i) => tone({ f: hz(m), start: 0.05 + i * 0.05, dur: 0.4, type: 'triangle', gain: 0.05, reverb: 0.6, pan }));
-    }),
+    }, 20),
     hit: play((mult = 1, pan = 0) => {
         const big = mult > 1;
         tone({ f: big ? 160 : 130, to: 45, dur: 0.25, gain: big ? 0.6 : 0.45, reverb: 0.1, pan });
         noise({ dur: big ? 0.2 : 0.12, filter: 'lowpass', f: big ? 4000 : 2500, sweep: 300, gain: big ? 0.45 : 0.3, reverb: 0.15, pan });
         if (big) noise({ start: 0.02, dur: 0.1, filter: 'highpass', f: 3500, gain: 0.2, reverb: 0.2, pan });
-    }),
+    }, (mult) => (mult > 1 ? 60 : 30)),
     heal: play((pan) => [72, 76, 79].forEach((m, i) => tone({ f: hz(m), start: i * 0.07, dur: 0.5, gain: 0.12, attack: 0.03, reverb: 0.6, pan }))),
     shield: play((pan) => { tone({ f: 880, dur: 0.6, type: 'triangle', gain: 0.2, reverb: 0.5, pan }); tone({ f: 1320, dur: 0.4, gain: 0.12, reverb: 0.5, pan }); }),
     debuff: play((pan) => tone({ f: 500, to: 180, dur: 0.4, type: 'triangle', gain: 0.08, reverb: 0.4, pan })),
     dodge: play((pan) => noise({ dur: 0.25, f: 3000, sweep: 800, q: 2, gain: 0.2, attack: 0.02, reverb: 0.2, pan })),
-    ko: play((pan) => { tone({ f: 400, to: 60, dur: 0.7, type: 'sawtooth', gain: 0.08, reverb: 0.3, pan }); boom(0.15, 0.5, 90); }),
+    ko: play((pan) => { tone({ f: 400, to: 60, dur: 0.7, type: 'sawtooth', gain: 0.08, reverb: 0.3, pan }); boom(0.15, 0.5, 90); }, 150),
     win: play(() => {
         [[67, 0], [72, 0.13], [76, 0.26], [79, 0.39]].forEach(([m, s]) => tone({ f: hz(m), start: s, dur: 0.2, type: 'sawtooth', gain: 0.07, reverb: 0.4 }));
         [60, 64, 67, 72, 76].forEach((m) => tone({ f: hz(m), start: 0.55, dur: 2, type: 'triangle', gain: 0.07, attack: 0.03, reverb: 0.6 }));
         boom(0.55, 0.4); sparkle(0.6, 14);
-    }),
-    lose: play(() => [[67, 0], [63, 0.3], [60, 0.6]].forEach(([m, s], i) => tone({ f: hz(m), to: i === 2 ? hz(58) : undefined, start: s, dur: i === 2 ? 1.2 : 0.35, type: 'triangle', gain: 0.16, reverb: 0.5 }))),
+    }, [60, 60, 60, 60, 250]),
+    lose: play(() => [[67, 0], [63, 0.3], [60, 0.6]].forEach(([m, s], i) => tone({ f: hz(m), to: i === 2 ? hz(58) : undefined, start: s, dur: i === 2 ? 1.2 : 0.35, type: 'triangle', gain: 0.16, reverb: 0.5 })), 300),
 
-    stop: () => { if (ctx) stopAll(); },
+    stop: () => { if (ctx) stopAll(); if (canVibrate) try { navigator.vibrate(0); } catch { /* blocked */ } },
 };
+
+// Generative ambient soundtrack: slow Cmaj7 – Am7 – Fmaj7 – G chords on a warm pad, a soft wind
+// bed, a few pentatonic bell notes and some birdsong now and then — never the same twice.
+// Scheduled a few seconds ahead; quieter during booster openings and battles, silent when the
+// tab is hidden.
+const PAD = [[48, 55, 64, 71], [45, 52, 60, 67], [41, 48, 57, 64], [43, 50, 59, 62]];
+const SCALE = [72, 74, 76, 79, 81, 84, 86, 88, 91];
+const BAR = 8;
+export const music = (() => {
+    let timer = null, next = 0, bar = 0, wanted = false, ducks = 0, target = -1;
+    const on = () => wanted && prefs.music && !(typeof document !== 'undefined' && document.hidden);
+
+    function out(gain, pan, wetAmount) {
+        const p = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+        if (p.pan) p.pan.value = pan;
+        gain.connect(p).connect(musicBus);
+        const w = ctx.createGain(); w.gain.value = wetAmount; gain.connect(w).connect(musicWet);
+    }
+    function pad(f, t0, dur, gain, type, pan, detune = 0) {
+        const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = detune;
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1100;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(gain, t0 + 2.5);
+        g.gain.setValueAtTime(gain, t0 + dur - 2.5);
+        g.gain.linearRampToValueAtTime(0, t0 + dur);
+        o.connect(lp).connect(g); out(g, pan, 0.6);
+        o.start(t0); o.stop(t0 + dur + 0.1);
+    }
+    function pluck(f, t0, gain, pan) {
+        for (const [mul, k, d] of [[1, 1, 3], [2.76, 0.25, 0.8]]) {
+            const o = ctx.createOscillator(); o.frequency.value = f * mul;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.0001, t0);
+            g.gain.exponentialRampToValueAtTime(gain * k, t0 + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+            o.connect(g); out(g, pan, 1);
+            o.start(t0); o.stop(t0 + d + 0.1);
+        }
+    }
+    function bird(t0) {
+        const pan = Math.random() * 1.4 - 0.7, base = 2600 + Math.random() * 1400;
+        const n = 2 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < n; i++) {
+            const s = t0 + i * (0.11 + Math.random() * 0.05);
+            const o = ctx.createOscillator(); o.frequency.setValueAtTime(base, s);
+            o.frequency.exponentialRampToValueAtTime(base * (1.3 + Math.random() * 0.4), s + 0.07);
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.0001, s);
+            g.gain.exponentialRampToValueAtTime(0.012, s + 0.015);
+            g.gain.exponentialRampToValueAtTime(0.0001, s + 0.09);
+            o.connect(g); out(g, pan, 0.8);
+            o.start(s); o.stop(s + 0.12);
+        }
+    }
+    function wind(t0) {
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.7;
+        bp.frequency.setValueAtTime(300, t0);
+        bp.frequency.linearRampToValueAtTime(500 + Math.random() * 400, t0 + BAR / 2);
+        bp.frequency.linearRampToValueAtTime(300, t0 + BAR + 2);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(0.025, t0 + BAR / 2);
+        g.gain.linearRampToValueAtTime(0, t0 + BAR + 2);
+        src.connect(bp).connect(g); out(g, 0, 0.3);
+        src.start(t0, Math.random()); src.stop(t0 + BAR + 2.1);
+    }
+    function scheduleBar(t0, b) {
+        const chord = PAD[b % PAD.length];
+        chord.forEach((m, i) => {
+            pad(hz(m), t0, BAR + 2, 0.022, 'triangle', (i % 2 ? 0.4 : -0.4), -6);
+            pad(hz(m), t0, BAR + 2, 0.022, 'triangle', (i % 2 ? -0.4 : 0.4), 6);
+        });
+        pad(hz(chord[0] - 12), t0, BAR + 2, 0.06, 'sine', 0);
+        if (b % 2 === 0) wind(t0);
+        const notes = 2 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < notes; i++) pluck(hz(SCALE[Math.floor(Math.random() * SCALE.length)]), t0 + 0.5 + Math.random() * (BAR - 1), 0.035, Math.random() * 1.2 - 0.6);
+        if (Math.random() < 0.4) bird(t0 + 1 + Math.random() * (BAR - 2));
+    }
+    function level() {
+        if (!musicBus) return;
+        const g = on() ? (ducks > 0 ? 0.12 : 0.35) : 0;
+        if (g === target) return;
+        target = g;
+        musicBus.gain.cancelScheduledValues(ctx.currentTime);
+        musicBus.gain.setTargetAtTime(g, ctx.currentTime, g ? 0.8 : 0.25);
+    }
+    function tick() {
+        if (!ctx || ctx.state !== 'running') return;
+        level();
+        if (!on()) return;
+        if (next < ctx.currentTime) next = ctx.currentTime + 0.1;
+        while (next < ctx.currentTime + 3) { scheduleBar(next, bar++); next += BAR; }
+    }
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => tick());
+    return {
+        start() {
+            if (wanted || !context()) return;
+            wanted = true;
+            timer = setInterval(tick, 1000);
+            tick();
+        },
+        stop() { wanted = false; clearInterval(timer); timer = null; tick(); if (musicBus) level(); },
+        /** quieter while something with its own sound effects is on screen; returns the release */
+        duck() { ducks++; level(); return () => { ducks--; level(); }; },
+        refresh: () => tick(),
+    };
+})();

@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, BookOpen, Brain, Camera, Compass, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, Volume2, VolumeX, X } from 'lucide-react';
+import { Award, BookOpen, Brain, Camera, Compass, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Music, Smartphone, Trophy, User, Users, Volume2, VolumeX, X } from 'lucide-react';
 import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
-import { setMuted, sfx, useMuted } from '../sfx.js';
+import { canVibrate, music, setPref, sfx, usePrefs } from '../sfx.js';
 import AwardNotice from './AwardNotice.jsx';
 import GiftNotice from './GiftNotice.jsx';
 import NewsNotice from './NewsNotice.jsx';
@@ -81,15 +81,63 @@ const fmt = (n) => Number(n).toLocaleString('fr-FR');
 // Header wallet only: 12 345 → "12,3 k" so the name keeps its room on phones.
 const short = (n) => (n >= 10_000 ? `${(Math.floor(n / 100) / 10).toLocaleString('fr-FR')} k` : fmt(n));
 
-function SoundToggle() {
-    const muted = useMuted();
-    const Icon = muted ? VolumeX : Volume2;
+const AUDIO_PREFS = [
+    { key: 'sound', label: 'Effets sonores', Icon: Volume2 },
+    { key: 'music', label: "Musique d'ambiance", Icon: Music },
+    { key: 'vibrate', label: 'Vibrations', Icon: Smartphone, hint: canVibrate ? null : 'Pas disponible sur cet appareil' },
+];
+
+function SoundMenu() {
+    const prefs = usePrefs();
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+    useEffect(() => {
+        if (!open) return;
+        const onKey = (e) => e.key === 'Escape' && setOpen(false);
+        const onDown = (e) => !ref.current?.contains(e.target) && setOpen(false);
+        window.addEventListener('keydown', onKey);
+        window.addEventListener('pointerdown', onDown);
+        return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('pointerdown', onDown); };
+    }, [open]);
+    const silent = !prefs.sound && !prefs.music;
+    const Icon = silent ? VolumeX : Volume2;
+    function toggle(key) {
+        const v = !prefs[key];
+        setPref(key, v);
+        if (v && key === 'sound') sfx.coin();
+        if (v && key === 'vibrate') navigator.vibrate?.(40);
+    }
     return (
-        <button type="button" onClick={() => { setMuted(!muted); if (muted) sfx.tap(); }}
-            className={`shrink-0 grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 ${muted ? 'text-white/40' : 'text-white/75'}`}
-            title={muted ? 'Activer les sons' : 'Couper les sons'} aria-label={muted ? 'Activer les sons' : 'Couper les sons'} aria-pressed={!muted}>
-            <Icon className="w-[18px] h-[18px]" />
-        </button>
+        <div ref={ref} className="shrink-0">
+            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="true"
+                className={`grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 ${open ? 'bg-white/10' : ''} ${silent ? 'text-white/40' : 'text-white/75'}`}
+                title="Son, musique et vibrations" aria-label="Son, musique et vibrations">
+                <Icon className="w-[18px] h-[18px]" />
+            </button>
+            <AnimatePresence>
+                {open && (
+                    <motion.div className="absolute right-4 sm:right-6 top-full -mt-1 z-50 w-64 p-2 rounded-2xl bg-[#0b1f16] ring-1 ring-white/12 shadow-2xl"
+                            initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.15 }}>
+                            {AUDIO_PREFS.map(({ key, label, Icon: I, hint }) => {
+                                const on = prefs[key] && !hint;
+                                return (
+                                    <button key={key} type="button" role="switch" aria-checked={on} disabled={!!hint} onClick={() => toggle(key)}
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-white/[0.06] disabled:opacity-50 disabled:hover:bg-transparent">
+                                        <I className={`w-5 h-5 shrink-0 ${on ? 'text-[#8ee6a8]' : 'text-white/40'}`} />
+                                        <span className="flex-1 min-w-0">
+                                            <span className="block text-sm font-semibold text-white">{label}</span>
+                                            {hint && <span className="block text-[11px] text-white/50">{hint}</span>}
+                                        </span>
+                                        <span className={`relative w-9 h-5 rounded-full transition-colors ${on ? 'bg-[#4fd18b]' : 'bg-white/15'}`}>
+                                            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
     );
 }
 
@@ -191,13 +239,15 @@ export default function Layout() {
     const { pathname } = useLocation();
     const home = pathname === '/';
     useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+    const loggedIn = !!user;
+    useEffect(() => { if (!loggedIn) return; music.start(); return () => music.stop(); }, [loggedIn]);
 
     return (
         <div className="min-h-screen flex flex-col">
             <header className={`${home ? 'absolute' : 'sticky bg-[#05130d]/75 backdrop-blur-xl border-b border-white/[0.07]'} top-0 inset-x-0 z-40`}>
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-3">
+                <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-3">
                     <Brand compact={!!user || pathname !== '/connexion'} />
-                    {user && <SoundToggle />}
+                    {user && <SoundMenu />}
                     {user ? <Wallet user={user} /> : pathname !== '/connexion' && (
                         <nav className="flex items-center gap-1 sm:gap-2 shrink-0">
                             <Link to="/connexion?mode=login" className="px-3 py-2 rounded-full text-sm font-semibold text-white/85 hover:text-white hover:bg-white/10 transition-colors">Connexion</Link>
