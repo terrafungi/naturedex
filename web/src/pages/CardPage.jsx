@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Camera, ExternalLink, Eye, Gavel, Recycle, Ruler, Weight } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
@@ -12,6 +12,13 @@ function formatMeasure(value, unit) {
     if (value == null) return null;
     if (unit === 'kg') return value >= 1000 ? `${(value / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} t` : value >= 1 ? `${value.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} kg` : `${(value * 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} g`;
     return value >= 1 ? `${value.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} m` : `${(value * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} cm`;
+}
+
+// Opened from the collection: go back in history so it comes back with the same filters and scroll position.
+function BackLink(props) {
+    const fromCollection = useLocation().state?.fromCollection;
+    const navigate = useNavigate();
+    return <Link to="/collection" onClick={(e) => { if (fromCollection) { e.preventDefault(); navigate(-1); } }} {...props} />;
 }
 
 export default function CardPage() {
@@ -42,7 +49,7 @@ export default function CardPage() {
     if (!card.count) {
         return (
             <div className="max-w-md mx-auto px-4 py-12 text-center">
-                <Link to="/collection" className="inline-flex items-center gap-2 text-sm font-semibold text-white mb-8"><ArrowLeft className="w-4 h-4" />Collection</Link>
+                <BackLink className="inline-flex items-center gap-2 text-sm font-semibold text-white mb-8"><ArrowLeft className="w-4 h-4" />Collection</BackLink>
                 <div className="w-64 mx-auto"><MysteryCard card={card} number={number} /></div>
                 <h1 className="mt-8 font-display text-3xl font-bold">Espèce inconnue</h1>
                 <p className="mt-2 text-ink-soft">Une carte <b style={{ color: r.color }}>{r.label}</b> de type <b style={{ color: t.color }}>{t.label}</b>. Ouvre des boosters pour la découvrir !</p>
@@ -62,7 +69,7 @@ export default function CardPage() {
 
     return (
         <div className="max-w-6xl mx-auto px-4 py-10">
-            <Link to="/collection" className="inline-flex items-center gap-2 text-sm font-semibold text-white"><ArrowLeft className="w-4 h-4" />Collection</Link>
+            <BackLink className="inline-flex items-center gap-2 text-sm font-semibold text-white"><ArrowLeft className="w-4 h-4" />Collection</BackLink>
             <div className="mt-6 grid md:grid-cols-[minmax(0,380px)_1fr] gap-10 lg:gap-16 items-start">
                 <div className="relative w-full max-w-[380px] mx-auto">
                     <Card card={card} number={number} total={catalog?.total} tilt />
