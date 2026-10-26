@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Package } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { ChallengeCard } from '../components/Challenge.jsx';
+import { sfx } from '../sfx.js';
 import { Amount } from '../components/Currency.jsx';
 
 export default function Challenges() {
@@ -18,6 +19,7 @@ export default function Challenges() {
         setError('');
         try {
             const res = await api('claimChallenge', { key });
+            sfx.coin();
             setUser(res.user);
             setData(res);
         } catch (err) {

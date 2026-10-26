@@ -7,6 +7,7 @@ import { RARITIES } from '../game.jsx';
 import { Pack } from './Pack.jsx';
 import ShareButton from './ShareButton.jsx';
 import { FavoriteStar } from './Favorite.jsx';
+import { sfx } from '../sfx.js';
 
 // Each rarity step adds an effect: halo → shockwave + sparks → light rays + tinted backdrop →
 // flash + screen shake → rainbow everything. `charge` is the suspense before the card flips.
@@ -194,14 +195,27 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
     useEffect(() => {
         if (stage !== 'reveal') return;
         setRevealed(false);
-        const t = setTimeout(() => setRevealed(true), fxOf(cards[index]).charge);
+        const f = fxOf(cards[index]);
+        if (f.level >= 2) sfx.charge(f.level, f.charge);
+        const t = setTimeout(() => setRevealed(true), f.charge);
         return () => clearTimeout(t);
     }, [stage, index, cards]);
+
+    useEffect(() => {
+        if (stage !== 'reveal' || !revealed) return;
+        sfx.flip();
+        sfx.reveal(cards[index].rarity);
+        if (!cards[index].isNew) return;
+        const t = setTimeout(sfx.newCard, 380);
+        return () => clearTimeout(t);
+    }, [stage, revealed, index, cards]);
+    useEffect(() => () => sfx.stop(), []);
 
     function next(side = -1) {
         // big pulls keep their suspense: no skipping the charge
         if (!revealed) return fx.level < 2 && setRevealed(true);
         setDir(side);
+        sfx.swish(side * 0.4);
         if (index + 1 < cards.length) setIndex(index + 1);
         else setStage('summary');
     }
@@ -240,7 +254,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                         <motion.div key="pack" className="flex flex-col items-center gap-8"
                             exit={{ scale: 1.4, opacity: 0, filter: 'brightness(3)' }} transition={{ duration: 0.35 }}>
                             <motion.button
-                                onClick={() => setStage('reveal')}
+                                onClick={() => { sfx.tear(); setStage('reveal'); }}
                                 className="w-[220px] sm:w-[250px]"
                                 animate={{ rotate: [0, -2, 2, -2, 0], y: [0, -4, 0] }}
                                 transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 0.6 }}
@@ -291,7 +305,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                     </motion.p>
                                 )}
                             </div>
-                            <button onClick={() => setStage('summary')} className="text-paper/60 text-sm underline hover:text-paper">Tout révéler</button>
+                            <button onClick={() => { sfx.stop(); sfx.swish(0); setStage('summary'); }} className="text-paper/60 text-sm underline hover:text-paper">Tout révéler</button>
                         </motion.div>
                     )}
 

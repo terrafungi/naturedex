@@ -7,6 +7,7 @@ import {
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { Amount } from '../components/Currency.jsx';
+import { sfx } from '../sfx.js';
 import { IUCN, RARITIES, TYPES } from '../game.jsx';
 
 const THEME_STYLE = {
@@ -303,6 +304,7 @@ function QuizRun({ id, onExit }) {
         try {
             const res = await api('quizAnswer', { id, index: q.index, choice });
             setFeedback(res);
+            res.correct ? sfx.correct() : sfx.wrong();
             setData((d) => ({ ...d, quiz: res.quiz }));
             setRecap((r) => [...r, { learn: res.learn, correct: res.correct, kind: q.kind }]);
             if (res.done) {

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Amount } from '../components/Currency.jsx';
+import { sfx } from '../sfx.js';
 import { TYPES } from '../game.jsx';
 
 const ICONS = {
@@ -83,6 +84,7 @@ export default function Trophies() {
         setMessage('');
         try {
             const res = await api(action, params);
+            sfx.coin();
             setUser(res.user);
             setTrophies(res.trophies);
             done?.(res);

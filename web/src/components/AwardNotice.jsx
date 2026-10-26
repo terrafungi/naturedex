@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Crown, Frame } from 'lucide-react';
 import { Nugget, NUGGET_COLOR } from './Currency.jsx';
 import { api, useGame } from '../api.jsx';
+import { sfx } from '../sfx.js';
 import { hasNews } from '../news.js';
 
 const MEDALS = ['#e9c46a', '#c3ccd8', '#cd8a4a'];
@@ -35,6 +36,7 @@ export default function AwardNotice() {
         setError('');
         try {
             const r = await api('claimShowcaseAward', { week: award.week });
+            sfx.coin();
             setDone(award);
             setAwards((list) => list.filter((a) => a.week !== award.week));
             setUser(r.user);

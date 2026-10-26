@@ -5,6 +5,7 @@ import { ArrowRight, Clock, Gift, Droplets, Lock, Package, Plus, Recycle, Sparkl
 import { Link } from 'react-router-dom';
 import { Amount, Nugget, Plant, Seed } from '../components/Currency.jsx';
 import { api, useGame } from '../api.jsx';
+import { sfx } from '../sfx.js';
 import BoosterOpening from '../components/BoosterOpening.jsx';
 
 const SEED_ORDER = ['radis', 'tournesol', 'chene', 'rose'];
@@ -301,6 +302,7 @@ export default function Garden() {
         setError('');
         try {
             const res = await api(action, params);
+            ({ plant: sfx.plant, water: sfx.water, harvest: sfx.coin, convert: sfx.coin, unlockPlot: sfx.coin })[action]?.();
             if (res.garden) setGarden(res.garden);
             setUser(res.user);
             return res;

@@ -6,11 +6,26 @@ import { api, useGame } from '../api.jsx';
 import { TYPES } from '../game.jsx';
 import { ABILITIES, Avatar, HpBar, MultTag, PROFILES, Stats, TypeChip, matchup } from '../components/Fighter.jsx';
 import { Reward } from './Combat.jsx';
+import { sfx } from '../sfx.js';
 
 const STEP_MS = 650;
 const INTENT_ICON = { attack: Swords, special: Sparkles, guard: Shield, switch: RefreshCw };
 const same = (a, b) => a.kind === b.kind && (a.kind !== 'switch' || a.to === b.to);
 const clone = (o) => JSON.parse(JSON.stringify(o));
+
+// one sound per battle event, panned to the side it happens on
+function eventSound(e) {
+    const pan = e.side === 0 ? -0.35 : 0.35;
+    if (e.kind === 'act') return e.special ? sfx.special(pan) : sfx.attack(pan);
+    if (e.kind === 'damage') return sfx.hit(e.source?.mult, pan);
+    if (e.kind === 'heal' || e.kind === 'boost') return sfx.heal(pan);
+    if (e.kind === 'shield') return sfx.shield(pan);
+    if (e.kind === 'dodge') return sfx.dodge(pan);
+    if (e.kind === 'poison' || e.kind === 'weak' || e.kind === 'drain') return sfx.debuff(pan);
+    if (e.kind === 'ko') return sfx.ko(pan);
+    if (e.kind === 'switch') return sfx.swish(pan);
+    if (e.kind === 'end') return e.winner === 0 ? sfx.win() : sfx.lose();
+}
 
 function Energy({ value, max = 5, label }) {
     return (
@@ -211,6 +226,7 @@ export default function Battle() {
                 setFlash((p) => e.side === 0 ? [fl, p[1]] : [p[0], fl]);
             }
             setShown(clone(cur));
+            eventSound(e);
             if (text) setLog((l) => [...l.slice(-60), { n: n.current + Math.random(), side: e.side, text, mine: e.side === 0, who: e.side != null ? names(e.side) : null }]);
             await new Promise((r) => setTimeout(r, e.kind === 'info' || e.kind === 'end' ? STEP_MS * 0.6 : STEP_MS));
         }
@@ -240,6 +256,7 @@ export default function Battle() {
         setBusy(true);
         try {
             const { battle: b } = await api('battleForfeit', { id });
+            sfx.lose();
             setBattle(b);
             show(b);
             refreshBadges?.();

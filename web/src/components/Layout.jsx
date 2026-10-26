@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, BookOpen, Brain, Camera, Compass, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, X } from 'lucide-react';
+import { Award, BookOpen, Brain, Camera, Compass, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Trophy, User, Users, Volume2, VolumeX, X } from 'lucide-react';
 import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
+import { setMuted, sfx, useMuted } from '../sfx.js';
 import AwardNotice from './AwardNotice.jsx';
 import GiftNotice from './GiftNotice.jsx';
 import NewsNotice from './NewsNotice.jsx';
@@ -79,6 +80,18 @@ function Brand({ compact }) {
 const fmt = (n) => Number(n).toLocaleString('fr-FR');
 // Header wallet only: 12 345 → "12,3 k" so the name keeps its room on phones.
 const short = (n) => (n >= 10_000 ? `${(Math.floor(n / 100) / 10).toLocaleString('fr-FR')} k` : fmt(n));
+
+function SoundToggle() {
+    const muted = useMuted();
+    const Icon = muted ? VolumeX : Volume2;
+    return (
+        <button type="button" onClick={() => { setMuted(!muted); if (muted) sfx.tap(); }}
+            className={`shrink-0 grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 ${muted ? 'text-white/40' : 'text-white/75'}`}
+            title={muted ? 'Activer les sons' : 'Couper les sons'} aria-label={muted ? 'Activer les sons' : 'Couper les sons'} aria-pressed={!muted}>
+            <Icon className="w-[18px] h-[18px]" />
+        </button>
+    );
+}
 
 function Wallet({ user }) {
     return (
@@ -184,6 +197,7 @@ export default function Layout() {
             <header className={`${home ? 'absolute' : 'sticky bg-[#05130d]/75 backdrop-blur-xl border-b border-white/[0.07]'} top-0 inset-x-0 z-40`}>
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[4.5rem] sm:h-20 flex items-center gap-3">
                     <Brand compact={!!user || pathname !== '/connexion'} />
+                    {user && <SoundToggle />}
                     {user ? <Wallet user={user} /> : pathname !== '/connexion' && (
                         <nav className="flex items-center gap-1 sm:gap-2 shrink-0">
                             <Link to="/connexion?mode=login" className="px-3 py-2 rounded-full text-sm font-semibold text-white/85 hover:text-white hover:bg-white/10 transition-colors">Connexion</Link>

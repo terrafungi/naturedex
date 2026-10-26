@@ -8,6 +8,7 @@ import { api, useGame } from '../api.jsx';
 import { Amount } from '../components/Currency.jsx';
 import { useCountdown } from './Boosters.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
+import { sfx } from '../sfx.js';
 import { ABILITIES, AbilityLine, Avatar, MultTag, PROFILES, RarityDot, STRONG, Stats, TypeChip, WEAK_TO, matchup } from '../components/Fighter.jsx';
 
 const AI_LEVEL = { 1: 'Débutant', 2: 'Tacticien', 3: 'Expert' };
@@ -436,6 +437,7 @@ export default function Combat() {
         setBusy(true);
         try {
             const res = await api('seasonClaim', { season });
+            sfx.coin();
             setUser(res.user);
             refreshBadges?.();
             await load();
