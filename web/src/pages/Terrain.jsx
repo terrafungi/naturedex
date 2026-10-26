@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, Camera, Check, Flag, Layers, MapPin, Sparkles, Trash2, Users, X } from 'lucide-react';
+import { AlertTriangle, Camera, Check, Flag, Layers, MapPin, RefreshCw, Sparkles, Trash2, Users, X } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, FieldCard } from '../components/Card.jsx';
 import { Amount } from '../components/Currency.jsx';
@@ -60,7 +60,7 @@ export default function Terrain() {
     const [journal, setJournal] = useState(null);
     const [feed, setFeed] = useState(null);
     const [open, setOpen] = useState(null);
-    const input = useRef(null);
+    const [camera, setCamera] = useState(false);
 
     const loadJournal = () => api('fieldJournal').then((r) => { setJournal(r.cards); setDaily(r.daily); }).catch((e) => setError(e.message));
     useEffect(() => { loadJournal(); }, []);
@@ -71,17 +71,15 @@ export default function Terrain() {
         setGeo(!geo);
     }
 
-    async function onFile(e) {
-        const file = e.target.files?.[0];
-        e.target.value = '';
-        if (!file) return;
+    // A frame of the live camera (never a file: gallery and computer uploads are not allowed).
+    async function onCapture(frame, token) {
+        setCamera(false);
         setError(''); setResult(null);
-        setPreview(URL.createObjectURL(file));
+        setPreview(frame.toDataURL('image/jpeg', 0.8));
         setStep('analysing');
         try {
-            const [bitmap, where] = await Promise.all([createImageBitmap(file, { imageOrientation: 'from-image' }), position()]);
-            const body = { photo: jpeg(bitmap, PHOTO_SIZE, 0.85), thumb: jpeg(bitmap, THUMB_SIZE, 0.8), dhash: dhash(bitmap), ...(where || {}) };
-            bitmap.close?.();
+            const where = await position();
+            const body = { photo: jpeg(frame, PHOTO_SIZE, 0.85), thumb: jpeg(frame, THUMB_SIZE, 0.8), dhash: dhash(frame), camera: token, ...(where || {}) };
             const res = await api('fieldIdentify', body);
             setDaily(res.daily);
             setResult(res);
@@ -114,7 +112,7 @@ export default function Terrain() {
     }
 
     const busy = step === 'analysing' || step === 'confirming';
-    const shot = () => input.current?.click();
+    const shot = () => { setError(''); setCamera(true); };
 
     return (
         <div className="max-w-5xl mx-auto px-4 py-10">
@@ -128,7 +126,7 @@ export default function Terrain() {
                 </p>
             </div>
 
-            <input ref={input} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+            {camera && <LiveCamera onCapture={onCapture} onClose={() => setCamera(false)} />}
 
             <div className="mt-8 max-w-xl mx-auto p-5 sm:p-6 rounded-3xl nd-glass">
                 <AnimatePresence mode="wait">
@@ -138,6 +136,7 @@ export default function Terrain() {
                                 className="nd-btn inline-flex items-center gap-3 px-8 py-4 rounded-full text-lg font-bold disabled:opacity-50">
                                 <Camera className="w-6 h-6" />Prendre une photo
                             </button>
+                            <p className="mt-2 text-xs text-white/55">En direct avec l'appareil photo uniquement : pas d'import depuis la galerie ou l'ordinateur.</p>
                             {daily && (
                                 <p className="mt-4 text-sm text-white/70">
                                     {daily.rewardsLeft > 0
@@ -259,6 +258,92 @@ export default function Terrain() {
             <FieldViewer obs={open} onClose={() => setOpen(null)}
                 onDeleted={(id) => { setJournal((j) => j?.filter((o) => o.id !== id)); setFeed(null); setOpen(null); }} />
         </div>
+    );
+}
+
+/** Full-screen live viewfinder: the only way to take a field photo. */
+function LiveCamera({ onCapture, onClose }) {
+    const video = useRef(null);
+    const [facing, setFacing] = useState('environment');
+    const [token, setToken] = useState(null);
+    const [ready, setReady] = useState(false);
+    const [flash, setFlash] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => { api('fieldCamera').then((r) => setToken(r.token)).catch((e) => setError(e.message)); }, []);
+
+    useEffect(() => {
+        let stream, cancelled = false;
+        setReady(false);
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setError("Ton navigateur ne donne pas accès à l'appareil photo. Ouvre NatureDex sur ton téléphone, dans Chrome ou Safari.");
+            return undefined;
+        }
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false })
+            .then((s) => {
+                if (cancelled) { s.getTracks().forEach((t) => t.stop()); return; }
+                stream = s;
+                video.current.srcObject = s;
+                video.current.play().catch(() => {});
+            })
+            .catch((e) => setError(e.name === 'NotAllowedError'
+                ? "Accès à l'appareil photo refusé. Autorise la caméra pour naturedex.fr dans les réglages de ton navigateur, puis réessaie."
+                : e.name === 'NotFoundError' || e.name === 'OverconstrainedError'
+                    ? "Aucun appareil photo trouvé. Le mode terrain se joue avec l'appareil photo de ton téléphone."
+                    : "Impossible d'ouvrir l'appareil photo."));
+        return () => { cancelled = true; stream?.getTracks().forEach((t) => t.stop()); };
+    }, [facing]);
+
+    useEffect(() => {
+        const onKey = (e) => e.key === 'Escape' && onClose();
+        window.addEventListener('keydown', onKey);
+        const overflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = overflow; };
+    }, [onClose]);
+
+    function capture() {
+        const v = video.current;
+        if (!ready || !token || !v.videoWidth) return;
+        const frame = document.createElement('canvas');
+        frame.width = v.videoWidth; frame.height = v.videoHeight;
+        frame.getContext('2d').drawImage(v, 0, 0);
+        setFlash(true);
+        setTimeout(() => onCapture(frame, token), 120);
+    }
+
+    return createPortal(
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+            <video ref={video} playsInline muted autoPlay onLoadedData={() => setReady(true)}
+                className={`flex-1 min-h-0 w-full object-cover ${facing === 'user' ? '-scale-x-100' : ''}`} />
+            {flash && <div className="absolute inset-0 bg-white animate-pulse" />}
+            <button onClick={onClose} aria-label="Fermer l'appareil photo"
+                className="absolute top-4 right-4 w-11 h-11 grid place-items-center rounded-full bg-black/50 text-white" style={{ marginTop: 'env(safe-area-inset-top)' }}>
+                <X className="w-6 h-6" />
+            </button>
+            {error ? (
+                <div className="absolute inset-0 grid place-items-center p-6">
+                    <div className="max-w-sm p-5 rounded-3xl bg-[#0b1f16] border border-white/10 text-center">
+                        <Camera className="w-8 h-8 mx-auto text-[#ffb4a2]" />
+                        <p className="mt-3 text-white/85">{error}</p>
+                        <button onClick={onClose} className="mt-4 nd-btn px-6 py-2.5 rounded-full font-bold">Fermer</button>
+                    </div>
+                </div>
+            ) : (
+                <div className="absolute inset-x-0 bottom-0 pt-6 pb-8 flex items-center justify-center gap-10 bg-gradient-to-t from-black/70 to-transparent" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+                    <span className="w-12" />
+                    <button onClick={capture} disabled={!ready || !token} aria-label="Prendre la photo"
+                        className="w-20 h-20 rounded-full border-4 border-white grid place-items-center disabled:opacity-40">
+                        <span className="w-16 h-16 rounded-full bg-white active:scale-90 transition-transform" />
+                    </button>
+                    <button onClick={() => setFacing((f) => (f === 'environment' ? 'user' : 'environment'))} aria-label="Changer de caméra"
+                        className="w-12 h-12 grid place-items-center rounded-full bg-black/50 text-white">
+                        <RefreshCw className="w-5 h-5" />
+                    </button>
+                </div>
+            )}
+        </div>,
+        document.body,
     );
 }
 

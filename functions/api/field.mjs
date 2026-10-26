@@ -18,6 +18,19 @@ const REPORTS_TO_HIDE = 3;
 const THREATENED = new Set(['VU', 'EN', 'CR', 'EW']); // location kept at country level only
 const MAX_PHOTO = 3_000_000; // bytes, after the browser resize (~1600 px JPEG is far below)
 const MIN_CONFIDENCE = 0.3;
+const CAMERA_TTL = 5 * 60_000; // a live photo must be sent within 5 min of opening the camera
+
+// Live camera only: the viewfinder asks for a signed token when it opens, the photo must carry it.
+let secret;
+const sign = (s) => crypto.createHmac('sha256', secret ??= crypto.createHash('sha256')
+    .update(`camera:${process.env.OPENKBS_API_KEY || 'naturedex'}`).digest()).update(s).digest('base64url');
+const cameraToken = (userId) => { const t = `${userId}.${Date.now()}`; return `${t}.${sign(t)}`; };
+function cameraTokenOk(token, userId) {
+    const [u, at, mac] = String(token || '').split('.');
+    if (!mac || u !== String(userId) || Date.now() - Number(at) > CAMERA_TTL || Number(at) > Date.now() + 60_000) return false;
+    const want = Buffer.from(sign(`${u}.${at}`)), got = Buffer.from(mac);
+    return want.length === got.length && crypto.timingSafeEqual(want, got);
+}
 
 // Cheapest vision models first: the "lite" line costs about 20× less than gemini-3.5-flash.
 const MODEL = 'gemini-flash-lite-latest';
@@ -146,9 +159,16 @@ export function fieldActions({ requireUser, inTransaction, HttpError, publicUser
     };
 
     return {
-        // { photo, thumb: base64 JPEG, dhash: 16 hex, lat, lon } → candidates to confirm, or a rejection
+        // The live viewfinder opened: token that the next photo must carry.
+        async fieldCamera(db, body, event) {
+            const user = await requireUser(db, event);
+            return { token: cameraToken(user.id) };
+        },
+
+        // { photo, thumb: base64 JPEG, dhash: 16 hex, lat, lon, camera: token } → candidates to confirm, or a rejection
         async fieldIdentify(db, body, event) {
             const user = await requireUser(db, event);
+            if (!cameraTokenOk(body.camera, user.id)) throw new HttpError(400, "Les photos se prennent en direct avec l'appareil photo : rouvre la caméra et réessaie.");
             const daily = await dailyState(db, user.id);
             if (!daily.attemptsLeft) throw new HttpError(429, `Tu as fait ${DAILY_ATTEMPTS} identifications aujourd'hui : reviens demain !`);
             const photo = decodeJpeg(body.photo, 'Photo', HttpError);
