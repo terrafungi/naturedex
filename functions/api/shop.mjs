@@ -41,6 +41,7 @@ export const PASS = {
     dailyNuggets: 40,
     catches: 5, // extra exploration catches a day
     quizzes: 2, // extra quizzes a day
+    chargeMinutes: 45, // a free booster every 45 min instead of every hour
 };
 export const passActive = (user) => !!user?.pass_until && new Date(user.pass_until).getTime() > Date.now();
 

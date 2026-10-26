@@ -115,6 +115,11 @@ export default function Boosters() {
                         <span>{nextCharge ? <>Prochaine charge dans <b className="text-white tabular-nums">{nextCharge}</b></> : 'Jauge pleine'}</span>
                         <span>+1 {user.chargeMinutes === 60 ? 'toutes les heures' : `toutes les ${user.chargeMinutes} min`}</span>
                     </p>
+                    {!user.pass && (
+                        <Link to="/boutique" className="relative mt-1 text-xs font-semibold text-[#f4d88f] hover:underline">
+                            Avec le Pass Naturaliste : +1 toutes les 45 min
+                        </Link>
+                    )}
                     <button
                         disabled={busy || !canOpen}
                         onClick={open}

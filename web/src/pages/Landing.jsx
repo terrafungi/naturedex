@@ -222,6 +222,7 @@ const PASS_PERKS = [
     [CalendarCheck, 'Bonus du jour doublé', '200 graines + 40 pépites chaque jour'],
     [Compass, '15 captures par jour', 'en Exploration, au lieu de 10'],
     [Brain, '5 quiz par jour', 'au lieu de 3'],
+    [Clock, 'Booster gratuit toutes les 45 min', 'au lieu de toutes les heures'],
     [Shirt, '5 objets d\'avatar exclusifs', 'Mécène, Lauriers d\'or, Faon, garde forestier, Baskets ailées'],
     [Leaf, 'Badge Mécène', 'à côté de ton pseudo'],
     [HeartHandshake, '0,80 € par mois pour la nature', 'reversés à la LPO, au WWF France ou à Humanité & Biodiversité'],

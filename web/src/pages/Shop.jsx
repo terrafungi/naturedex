@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Brain, CalendarCheck, Check, CheckCircle2, Compass, ExternalLink, FlaskConical, HeartHandshake, Info, Leaf, Loader2, Lock, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
+import { Brain, CalendarCheck, Clock, Check, CheckCircle2, Compass, ExternalLink, FlaskConical, HeartHandshake, Info, Leaf, Loader2, Lock, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
 import InviteBanner from '../components/InviteBanner.jsx';
 import { api, useGame } from '../api.jsx';
 import { Amount, Nugget, Seed } from '../components/Currency.jsx';
@@ -154,6 +154,7 @@ function PassCard({ shop, user, assoc, ret, onUser }) {
         [CalendarCheck, <>Bonus du jour doublé : <Amount seeds={p.dailyBase + p.dailyCoins} /> + <Amount nuggets={p.dailyNuggets} /></>],
         [Compass, <><b className="text-white">{p.catchBase + p.catches} captures</b> par jour en Exploration au lieu de {p.catchBase}</>],
         [Brain, <><b className="text-white">{p.quizBase + p.quizzes} quiz</b> par jour au lieu de {p.quizBase}</>],
+        [Clock, <>Un booster gratuit <b className="text-white">toutes les {p.chargeMinutes} min</b> au lieu de {p.chargeBase === 60 ? '1 h' : `${p.chargeBase} min`}</>],
         [Leaf, <>Badge <b className="text-white">Mécène</b> à côté de ton pseudo</>],
         [HeartHandshake, <><b className="text-[#a8f0c6]">{euros(p.donation)} chaque mois</b> pour {assoc.name}</>],
     ];

@@ -121,12 +121,13 @@ async function requireUser(db, event) {
     return rows[0];
 }
 
-// Free openings: `charges` as of `charges_at`, plus one every hour up to the cap.
+// Free openings: `charges` as of `charges_at`, plus one every hour (45 min with the Pass) up to the cap.
+const chargeMs = (user) => (passActive(user) ? PASS.chargeMinutes * 60000 : CHARGE_MS);
 function chargeState(user, now = Date.now()) {
-    const from = new Date(user.charges_at).getTime();
-    const ticks = Math.max(0, Math.floor((now - from) / CHARGE_MS));
+    const from = new Date(user.charges_at).getTime(), step = chargeMs(user);
+    const ticks = Math.max(0, Math.floor((now - from) / step));
     const charges = Math.min(MAX_CHARGES, user.charges + ticks);
-    return { charges, ticks, from, nextAt: charges >= MAX_CHARGES ? null : from + (ticks + 1) * CHARGE_MS };
+    return { charges, ticks, from, step, nextAt: charges >= MAX_CHARGES ? null : from + (ticks + 1) * step };
 }
 
 const quizPerDay = (user) => QUIZ_PER_DAY + (passActive(user) ? PASS.quizzes : 0);
@@ -147,7 +148,7 @@ async function publicUser(db, user) {
         boosters: user.boosters,
         charges: charge.charges,
         maxCharges: MAX_CHARGES,
-        chargeMinutes: CHARGE_MS / 60000,
+        chargeMinutes: chargeMs(user) / 60000,
         nextChargeAt: charge.nextAt && new Date(charge.nextAt).toISOString(),
         boosterPrice: BOOSTER_PRICE,
         plants: user.plants,
@@ -1265,7 +1266,7 @@ const actions = {
             let update, params, paidWith;
             if (charge.charges > 0) {
                 // A full gauge starts its 30-minute timer at this opening; otherwise keep the timer running.
-                const since = charge.charges >= MAX_CHARGES ? now : charge.from + charge.ticks * CHARGE_MS;
+                const since = charge.charges >= MAX_CHARGES ? now : charge.from + charge.ticks * charge.step;
                 [update, params, paidWith] = [`charges = $2, charges_at = $3`, [charge.charges - 1, new Date(since)], 'charge'];
             } else if (current.boosters > 0) {
                 [update, params, paidWith] = [`boosters = boosters - 1`, [], 'booster'];
@@ -2487,7 +2488,7 @@ const actions = {
                 id, ...a, donated: byAssoc[id]?.donated || 0, purchases: byAssoc[id]?.purchases || 0,
             })),
             totalDonated: totals.reduce((sum, t) => sum + t.donated, 0),
-            pass: { ...PASS, donation: donationOf(PASS.price), dailyBase: DAILY_COINS, quizBase: QUIZ_PER_DAY, catchBase: 10 },
+            pass: { ...PASS, donation: donationOf(PASS.price), dailyBase: DAILY_COINS, quizBase: QUIZ_PER_DAY, catchBase: 10, chargeBase: CHARGE_MS / 60000 },
             purchases: mine.map(shapePurchase),
             user: await publicUser(db, await requireUser(db, event)),
         };
