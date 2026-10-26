@@ -1449,9 +1449,10 @@ const actions = {
                AND ($5 = '' OR (uc.count IS NOT NULL AND (c.name ILIKE '%' || $5 || '%' OR c.sci_name ILIKE '%' || $5 || '%')))
                AND ($8::int IS NULL OR EXISTS (SELECT 1 FROM binder_cards bc JOIN binders b ON b.id = bc.binder_id
                     WHERE bc.card_id = c.id AND b.user_id = $1 AND ($8 = 0 OR b.id = $8)))
+               AND (NOT $9 OR uc.count > 1)
              ORDER BY uc.count IS NULL, ${RARITY_ORDER} DESC, c.num
              LIMIT $6 OFFSET $7`,
-            [user.id, body.type || null, body.rarity || null, Boolean(body.onlyOwned || q || binder != null), q, limit, offset, binder]
+            [user.id, body.type || null, body.rarity || null, Boolean(body.onlyOwned || q || binder != null), q, limit, offset, binder, Boolean(body.duplicates)]
         );
         return {
             matches: rows[0]?.matches || 0,

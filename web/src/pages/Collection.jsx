@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FolderPlus, Frame, Pencil, Recycle, Search, Star, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigationType } from 'react-router-dom';
+import { Copy, FolderPlus, Frame, Pencil, Recycle, Search, Star, Trash2 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { FavoriteStar } from '../components/Favorite.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
 
 const PAGE = 60;
+
+// Filters, loaded cards and scroll position, so coming back from a card (« retour ») lands where you were.
+let saved = null;
 
 function Chip({ active, onClick, children, color }) {
     return (
@@ -22,12 +25,15 @@ function Chip({ active, onClick, children, color }) {
 
 export default function Collection() {
     const { catalog, owned, ownedInfo, user, setUser, favs, setFavs, refreshCollection } = useGame();
-    const [binder, setBinder] = useState(null); // null = whole collection, 'all' = every favourite, or a binder id
-    const [type, setType] = useState(null);
-    const [rarity, setRarity] = useState(null);
-    const [query, setQuery] = useState('');
-    const [debounced, setDebounced] = useState('');
-    const [page, setPage] = useState(null); // { cards, matches } for the current filters
+    const restore = useRef(useNavigationType() === 'POP' ? saved : null).current;
+    const [binder, setBinder] = useState(restore?.binder ?? null); // null = whole collection, 'all' = every favourite, or a binder id
+    const [dupes, setDupes] = useState(restore?.dupes ?? false); // only the cards owned more than once
+    const [type, setType] = useState(restore?.type ?? null);
+    const [rarity, setRarity] = useState(restore?.rarity ?? null);
+    const [query, setQuery] = useState(restore?.query ?? '');
+    const [debounced, setDebounced] = useState(restore?.query ?? '');
+    const [page, setPage] = useState(restore?.page ?? null); // { cards, matches } for the current filters
+    const skipFetch = useRef(!!restore?.page);
     const [loadingMore, setLoadingMore] = useState(false);
     const [message, setMessage] = useState('');
 
@@ -38,10 +44,11 @@ export default function Collection() {
 
     // The catalogue is far too big for the browser: the server sorts and filters, we fetch pages.
     // Only the player's own cards are listed; undiscovered ones stay hidden.
-    const filters = useMemo(() => ({ binder, type, rarity, onlyOwned: true, query: debounced }), [binder, type, rarity, debounced]);
+    const filters = useMemo(() => ({ binder, type, rarity, onlyOwned: true, duplicates: dupes, query: debounced }), [binder, dupes, type, rarity, debounced]);
     // inside a binder, starring or unstarring a card changes the list
     const favKey = binder ? favs.cards : null;
     useEffect(() => {
+        if (skipFetch.current) { skipFetch.current = false; return undefined; }
         let alive = true;
         setPage(null);
         api('browse', { ...filters, offset: 0, limit: PAGE })
@@ -49,6 +56,26 @@ export default function Collection() {
             .catch(() => alive && setPage({ cards: [], matches: 0 }));
         return () => { alive = false; };
     }, [filters, owned, favKey]);
+
+    useEffect(() => { saved = { ...saved, binder, dupes, type, rarity, query, page }; }, [binder, dupes, type, rarity, query, page]);
+    // back from a card: return to the same spot, retrying for a moment while the grid grows tall enough
+    // (and after the layout's scroll-to-top)
+    useEffect(() => {
+        if (!restore?.scrollY) return undefined;
+        const until = Date.now() + 1500;
+        let id;
+        const tick = () => {
+            window.scrollTo(0, restore.scrollY);
+            if (Math.abs(window.scrollY - restore.scrollY) > 2 && Date.now() < until) id = requestAnimationFrame(tick);
+        };
+        id = requestAnimationFrame(() => { id = requestAnimationFrame(tick); });
+        const stop = () => cancelAnimationFrame(id); // the user scrolls on their own: let them
+        window.addEventListener('wheel', stop, { once: true, passive: true });
+        window.addEventListener('touchstart', stop, { once: true, passive: true });
+        return () => { stop(); window.removeEventListener('wheel', stop); window.removeEventListener('touchstart', stop); };
+    }, [restore]);
+    const remember = () => { saved = { ...saved, scrollY: window.scrollY }; };
+    const showAll = () => { setBinder(null); setDupes(false); };
 
     async function loadMore() {
         setLoadingMore(true);
@@ -61,13 +88,13 @@ export default function Collection() {
     }
 
     const duplicates = useMemo(() => {
-        let count = 0, coins = 0;
+        let count = 0, coins = 0, cards = 0;
         for (const [id, n] of Object.entries(owned)) {
             const extra = n - 1;
             const rarity = ownedInfo[id]?.[1];
-            if (extra > 0) { count += extra; coins += extra * (user.recycleValue?.[rarity] || 0); }
+            if (extra > 0) { count += extra; cards += 1; coins += extra * (user.recycleValue?.[rarity] || 0); }
         }
-        return { count, coins };
+        return { count, coins, cards };
     }, [owned, ownedInfo, user.recycleValue]);
 
     const favCount = useMemo(() => Object.keys(favs.cards).filter((id) => owned[id]).length, [favs.cards, owned]);
@@ -114,19 +141,29 @@ export default function Collection() {
                     </h1>
                 </div>
                 {duplicates.count > 0 && (
-                    <button onClick={recycleAll} className="flex items-center gap-2 px-4 py-2.5 rounded-full nd-btn text-sm font-semibold">
-                        <Recycle className="w-4 h-4" /> Recycler {duplicates.count} doublon{duplicates.count > 1 ? 's' : ''} · +{duplicates.coins} pépites
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                        {!dupes && (
+                            <button onClick={() => { setBinder(null); setDupes(true); }} className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/15 text-white text-sm font-semibold hover:bg-white/10">
+                                <Copy className="w-4 h-4" /> Voir les doublons
+                            </button>
+                        )}
+                        <button onClick={recycleAll} className="flex items-center gap-2 px-4 py-2.5 rounded-full nd-btn text-sm font-semibold">
+                            <Recycle className="w-4 h-4" /> Recycler {duplicates.count} doublon{duplicates.count > 1 ? 's' : ''} · +{duplicates.coins} pépites
+                        </button>
+                    </div>
                 )}
             </div>
             {message && <p className="mt-3 text-sm font-semibold text-white">{message}</p>}
 
             <div className="mt-8 space-y-3">
                 <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-white/10">
-                    <Chip active={binder === null} onClick={() => setBinder(null)}>Toute la collection</Chip>
-                    <Chip active={binder === 'all'} color="#c9a227" onClick={() => setBinder('all')}><Star className="w-3.5 h-3.5 fill-current" />Favoris · {favCount}</Chip>
+                    <Chip active={binder === null && !dupes} onClick={showAll}>Toute la collection</Chip>
+                    {(duplicates.count > 0 || dupes) && (
+                        <Chip active={dupes} onClick={() => (dupes ? showAll() : (setBinder(null), setDupes(true)))}><Copy className="w-3.5 h-3.5" />Doublons · {duplicates.cards}</Chip>
+                    )}
+                    <Chip active={binder === 'all'} color="#c9a227" onClick={() => { setDupes(false); setBinder('all'); }}><Star className="w-3.5 h-3.5 fill-current" />Favoris · {favCount}</Chip>
                     {favs.binders.map((b) => (
-                        <Chip key={b.id} active={binder === b.id} color="#c9a227" onClick={() => setBinder(binder === b.id ? null : b.id)}>{b.name} · {b.count}</Chip>
+                        <Chip key={b.id} active={binder === b.id} color="#c9a227" onClick={() => { setDupes(false); setBinder(binder === b.id ? null : b.id); }}>{b.name} · {b.count}</Chip>
                     ))}
                     <button onClick={newBinder} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-white/25 text-white/80 hover:bg-white/10">
                         <FolderPlus className="w-3.5 h-3.5" />Nouveau classeur
@@ -170,7 +207,7 @@ export default function Collection() {
             {page && (
                 <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
                     {page.cards.map((c) => (
-                        <Link key={c.id} to={`/carte/${c.id}`} className="relative block transition-transform hover:-translate-y-1">
+                        <Link key={c.id} to={`/carte/${c.id}`} onClick={remember} className="relative block transition-transform hover:-translate-y-1">
                             <Card card={c} number={c.num} total={catalog.total} />
                             {c.count > 1 && (
                                 <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#04150d] text-xs font-bold shadow-lg shadow-emerald-500/30">×{c.count}</span>
@@ -184,6 +221,8 @@ export default function Collection() {
                 <p className="py-20 text-center text-ink-soft">{binder === 'all' && !favs.binders.length
                     ? <>Aucun favori pour l'instant. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour la ranger dans un classeur.</>
                     : <>Aucune carte ici{type || rarity || debounced ? ' avec ces filtres' : ''}. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour l'ajouter.</>}</p>
+            ) : dupes ? (
+                <p className="py-20 text-center text-ink-soft">Aucun doublon{type || rarity || debounced ? ' avec ces filtres' : ''}.</p>
             ) : Object.keys(owned).length ? (
                 <p className="py-20 text-center text-ink-soft">Aucune de tes cartes ne correspond à ces filtres.</p>
             ) : (
