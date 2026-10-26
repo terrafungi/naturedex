@@ -639,7 +639,9 @@ export default function Avatar3D({ avatar, height = 360, className = '', interac
         renderer.toneMappingExposure = 1.05;
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFShadowMap;
-        renderer.domElement.style.display = 'block';
+        // Out of the flow: a canvas sized once too wide (mobile viewport settling) would otherwise
+        // keep its frame wide and never let it shrink back.
+        renderer.domElement.style.cssText = 'display:block;position:absolute;inset:0';
         el.prepend(renderer.domElement);
 
         const scene = new THREE.Scene();

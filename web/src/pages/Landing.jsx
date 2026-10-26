@@ -239,7 +239,7 @@ function PassSection() {
     return (
         <section id="pass" className="px-5 sm:px-6 py-10 scroll-mt-20">
             <Reveal>
-                <div className="relative isolate overflow-hidden max-w-6xl mx-auto rounded-[2rem] ring-1 ring-[#e9c46a]/50 shadow-[0_0_80px_-30px_#e9c46a] bg-[linear-gradient(135deg,#0d3321,#0a2418_50%,#3a2c0c)] grid md:grid-cols-[1fr_1.15fr] items-center">
+                <div className="relative isolate overflow-hidden max-w-6xl mx-auto rounded-[2rem] ring-1 ring-[#e9c46a]/50 shadow-[0_0_80px_-30px_#e9c46a] bg-[linear-gradient(135deg,#0d3321,#0a2418_50%,#3a2c0c)] grid grid-cols-1 md:grid-cols-[1fr_1.15fr] items-center">
                     <Aurora className="-z-10 opacity-70" />
                     <div ref={stage} className="p-4 sm:p-6 md:pr-0">
                         {seen ? (
