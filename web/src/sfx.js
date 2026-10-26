@@ -312,16 +312,17 @@ export const music = (() => {
             o.start(t0); o.stop(t0 + d + 0.1);
         }
     }
+    let lastBird = -99;
     function bird(t0) {
         const pan = Math.random() * 1.4 - 0.7, base = 2600 + Math.random() * 1400;
-        const n = 2 + Math.floor(Math.random() * 4);
+        const n = 2 + Math.floor(Math.random() * 3);
         for (let i = 0; i < n; i++) {
             const s = t0 + i * (0.11 + Math.random() * 0.05);
             const o = ctx.createOscillator(); o.frequency.setValueAtTime(base, s);
             o.frequency.exponentialRampToValueAtTime(base * (1.3 + Math.random() * 0.4), s + 0.07);
             const g = ctx.createGain();
             g.gain.setValueAtTime(0.0001, s);
-            g.gain.exponentialRampToValueAtTime(0.012, s + 0.015);
+            g.gain.exponentialRampToValueAtTime(0.008, s + 0.015);
             g.gain.exponentialRampToValueAtTime(0.0001, s + 0.09);
             o.connect(g); out(g, pan, 0.8);
             o.start(s); o.stop(s + 0.12);
@@ -348,13 +349,14 @@ export const music = (() => {
         });
         pad(hz(chord[0] - 12), t0, BAR + 2, 0.06, 'sine', 0);
         if (b % 2 === 0) wind(t0);
-        const notes = 2 + Math.floor(Math.random() * 3);
+        const notes = 1 + Math.floor(Math.random() * 3);
         for (let i = 0; i < notes; i++) pluck(hz(SCALE[Math.floor(Math.random() * SCALE.length)]), t0 + 0.5 + Math.random() * (BAR - 1), 0.035, Math.random() * 1.2 - 0.6);
-        if (Math.random() < 0.4) bird(t0 + 1 + Math.random() * (BAR - 2));
+        // un oiseau de temps en temps : au moins ~30 s entre deux chants
+        if (b - lastBird >= 4 && Math.random() < 0.35) { lastBird = b; bird(t0 + 1 + Math.random() * (BAR - 2)); }
     }
     function level() {
         if (!musicBus) return;
-        const g = on() ? (ducks > 0 ? 0.12 : 0.35) : 0;
+        const g = on() ? (ducks > 0 ? 0.06 : 0.2) : 0;
         if (g === target) return;
         target = g;
         musicBus.gain.cancelScheduledValues(ctx.currentTime);
