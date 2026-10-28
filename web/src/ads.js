@@ -1,6 +1,6 @@
 // Rewarded video ads via Google AdSense H5 Games Ads (Ad Placement API).
 // The publisher id is public (it also goes in /ads.txt). Empty = feature hidden.
-const ADSENSE_CLIENT = '';
+const ADSENSE_CLIENT = 'ca-pub-2706263813199995';
 
 let loaded = false;
 
