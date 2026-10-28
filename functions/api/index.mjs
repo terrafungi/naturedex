@@ -47,7 +47,7 @@ const MAX_CHARGES = 10;
 const CHARGE_MS = 60 * 60 * 1000; // a full refill takes 10 h: one in the evening, one in the morning
 const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
 // Rewarded ads can't be verified server-side (web ads have no callback), so the reward is small and capped.
-const AD_DAILY = 3; // bonus boosters per Paris day
+const AD_DAILY = 5; // bonus boosters per Paris day
 const AD_MIN_SECONDS = 12; // minimum time between starting and claiming an ad
 const SESSION_DAYS = 60;
 // Invitations and sharing. The sponsor is paid only once the invitee has really played
