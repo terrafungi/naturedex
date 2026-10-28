@@ -46,6 +46,9 @@ const DAILY_COINS = 100;
 const MAX_CHARGES = 10;
 const CHARGE_MS = 60 * 60 * 1000; // a full refill takes 10 h: one in the evening, one in the morning
 const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
+// Rewarded ads can't be verified server-side (web ads have no callback), so the reward is small and capped.
+const AD_DAILY = 3; // bonus boosters per Paris day
+const AD_MIN_SECONDS = 12; // minimum time between starting and claiming an ad
 const SESSION_DAYS = 60;
 // Invitations and sharing. The sponsor is paid only once the invitee has really played
 // (INVITE_DAYS different days), and at most INVITE_CAP times, so fake accounts don't pay.
@@ -681,6 +684,13 @@ async function settleAuctions(db) {
         });
         if (settled < 50) return; // the rest (if any) is locked by a concurrent request settling it
     }
+}
+
+async function adsLeft(db, userId) {
+    const { rows: [{ n }] } = await db.query(
+        `SELECT COUNT(*)::int AS n FROM ad_views
+         WHERE user_id = $1 AND (claimed_at AT TIME ZONE 'Europe/Paris')::date = ${PARIS_DAY}`, [userId]);
+    return Math.max(0, AD_DAILY - n);
 }
 
 async function inTransaction(db, fn) {
@@ -1825,6 +1835,36 @@ const actions = {
         if (!paid) throw new HttpError(400, 'Aucune récompense à récupérer pour l\'instant');
         const { rows: [updated] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
         return { paid, coins: paid * INVITE_REWARD.coins, nuggets: paid * INVITE_REWARD.nuggets, user: await publicUser(db, updated), invites: await inviteState(db, updated) };
+    },
+
+    async adStatus(db, body, event) {
+        const user = await requireUser(db, event);
+        return { adsLeft: await adsLeft(db, user.id), adDaily: AD_DAILY };
+    },
+
+    async adStart(db, body, event) {
+        const user = await requireUser(db, event);
+        if (await adsLeft(db, user.id) <= 0) throw new HttpError(429, 'Plus de pub récompensée aujourd\'hui, reviens demain');
+        await db.query(`DELETE FROM ad_views WHERE user_id = $1 AND claimed_at IS NULL AND started_at < now() - interval '1 hour'`, [user.id]);
+        const token = crypto.randomUUID();
+        await db.query(`INSERT INTO ad_views (user_id, token) VALUES ($1, $2)`, [user.id, token]);
+        return { token };
+    },
+
+    async adClaim(db, body, event) {
+        const user = await requireUser(db, event);
+        return inTransaction(db, async (client) => {
+            await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+            if (await adsLeft(client, user.id) <= 0) throw new HttpError(429, 'Plus de pub récompensée aujourd\'hui, reviens demain');
+            const { rowCount } = await client.query(
+                `UPDATE ad_views SET claimed_at = now()
+                 WHERE token = $2 AND user_id = $1 AND claimed_at IS NULL
+                   AND started_at <= now() - make_interval(secs => $3) AND started_at > now() - interval '1 hour'`,
+                [user.id, String(body.token || ''), AD_MIN_SECONDS]);
+            if (!rowCount) throw new HttpError(409, 'Pub non terminée : pas de booster');
+            const { rows: [updated] } = await client.query(`UPDATE users SET boosters = boosters + 1 WHERE id = $1 RETURNING *`, [user.id]);
+            return { user: await publicUser(client, updated), adsLeft: await adsLeft(client, user.id) };
+        });
     },
 
     // Sharing can't be verified, so it pays little and only once per account.

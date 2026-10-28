@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Gift, Sprout, Zap } from 'lucide-react';
+import { Clapperboard, Gift, Sprout, Zap } from 'lucide-react';
 import { Amount, Plant, Seed } from '../components/Currency.jsx';
 import { api, useGame } from '../api.jsx';
 import { Pack } from '../components/Pack.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
 import { TYPES } from '../game.jsx';
+import { adsEnabled, loadAds, showRewardedAd } from '../ads.js';
 
 export function useCountdown(iso, onDone) {
     const [now, setNow] = useState(Date.now());
@@ -69,6 +70,38 @@ export default function Boosters() {
 
     const open = () => run('openBooster', (res) => { addCards(res.cards); setOpening(res.cards); }, { pay: payWith === 'plants' ? 'plants' : payWith === 'coins' });
     const daily = () => run('claimDaily');
+
+    // Rewarded ad: the server hands out a token, the reward is claimable once the ad was watched.
+    const [ads, setAds] = useState(null);
+    const [adNote, setAdNote] = useState('');
+    useEffect(() => {
+        if (!adsEnabled()) return;
+        loadAds();
+        api('adStatus').then(setAds).catch(() => {});
+    }, []);
+    async function watchAd() {
+        setBusy(true);
+        setError('');
+        setAdNote('');
+        try {
+            const started = Date.now();
+            const { token } = await api('adStart');
+            const result = await showRewardedAd();
+            if (result !== 'viewed') {
+                setAdNote(result === 'dismissed' ? 'Pub interrompue : pas de booster cette fois.' : 'Aucune pub disponible pour l\'instant, réessaie un peu plus tard.');
+                return;
+            }
+            await new Promise((r) => setTimeout(r, Math.max(0, started + 12500 - Date.now())));
+            const res = await api('adClaim', { token });
+            setUser(res.user);
+            setAds((a) => ({ ...a, adsLeft: res.adsLeft }));
+            setAdNote('+1 booster offert ! Ouvre-le avec le bouton du paquet.');
+        } catch (err) {
+            setAdNote(err.message);
+        } finally {
+            setBusy(false);
+        }
+    }
 
     const total = catalog?.total || user.total;
     const discovered = Object.keys(owned).length;
@@ -146,6 +179,20 @@ export default function Boosters() {
                 <div className="space-y-6">
                     {/* daily + shop */}
                     <div className="grid sm:grid-cols-2 gap-4">
+                        {ads && (
+                            <div className="sm:col-span-2 p-5 rounded-3xl border border-[#e9c46a]/30 bg-gradient-to-br from-[#e9c46a]/12 to-white/[0.03] backdrop-blur flex flex-wrap items-center gap-4">
+                                <Clapperboard className="w-8 h-8 text-[#f4d88f] shrink-0" />
+                                <div className="flex-1 min-w-[12rem]">
+                                    <h2 className="font-display text-xl font-bold">Booster offert</h2>
+                                    <p className="text-sm text-ink-soft">Regarde une courte vidéo et gagne 1 booster gratuit · <b className="text-white">{ads.adsLeft}/{ads.adDaily}</b> aujourd'hui</p>
+                                    {adNote && <p className="mt-1 text-sm font-semibold text-[#f4d88f]">{adNote}</p>}
+                                </div>
+                                <button disabled={busy || ads.adsLeft <= 0} onClick={watchAd}
+                                    className="w-full sm:w-auto px-6 py-2.5 rounded-full nd-cta-gold font-bold disabled:opacity-40 disabled:grayscale">
+                                    {ads.adsLeft > 0 ? 'Regarder une pub' : 'Reviens demain'}
+                                </button>
+                            </div>
+                        )}
                         <div className="p-5 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur">
                             <Gift className="w-6 h-6 text-rust" />
                             <h2 className="mt-2 font-display text-xl font-bold">Bonus du jour</h2>

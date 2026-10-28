@@ -515,3 +515,13 @@ UPDATE users SET avatar = (avatar - 'acc') || jsonb_build_object(
     'neck', CASE WHEN avatar->>'acc' = 'jumelles' THEN 'jumelles' ELSE 'aucun' END,
     'pet', 'aucun')
 WHERE avatar ? 'acc';
+
+-- Rewarded ads: a server token per ad view, claimable once after a minimum watch time (1 bonus booster, capped per Paris day).
+CREATE TABLE IF NOT EXISTS ad_views (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    claimed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS ad_views_user_claimed ON ad_views (user_id, claimed_at);
