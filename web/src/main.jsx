@@ -26,6 +26,7 @@ import Auctions from './pages/Auctions.jsx';
 import Friends from './pages/Friends.jsx';
 import Quiz from './pages/Quiz.jsx';
 import Shop from './pages/Shop.jsx';
+import Privacy from './pages/Privacy.jsx';
 import Combat from './pages/Combat.jsx';
 import Battle from './pages/Battle.jsx';
 
@@ -57,6 +58,7 @@ createRoot(document.getElementById('root')).render(
                     <Route element={<Layout />}>
                         <Route path="/" element={<Home />} />
                         <Route path="/connexion" element={<Auth />} />
+                        <Route path="/confidentialite" element={<Privacy />} />
                         <Route path="/booster" element={<Private><Boosters /></Private>} />
                         <Route path="/exploration" element={<Private><Suspense fallback={<div className="py-32 text-center font-display text-xl text-ink-soft">Chargement de la carte…</div>}><Exploration /></Suspense></Private>} />
                         <Route path="/terrain" element={<Private><Terrain /></Private>} />

@@ -260,7 +260,7 @@ export default function Layout() {
                 <Outlet />
             </main>
             <footer className={`border-t border-white/[0.07] px-4 pt-6 ${user ? 'pb-32' : 'pb-6'} text-center text-xs text-ink-soft`}>
-                NatureDex · Images et textes : <a className="underline hover:text-white" href="https://fr.wikipedia.org" target="_blank" rel="noreferrer">Wikipédia</a> & Wikimedia Commons (licences libres) · Données : Wikidata · <a className="underline hover:text-white" href="https://naturedex.fr/api/blog">Blog nature</a>
+                NatureDex · Images et textes : <a className="underline hover:text-white" href="https://fr.wikipedia.org" target="_blank" rel="noreferrer">Wikipédia</a> & Wikimedia Commons (licences libres) · Données : Wikidata · <a className="underline hover:text-white" href="https://naturedex.fr/api/blog">Blog nature</a> · <Link className="underline hover:text-white" to="/confidentialite">Confidentialité</Link>
                 <div><InstallLink /></div>
             </footer>
             {user && <TabBar />}
