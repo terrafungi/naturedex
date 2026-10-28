@@ -22,8 +22,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import readline from 'node:readline';
 import pg from 'pg';
+import { pathToFileURL } from 'node:url';
 
-const UA = 'NaturDex/0.1 (OpenKBS card game; contact via openkbs.com)';
+export const UA = 'NaturDex/0.1 (OpenKBS card game; contact via openkbs.com)';
 // QLever: same Wikidata data as query.wikidata.org, but handles deep taxonomy traversals in seconds.
 const SPARQL = 'https://qlever.dev/api/wikidata';
 const PREFIXES = `PREFIX wd: <http://www.wikidata.org/entity/> PREFIX wdt: <http://www.wikidata.org/prop/direct/>
@@ -32,11 +33,11 @@ PREFIX wikibase: <http://wikiba.se/ontology#> PREFIX schema: <http://schema.org/
 const CACHE_DIR = path.join(import.meta.dirname, '.cache');
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
-const RANK = { species: 'wd:Q7432', genus: 'wd:Q34740', strain: 'wd:Q855769' };
+export const RANK = { species: 'wd:Q7432', genus: 'wd:Q34740', strain: 'wd:Q855769' };
 
 // Order = priority: an item matching several types keeps the first one.
 // No quota: every taxon with a fr.wikipedia article (and, later, a lead image) becomes a card.
-const TYPES = [
+export const TYPES = [
     { key: 'fossil', fossilTaxon: true },
     { key: 'virus', anchors: ['Riboviria', 'Duplodnaviria', 'Monodnaviria', 'Varidnaviria', 'Adnaviria', 'Ribozyviria'], ranks: ['species', 'genus', 'strain'] },
     { key: 'bacteria', anchors: ['Bacteria', 'Archaea'], ranks: ['species', 'genus'] },
@@ -53,22 +54,22 @@ const TYPES = [
     { key: 'marine', anchors: ['Mollusca', 'Cnidaria', 'Echinodermata', 'Porifera', 'Crustacea', 'Annelida', 'Ctenophora', 'Tunicata', 'Bryozoa', 'Brachiopoda'], ranks: ['species', 'genus'] },
 ];
 
-const IUCN = {
+export const IUCN = {
     Q211005: 'LC', Q719675: 'NT', Q278113: 'VU', Q11394: 'EN', Q219127: 'CR',
     Q239509: 'EW', Q237350: 'EX', Q3245245: 'DD',
 };
 
 // ---------- helpers ----------
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function cache(name) {
+export function cache(name) {
     const file = path.join(CACHE_DIR, `${name}.json`);
     const data = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
     return { data, save: () => fs.writeFileSync(file, JSON.stringify(data)) };
 }
 
-async function sparql(query, { timeoutMs = 65_000 } = {}) {
+export async function sparql(query, { timeoutMs = 65_000 } = {}) {
     for (let attempt = 1; attempt <= 3; attempt++) {
         try {
             const res = await fetch(SPARQL, {
@@ -77,7 +78,7 @@ async function sparql(query, { timeoutMs = 65_000 } = {}) {
                 body: new URLSearchParams({ query: `${PREFIXES}\n${query}` }),
                 signal: AbortSignal.timeout(timeoutMs),
             });
-            if (res.status === 429) { await sleep(10_000 * attempt); continue; }
+            if (res.status === 429) { if (attempt === 3) throw new Error("SPARQL HTTP 429"); await sleep(10_000 * attempt); continue; }
             if (!res.ok) throw new Error(`SPARQL HTTP ${res.status}`);
             return (await res.json()).results.bindings;
         } catch (err) {
@@ -89,7 +90,7 @@ async function sparql(query, { timeoutMs = 65_000 } = {}) {
 
 // Commons file name -> direct upload.wikimedia.org URLs (original + 500px thumbnail).
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)$/i;
-function commonsImage(file) {
+export function commonsImage(file) {
     if (!file || !IMAGE_EXT.test(file)) return null;
     const name = file.replace(/ /g, '_');
     const hash = crypto.createHash('md5').update(name).digest('hex');
@@ -117,11 +118,11 @@ async function loadViews(files) {
     return views;
 }
 
-const qidOf = (uri) => uri.split('/').pop();
+export const qidOf = (uri) => uri.split('/').pop();
 
 // ---------- steps ----------
 
-async function resolveAnchors(names) {
+export async function resolveAnchors(names) {
     const values = [...new Set(names)].map((n) => JSON.stringify(n)).join(' ');
     const rows = await sparql(`SELECT ?n ?q ?sl WHERE { VALUES ?n { ${values} } ?q wdt:P225 ?n; wikibase:sitelinks ?sl. }`);
     // Several taxa can share a name (homonyms across kingdoms): keep the best-known one.
@@ -180,7 +181,7 @@ async function fetchDetails(qids, out = {}) {
     return out;
 }
 
-function hpFor(views, rarity) {
+export function hpFor(views, rarity) {
     const bonus = { common: 0, uncommon: 10, rare: 20, epic: 40, legendary: 60, secret: 80 }[rarity];
     const base = Math.round((30 + 22 * Math.log10(views + 1)) / 10) * 10;
     return Math.min(rarity === 'secret' ? 300 : 260, Math.max(30, base + bonus));
@@ -277,15 +278,15 @@ async function main() {
                                   $8::text[], $9::text[], $10::text[], $11::text[], $12::jsonb[])
              ON CONFLICT (qid) DO UPDATE SET name=EXCLUDED.name, sci_name=EXCLUDED.sci_name, type=EXCLUDED.type,
                 rarity=EXCLUDED.rarity, views=EXCLUDED.views, image_url=EXCLUDED.image_url, thumb_url=EXCLUDED.thumb_url,
-                extract=EXCLUDED.extract, wiki_url=EXCLUDED.wiki_url, iucn=EXCLUDED.iucn, stats=EXCLUDED.stats`,
+                extract=EXCLUDED.extract, wiki_url=EXCLUDED.wiki_url, iucn=EXCLUDED.iucn, stats=EXCLUDED.stats, source='frwiki'`,
             [col('qid'), col('name'), col('sci_name'), col('type'), col('rarity'), col('views'), col('image_url'),
              col('thumb_url'), col('extract'), col('wiki_url'), col('iucn'), batch.map((c) => JSON.stringify(c.stats))],
         );
         if ((i / 500) % 20 === 0) console.log(`  ${Math.min(i + 500, cards.length)}/${cards.length}`);
     }
-    // Drop cards that left the catalog, unless a player already owns them.
+    // Drop cards that left the catalog, unless a player already owns them (Wikispecies imports have their own script).
     const gone = await db.query(
-        `DELETE FROM cards WHERE NOT (qid = ANY($1)) AND id NOT IN (SELECT card_id FROM user_cards) RETURNING id`,
+        `DELETE FROM cards WHERE NOT (qid = ANY($1)) AND source = 'frwiki' AND id NOT IN (SELECT card_id FROM user_cards) RETURNING id`,
         [cards.map((c) => c.qid)],
     );
     console.log(`Removed ${gone.rowCount} stale cards`);
@@ -297,4 +298,5 @@ async function main() {
     await db.end();
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+// Importable (scripts/import-wikispecies.mjs reuses the helpers): only build when run directly.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((err) => { console.error(err); process.exit(1); });

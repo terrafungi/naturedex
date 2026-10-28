@@ -160,7 +160,7 @@ ${sci ? `<p class="sci">${esc(sci)}</p>` : ''}
 <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
 ${rich ? enrichedBody(c, rich) : `<h2 style="margin-top:.6em">Présentation</h2>
 ${paragraphs.length ? paragraphs.map((t) => `<p>${esc(t)}</p>`).join('') : `<p>${esc(c.name)} fait partie des ${esc(typePlural.toLowerCase())} de NatureDex.</p>`}
-<p class="meta">Source : <a href="${esc(c.wiki_url)}" rel="noopener" target="_blank">article « ${esc(c.name)} » sur Wikipédia</a> (licence CC BY-SA).</p>`}
+<p class="meta">Source : <a href="${esc(c.wiki_url)}" rel="noopener" target="_blank">article « ${esc(c.name)} » sur Wikipédia${c.wiki_url.includes('://en.') ? ' en anglais' : ''}</a> (licence CC BY-SA).</p>`}
 </div>
 </article>
 ${posts.length ? `<section><h2>À lire sur le blog</h2><ul>${posts.map((p) => `<li><a href="${BLOG}/${esc(p.slug)}">${esc(p.title)}</a> <span class="meta">· ${dateFr(p.published_at)}</span></li>`).join('')}</ul></section>` : ''}

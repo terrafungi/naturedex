@@ -455,7 +455,7 @@ async function sharePage(db, cardId, username) {
         ? `${sharer ? `${sharer.username} a découvert` : 'Découverte :'} ${card.name}, carte ${rarity}${card.rarity === 'secret' ? ' ✦' : ' !'}`
         : 'NatureDex : collectionne le vivant';
     const extract = card?.extract ? (card.extract.length > 180 ? `${card.extract.slice(0, 177).trimEnd()}…` : card.extract) : '';
-    const description = `${extract} Collectionne ${card ? 'toi aussi ' : ''}60 000 espèces du vivant sur NatureDex.`.trim();
+    const description = `${extract} Collectionne ${card ? 'toi aussi ' : ''}68 000 espèces du vivant sur NatureDex.`.trim();
     const custom = card && await shareImage(card).catch((e) => (console.error('share image', card.id, e), null));
     const image = custom || card?.image_url || `${SITE}/og.png`;
     const self = `${SITE}/api/partage/${card?.id ?? cardId}?v=2${sharer ? `&u=${encodeURIComponent(sharer.username)}` : ''}`;
@@ -732,15 +732,36 @@ let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
 // The catalogue builder skips article intros (too many pages to fetch in bulk):
 // fetch one the first time somebody opens the card, and keep it.
+// Wikispecies cards link to en.wikipedia: their intro is translated to French first.
 async function fillExtract(db, card) {
-    const title = card.wiki_url.split('/wiki/').pop();
-    const res = await fetch(`https://fr.wikipedia.org/api/rest_v1/page/summary/${title}`, {
+    const { origin, pathname } = new URL(card.wiki_url);
+    const res = await fetch(`${origin}/api/rest_v1/page/summary/${pathname.split('/wiki/').pop()}`, {
         headers: { 'User-Agent': 'NaturDex/0.1 (OpenKBS card game; contact via openkbs.com)' },
         signal: AbortSignal.timeout(4_000),
     }).catch(() => null);
-    const extract = res?.ok ? (await res.json()).extract : null;
+    let extract = res?.ok ? (await res.json()).extract : null;
+    if (extract && !origin.includes('//fr.')) extract = await translateIntro(extract, card).catch(() => null);
     if (extract) await db.query(`UPDATE cards SET extract = $2 WHERE id = $1`, [card.id, extract]);
     return extract;
+}
+
+async function translateIntro(text, card) {
+    const key = process.env.GEMINI_API_KEY;
+    const endpoints = [
+        ...(key ? [{ url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent', headers: { 'x-goog-api-key': key } }] : []),
+        { url: 'https://proxy.openkbs.com/v1/google/models/gemini-flash-lite-latest:generateContent', headers: { Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` } },
+    ];
+    const body = JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: `Traduis en français ce résumé Wikipédia de l'espèce ${card.sci_name || card.name}${card.name !== card.sci_name ? ` (nom français : ${card.name})` : ''}. Garde les noms scientifiques en latin, n'ajoute rien. Réponds uniquement avec la traduction, sans markdown.\n\n${text}` }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1200 },
+    });
+    for (const ep of endpoints) {
+        const res = await fetch(ep.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...ep.headers }, body, signal: AbortSignal.timeout(8_000) }).catch(() => null);
+        if (!res?.ok) continue;
+        const out = ((await res.json()).candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
+        if (out.length > 20) return out;
+    }
+    return null;
 }
 
 // ---------- actions ----------

@@ -85,7 +85,7 @@ export default function CardPage() {
                     {card.sci_name && card.sci_name !== card.name && <p className="mt-2 font-display italic text-xl text-ink-soft">{card.sci_name}</p>}
                     <p className="mt-6 text-lg leading-relaxed max-w-prose">{card.extract}</p>
                     <a href={card.wiki_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white underline underline-offset-4">
-                        Lire l'article sur Wikipédia <ExternalLink className="w-3.5 h-3.5" />
+                        Lire l'article sur Wikipédia{card.wiki_url?.includes('://en.') ? ' (en anglais)' : ''} <ExternalLink className="w-3.5 h-3.5" />
                     </a>
 
                     <dl className="mt-8 grid sm:grid-cols-2 gap-3">

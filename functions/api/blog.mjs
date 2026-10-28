@@ -76,7 +76,7 @@ export const slugify = (s) => {
 async function wikiText(wikiUrl) {
     const title = decodeURIComponent(wikiUrl.split('/wiki/')[1] || '');
     if (!title) return '';
-    const api = `https://fr.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(title)}`;
+    const api = `${new URL(wikiUrl).origin}/w/api.php?action=query&format=json&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(title)}`;
     const data = JSON.parse(await fetchText(api));
     const page = Object.values(data.query?.pages || {})[0];
     let text = page?.extract || '';

@@ -28,7 +28,8 @@ async function article(lang, title, stop, max) {
 }
 
 async function sources(card) {
-    const frTitle = decodeURIComponent(card.wiki_url.split('/wiki/')[1] || '');
+    // Wikispecies cards link to en.wikipedia: they have no French article.
+    const frTitle = card.wiki_url.includes('://fr.') ? decodeURIComponent(card.wiki_url.split('/wiki/')[1] || '') : '';
     const [fr, enTitle] = await Promise.all([
         frTitle ? article('fr', frTitle, STOP_FR, 9000).catch(() => null) : null,
         fetchText(`https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=sitelinks&sitefilter=enwiki&ids=${card.qid}`)

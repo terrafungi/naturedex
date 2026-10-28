@@ -525,3 +525,7 @@ CREATE TABLE IF NOT EXISTS ad_views (
     claimed_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS ad_views_user_claimed ON ad_views (user_id, claimed_at);
+
+-- Card source: 'frwiki' (build-catalog.mjs, fr.wikipedia articles) or 'wikispecies' (import-wikispecies.mjs:
+-- Wikispecies taxa with a photo and an English article, intro translated to French on first view).
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'frwiki';
