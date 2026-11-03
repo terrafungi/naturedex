@@ -271,7 +271,27 @@ body {
     transition: opacity 0.3s;
 }
 .nd-card[data-rarity="epic"]::after { opacity: 0.32; }
-.nd-card[data-art]::after { opacity: 0.14; }
+.nd-card[data-art]::after { opacity: 0.16; }
+/* full art holo: rainbow bands + glitter over the picture, drifting on its own and following the pointer */
+.nd-card[data-art] .nd-window::after {
+    content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    mix-blend-mode: color-dodge; opacity: 0.42;
+    background:
+        radial-gradient(circle at var(--mx) var(--my), rgb(255 255 255 / 0.35), transparent 30%),
+        radial-gradient(circle, rgb(255 255 255 / 0.9) 0.25cqi, transparent 0.6cqi) 0 0 / 4.3cqi 4.3cqi,
+        radial-gradient(circle, rgb(255 240 200 / 0.8) 0.2cqi, transparent 0.5cqi) 2.1cqi 1.7cqi / 6.1cqi 6.1cqi,
+        repeating-linear-gradient(125deg, transparent 0 9%, #ff7eb3 11%, #ffd36e 12.5%, #7dffb0 14%, #6ec8ff 15.5%, #c18bff 17%, transparent 19% 28%) 0 0 / 300% 300%;
+    animation: nd-holo-drift 6s ease-in-out infinite alternate;
+}
+.nd-card[data-art] .nd-window::after {
+    -webkit-mask-image: linear-gradient(180deg, black, rgb(0 0 0 / 0.55) 45%, black);
+            mask-image: linear-gradient(180deg, black, rgb(0 0 0 / 0.55) 45%, black);
+}
+@keyframes nd-holo-drift {
+    from { background-position: center, 0 0, 2.1cqi 1.7cqi, 0% 0%; }
+    to   { background-position: center, 1.4cqi 2.2cqi, 0.6cqi 3.4cqi, 100% 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .nd-card[data-art] .nd-window::after { animation: none; } }
 .nd-card[data-rarity="legendary"] {
     background: linear-gradient(135deg, #f6e3a1, #c9a24a 30%, #fff1c1 50%, #a77f28 70%, #f0d58a);
 }
