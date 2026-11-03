@@ -194,7 +194,7 @@ function TileArt({ kind, sp }) {
 function Tile({ t, i, cell, selected, hint }) {
     const [r, c] = rc(i);
     return (
-        <motion.div className="absolute left-0 top-0 p-[7%] pointer-events-none" style={{ width: cell, height: cell }}
+        <motion.div className="absolute left-0 top-0 pointer-events-none" style={{ width: cell, height: cell, padding: cell * 0.07 }}
             initial={{ x: c * cell, y: (r - t.drop) * cell, scale: t.drop ? 1 : 0 }}
             animate={{ x: c * cell, y: r * cell, scale: selected ? 1.15 : 1, rotate: hint ? [0, -12, 12, -8, 0] : 0 }}
             exit={{ scale: 0, opacity: 0, rotate: 60, transition: { duration: 0.2 } }}
