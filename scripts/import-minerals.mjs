@@ -1,8 +1,8 @@
 /**
  * Add minerals and rocks to the NaturDex catalog, as one "mineral" card type.
  *
- *   DATABASE_URL="$(openkbs postgres connection --libpq)" node scripts/import-minerals.mjs          # preview only
- *   DATABASE_URL="$(openkbs postgres connection --libpq)" node scripts/import-minerals.mjs --apply  # write the cards
+ *   DATABASE_URL="$(openkbs postgres connection)" node scripts/import-minerals.mjs          # preview only
+ *   DATABASE_URL="$(openkbs postgres connection)" node scripts/import-minerals.mjs --apply  # write the cards
  *
  * Candidates: Wikidata mineral species (Q12089225), mineral varieties (Q429795: ruby, amethyst, agate…)
  * and rock types (subclasses of rock, Q8063), each with a fr.wikipedia article and a Commons photo (P18).
