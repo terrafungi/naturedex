@@ -11,6 +11,48 @@ export const PERFECT_NUGGETS = 10;
 export const CARD_SCORE = 8; // right answers needed to win a card
 const GRACE_MS = 3000; // network latency allowance on the timer
 
+// Game modes. Classic and daily keep the 10 rising questions; survival goes on until three
+// mistakes; blitz is one minute against the clock (right answers add time, wrong ones cost some).
+const JOKERS = { fifty: 1, time: 1, skip: 1 };
+export const MODES = {
+    classic: { label: 'Classique', length: 10, themes: true, jokers: JOKERS },
+    daily: { label: 'Défi du jour', length: 10, perDay: 1, jokers: JOKERS },
+    survival: { label: 'Survie', lives: 3, perDay: 2, passBonus: 1, themes: true, jokers: JOKERS },
+    blitz: { label: 'Blitz', seconds: 60, perDay: 3, passBonus: 2, themes: true, jokers: JOKERS },
+};
+export const BLITZ = { correctMs: 2000, wrongMs: 5000, timeJokerMs: 10000 };
+export const TIME_JOKER_MS = 10000;
+const BLITZ_KINDS = ['photo_name', 'name_photo', 'type', 'true_false', 'sci_name', 'odd', 'heavier'];
+// Endless modes get harder as the run goes on.
+export const levelAt = (mode, i) => (mode === 'blitz' ? (i < 6 ? 0 : i < 16 ? 1 : 2) : i < 5 ? 0 : i < 12 ? 1 : 2);
+export const kindsFor = (mode) => (mode === 'blitz' ? BLITZ_KINDS : null);
+
+// Endless-mode rewards: graines per right answer, bonuses at milestones, a card past `card`.
+export const RUN_REWARDS = {
+    survival: { perCorrect: 1, every: 10, everyCoins: 5, nuggets: [[20, 5], [40, 10]], card: 15 },
+    blitz: { perCorrect: 1, every: 15, everyCoins: 10, nuggets: [[25, 10]], card: 15 },
+};
+
+// Points: level base + speed bonus, multiplied by the combo of right answers in a row.
+export const COMBO_STEPS = [[8, 3], [5, 2], [3, 1.5]];
+export const multiplier = (combo) => (COMBO_STEPS.find(([n]) => combo >= n) || [0, 1])[1];
+const BASE_POINTS = [100, 150, 200];
+export function questionPoints(level, speed, combo, fifty) {
+    const s = Math.max(0, Math.min(1, speed));
+    return Math.round((BASE_POINTS[level] + 100 * s) * multiplier(combo) * (fifty ? 0.5 : 1));
+}
+
+// Naturalist level from all the quiz points ever earned: level L starts at STEP × L(L−1)/2.
+const STEP = 3000;
+const RANKS = [[40, 'Légende vivante'], [30, 'Professeur'], [20, 'Savant'], [15, 'Explorateur'], [10, 'Naturaliste'], [5, 'Observateur'], [1, 'Promeneur']];
+export function quizLevel(points) {
+    const level = Math.floor((1 + Math.sqrt(1 + (8 * points) / STEP)) / 2);
+    return {
+        level, points, from: (STEP * level * (level - 1)) / 2, to: (STEP * (level + 1) * level) / 2,
+        title: RANKS.find(([l]) => level >= l)[1], next: [...RANKS].reverse().find(([l]) => l > level) || null,
+    };
+}
+
 export const THEMES = {
     all: { label: 'Tout le vivant', types: null },
     faune: { label: 'Faune', types: ['mammal', 'bird', 'reptile', 'fish'] },
@@ -278,34 +320,74 @@ const BUILDERS = {
             };
         },
     },
+    true_false: {
+        seconds: 12,
+        target: (c) => c.hasSci || CONFUSABLE[c.type],
+        build(ctx, t) {
+            const truth = rand(2) === 0;
+            let prompt;
+            if (t.hasSci && rand(2) === 0) {
+                const decoy = !truth && distractors(ctx, t, 1, (c) => c.hasSci && c.genus !== t.genus)?.[0];
+                if (!truth && !decoy) return null;
+                prompt = `« ${truth ? t.sci_name : decoy.sci_name} » est le nom scientifique de : ${t.name}.`;
+            } else {
+                if (!CONFUSABLE[t.type]) return null;
+                prompt = `${t.name} est ${TYPE_ONE[truth ? t.type : pick(CONFUSABLE[t.type])]}.`;
+            }
+            return {
+                prompt: `Vrai ou faux ? ${prompt}`, media: { image: t.thumb_url },
+                options: [{ label: 'Vrai', tf: true }, { label: 'Faux', tf: false }], answer: truth ? 0 : 1, cardIds: [t.id],
+            };
+        },
+    },
+    famous: {
+        seconds: 20, levels: [1, 2],
+        target: () => true,
+        build(ctx, t) {
+            // Clear-cut only: the answer is read at least twice as much as every other option.
+            const d = sample(ctx.byType.get(t.type) || [], 3, (c, out) => c.views * 2 <= t.views && c.views >= 800
+                && c.name !== t.name && !out.some((o) => o.name === c.name));
+            if (d.length < 3) return null;
+            const q = withAnswer(t, d, photoOption);
+            const byId = new Map([t, ...d].map((c) => [c.id, c]));
+            return {
+                prompt: 'Laquelle de ces espèces est la plus célèbre (la plus lue sur Wikipédia) ?', ...q,
+                facts: q.cardIds.map((id) => `${byId.get(id).views.toLocaleString('fr-FR')} lectures/an`),
+            };
+        },
+    },
 };
 
-const KIND_WEIGHT = { photo_name: 1.6, name_photo: 1.3, name_sci: 1.2, extract: 1.5, sci_name: 1.1 };
+const KIND_WEIGHT = { photo_name: 1.6, name_photo: 1.3, name_sci: 1.2, extract: 1.5, sci_name: 1.1, true_false: 0.9, famous: 0.8 };
 
 export const KIND_LABELS = {
     photo_name: 'Reconnaître une photo', name_photo: 'Trouver la bonne photo', name_sci: 'Noms scientifiques',
     sci_name: 'Latin → français', extract: 'Lecture Wikipédia', type: 'Groupes du vivant', odd: 'Trouver l\'intrus',
     iucn: 'Conservation', extinct: 'Espèces disparues', threatened: 'Espèces menacées', heavier: 'Poids', genus: 'Cousins de genre',
+    true_false: 'Vrai ou faux', famous: 'Célébrités du vivant',
 };
 
-// Builds a full quiz. `seen` maps cardId → last time the player met it in a quiz:
-// unseen species come first, then the ones seen longest ago.
-export async function buildQuiz(db, theme, seen) {
+// Builds a list of questions, one per entry of `levels`. `seen` maps cardId → last time the player
+// met it in a quiz: unseen species come first, then the ones seen longest ago. `kinds` limits the
+// question kinds (blitz keeps the quick ones); `exclude` holds species already used in this game.
+export async function buildQuiz(db, theme, seen, { levels = LEVELS, kinds: allowed = null, exclude = [] } = {}) {
     const p = await getPool(db);
     const types = THEMES[theme]?.types;
     const themed = types ? p.cards.filter((c) => types.includes(c.type)) : p.cards;
     const byType = new Map();
     for (const c of p.cards) byType.set(c.type, [...(byType.get(c.type) || []), c]);
 
-    const usedCards = new Set();
+    const usedCards = new Set(exclude);
     const kindCount = {};
     const questions = [];
     let last = null;
-    for (const level of LEVELS) {
+    const maxKind = Math.max(2, Math.ceil(levels.length / 4));
+    for (const level of levels) {
         const ctx = { pool: p, level, themed, byType };
         // Weighted random order: photos, names and texts come up a bit more often than the rest.
         const kinds = Object.keys(BUILDERS)
-            .filter((k) => k !== last && (kindCount[k] || 0) < 2 && (!BUILDERS[k].levels || BUILDERS[k].levels.includes(level)))
+            .filter((k) => k !== last && (kindCount[k] || 0) < maxKind && (!allowed || allowed.includes(k))
+                && (!BUILDERS[k].levels || BUILDERS[k].levels.includes(level)))
             .map((k) => [k, Math.random() * (KIND_WEIGHT[k] || 1)]).sort((a, b) => b[1] - a[1]).map(([k]) => k);
         let q = null;
         for (const kind of kinds) {
@@ -340,15 +422,22 @@ export async function buildQuiz(db, theme, seen) {
     return questions;
 }
 
+// Time allowed on a question: its own timer (+ the time joker), or the end of the blitz.
+export function deadlineOf(q, askedAt, cur = {}, endsAt = null) {
+    if (endsAt) return new Date(endsAt).getTime();
+    return new Date(askedAt).getTime() + q.seconds * 1000 + (cur.extraMs || 0);
+}
+
 // What the browser may see before answering: no answer, no card ids.
-export function publicQuestion(q, index, askedAt) {
+export function publicQuestion(q, index, askedAt, cur = {}, endsAt = null) {
     return {
-        index, kind: q.kind, level: q.level, seconds: q.seconds, prompt: q.prompt, media: q.media || null,
+        index, kind: q.kind, level: q.level, seconds: q.seconds + (cur.extraMs || 0) / 1000, prompt: q.prompt, media: q.media || null,
         options: q.options.map((o) => (q.hideLabels ? { image: o.image } : o)),
-        deadline: askedAt ? new Date(new Date(askedAt).getTime() + q.seconds * 1000).toISOString() : null,
+        removed: cur.removed || [],
+        deadline: askedAt ? new Date(deadlineOf(q, askedAt, cur, endsAt)).toISOString() : null,
     };
 }
 
-export function isLate(q, askedAt, now = Date.now()) {
-    return now - new Date(askedAt).getTime() > q.seconds * 1000 + GRACE_MS;
+export function isLate(q, askedAt, cur, endsAt, now = Date.now()) {
+    return now > deadlineOf(q, askedAt, cur, endsAt) + GRACE_MS;
 }

@@ -156,9 +156,26 @@ CREATE TABLE IF NOT EXISTS quizzes (
     reward_card INT REFERENCES cards(id) ON DELETE SET NULL,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'done')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    finished_at TIMESTAMPTZ
+    finished_at TIMESTAMPTZ,
+    mode TEXT NOT NULL DEFAULT 'classic', -- classic | daily | survival | blitz
+    lives INT, -- survival only
+    points INT NOT NULL DEFAULT 0, -- game score: level, speed and combo
+    combo INT NOT NULL DEFAULT 0,
+    best_combo INT NOT NULL DEFAULT 0,
+    jokers JSONB NOT NULL DEFAULT '{}'::jsonb, -- jokers left: { fifty, time, skip }
+    reserve JSONB, -- spare question swapped in by the "skip" joker (classic, daily)
+    cur JSONB NOT NULL DEFAULT '{}'::jsonb, -- jokers on the current question: { removed, extraMs, fifty }
+    ends_at TIMESTAMPTZ -- blitz: end of the whole game
 );
 CREATE INDEX IF NOT EXISTS quizzes_user_day ON quizzes (user_id, day);
+CREATE INDEX IF NOT EXISTS quizzes_mode_day ON quizzes (mode, day) WHERE status = 'done';
+-- Daily challenge: the same questions for every player on a given day.
+CREATE TABLE IF NOT EXISTS quiz_daily (
+    day DATE PRIMARY KEY,
+    questions JSONB NOT NULL,
+    reserve JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 -- species a player already met in a quiz, so new quizzes favour unseen ones
 CREATE TABLE IF NOT EXISTS quiz_seen (
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

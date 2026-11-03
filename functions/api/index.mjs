@@ -13,8 +13,8 @@ import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import pg from 'pg';
 import {
-    CARD_SCORE, IUCN_LABELS, KIND_LABELS, LEVEL_COINS, PERFECT_COINS, PERFECT_NUGGETS, QUIZ_PER_DAY, THEMES,
-    buildQuiz, intro, isLate, publicQuestion,
+    BLITZ, CARD_SCORE, COMBO_STEPS, IUCN_LABELS, KIND_LABELS, LEVEL_COINS, LEVELS, MODES, PERFECT_COINS, PERFECT_NUGGETS, QUIZ_PER_DAY,
+    RUN_REWARDS, THEMES, TIME_JOKER_MS, buildQuiz, intro, isLate, kindsFor, levelAt, multiplier, publicQuestion, questionPoints, quizLevel,
 } from './quiz.mjs';
 import {
     ASSOCIATIONS, DONATION_SHARE, PACKS, PASS, createCheckout, createPassCheckout, donationOf, getCheckout, getSubscription,
@@ -177,7 +177,8 @@ async function socialCounts(db, userId) {
     const { rows: [c] } = await db.query(
         `SELECT (SELECT COUNT(*)::int FROM friendships WHERE addressee_id = $1 AND status = 'pending') AS "friendRequests",
                 (SELECT COUNT(*)::int FROM trades WHERE to_id = $1 AND status = 'pending') AS "tradeOffers",
-                (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND day = (now() AT TIME ZONE 'Europe/Paris')::date) AS "quizPlayed",
+                (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND mode = 'classic' AND day = (now() AT TIME ZONE 'Europe/Paris')::date) AS "quizPlayed",
+                (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND mode = 'daily' AND day = (now() AT TIME ZONE 'Europe/Paris')::date) AS "quizDaily",
                 (SELECT COUNT(*)::int FROM messages WHERE to_id = $1 AND read_at IS NULL) AS "unreadMessages",
                 (SELECT COUNT(*)::int FROM gifts WHERE to_id = $1 AND seen_at IS NULL) AS "newGifts"`,
         [userId]
@@ -369,7 +370,7 @@ const TROPHIES = [
 const RARITY_POINTS = `CASE c.rarity WHEN 'secret' THEN 100 WHEN 'legendary' THEN 25 WHEN 'epic' THEN 8 WHEN 'rare' THEN 3 WHEN 'uncommon' THEN 1 ELSE 0 END`;
 const BOARDS = {
     quiz: (week) => `SELECT user_id, SUM(score)::int AS score,
-                            COUNT(*) FILTER (WHERE score = jsonb_array_length(questions))::int AS extra
+                            COUNT(*) FILTER (WHERE mode IN ('classic', 'daily') AND score = jsonb_array_length(questions))::int AS extra
                      FROM quizzes WHERE status = 'done' ${week ? `AND day >= current_date - 6` : ''} GROUP BY 1`,
     species: () => `SELECT user_id, COUNT(*)::int AS score, SUM(count)::int AS extra FROM user_cards GROUP BY 1`,
     cards: () => `SELECT user_id, SUM(count)::int AS score, COUNT(*)::int AS extra FROM user_cards GROUP BY 1`,
@@ -515,7 +516,7 @@ async function trophyList(db, userId) {
                     (SELECT COUNT(*)::int FROM trades WHERE status = 'accepted' AND $1 IN (from_id, to_id)) AS trades,
                     (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND status = 'done') AS quizzes,
                     (SELECT COALESCE(SUM(score), 0)::int FROM quizzes WHERE user_id = $1 AND status = 'done') AS "quizCorrect",
-                    (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND status = 'done' AND score = jsonb_array_length(questions)) AS "quizPerfect",
+                    (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND status = 'done' AND mode IN ('classic', 'daily') AND score = jsonb_array_length(questions)) AS "quizPerfect",
                     (SELECT COUNT(DISTINCT day)::int FROM quizzes WHERE user_id = $1 AND status = 'done') AS "quizDays",
                     (SELECT COUNT(*)::int FROM purchases WHERE user_id = $1 AND status = 'paid') AS patron,
                     (SELECT COUNT(*)::int FROM battles WHERE user_id = $1 AND status = 'won') AS "battleWins",
@@ -578,7 +579,7 @@ async function badgeCounts(db, user, pub) {
     return {
         '/booster': (pub.nextDailyAt ? 0 : 1) + (pub.charges >= pub.maxCharges ? 1 : 0),
         '/jardin': garden.ready,
-        '/quiz': Math.max(0, quizPerDay(user) - s.quizPlayed),
+        '/quiz': Math.max(0, quizPerDay(user) - s.quizPlayed) + (s.quizDaily ? 0 : 1),
         '/defis': challenges.filter((c) => !c.claimed && c.progress >= c.goal).length,
         '/trophees': trophies.filter((t) => !t.claimed && t.progress >= t.goal).length,
         '/inviter': Math.min(inv.ready, Math.max(0, INVITE_CAP - inv.rewarded)),
@@ -780,39 +781,88 @@ function quizStreak(days, today) {
     return streak;
 }
 
+// Games a player may start per day in each mode (the Pass adds a few).
+function modePerDay(user, mode) {
+    if (mode === 'classic') return quizPerDay(user);
+    const m = MODES[mode];
+    return m.perDay + (passActive(user) ? m.passBonus || 0 : 0);
+}
+
 async function quizState(db, user) {
     const userId = user.id;
     const day = await parisDay(db);
-    const [{ rows: today }, { rows: active }, { rows: days }, { rows: kinds }, { rows: [totals] }] = await Promise.all([
-        db.query(`SELECT id, theme, score, coins, nuggets, status, jsonb_array_length(questions) AS total, finished_at
+    const [{ rows: today }, { rows: active }, { rows: days }, { rows: kinds }, { rows: [totals] }, { rows: records }] = await Promise.all([
+        db.query(`SELECT id, mode, theme, score, coins, nuggets, points, best_combo AS "bestCombo", status, jsonb_array_length(questions) AS total, finished_at
                   FROM quizzes WHERE user_id = $1 AND day = $2 ORDER BY id`, [userId, day]),
-        db.query(`SELECT id, theme, current, score, jsonb_array_length(questions) AS total FROM quizzes
+        db.query(`SELECT id, mode, theme, current, score, points, lives, jsonb_array_length(questions) AS total FROM quizzes
                   WHERE user_id = $1 AND status = 'active' ORDER BY id DESC LIMIT 1`, [userId]),
         db.query(`SELECT DISTINCT to_char(day, 'YYYY-MM-DD') AS day FROM quizzes WHERE user_id = $1 AND status = 'done'
                   ORDER BY 1 DESC LIMIT 400`, [userId]),
         db.query(`SELECT q.questions -> (a.i::int - 1) ->> 'kind' AS kind, COUNT(*)::int AS answered,
                          COUNT(*) FILTER (WHERE (a.v ->> 'correct')::boolean)::int AS correct
                   FROM quizzes q CROSS JOIN jsonb_array_elements(q.answers) WITH ORDINALITY AS a(v, i)
-                  WHERE q.user_id = $1 GROUP BY 1`, [userId]),
+                  WHERE q.user_id = $1 AND NOT (a.v ? 'skip') GROUP BY 1`, [userId]),
         db.query(`SELECT COUNT(*) FILTER (WHERE status = 'done')::int AS quizzes,
                          COALESCE(SUM(score) FILTER (WHERE status = 'done'), 0)::int AS correct,
-                         COALESCE(SUM(jsonb_array_length(questions)) FILTER (WHERE status = 'done'), 0)::int AS questions,
-                         COUNT(*) FILTER (WHERE status = 'done' AND score = jsonb_array_length(questions))::int AS perfect,
+                         COALESCE(SUM(jsonb_array_length(answers)) FILTER (WHERE status = 'done'), 0)::int AS questions,
+                         COUNT(*) FILTER (WHERE status = 'done' AND mode IN ('classic', 'daily') AND score = jsonb_array_length(questions))::int AS perfect,
+                         COALESCE(SUM(points) FILTER (WHERE status = 'done'), 0)::int AS points,
+                         COALESCE(MAX(best_combo), 0)::int AS "bestCombo",
                          (SELECT COUNT(*)::int FROM quiz_seen WHERE user_id = $1) AS species
                   FROM quizzes WHERE user_id = $1`, [userId]),
+        db.query(`SELECT mode, MAX(points)::int AS points, MAX(score)::int AS score FROM quizzes
+                  WHERE user_id = $1 AND status = 'done' GROUP BY 1`, [userId]),
     ]);
+    const modes = Object.entries(MODES).map(([key, m]) => {
+        const perDay = modePerDay(user, key);
+        return {
+            key, label: m.label, perDay, left: Math.max(0, perDay - today.filter((q) => q.mode === key).length),
+            themes: !!m.themes, lives: m.lives || null, seconds: m.seconds || null, length: m.length || null,
+            record: records.find((r) => r.mode === key) || null,
+        };
+    });
+    const classic = modes.find((m) => m.key === 'classic');
     return {
         day,
-        perDay: quizPerDay(user),
-        left: Math.max(0, quizPerDay(user) - today.length),
+        perDay: classic.perDay,
+        left: classic.left,
         today,
         active: active[0] || null,
         streak: quizStreak(days.map((r) => r.day), day),
         stats: totals,
+        level: quizLevel(totals.points),
+        modes,
         kinds: Object.entries(KIND_LABELS).map(([kind, label]) => ({ kind, label, ...(kinds.find((k) => k.kind === kind) || { answered: 0, correct: 0 }) })),
         themes: Object.entries(THEMES).map(([key, t]) => ({ key, label: t.label })),
-        rewards: { levelCoins: LEVEL_COINS, perfectCoins: PERFECT_COINS, perfectNuggets: PERFECT_NUGGETS, cardScore: CARD_SCORE },
+        rewards: {
+            levelCoins: LEVEL_COINS, perfectCoins: PERFECT_COINS, perfectNuggets: PERFECT_NUGGETS, cardScore: CARD_SCORE,
+            runs: RUN_REWARDS, combo: COMBO_STEPS, blitz: BLITZ,
+        },
     };
+}
+
+// Today's daily challenge: built once, the same questions for every player.
+async function dailyQuestions(db, day) {
+    const get = () => db.query(`SELECT questions, reserve FROM quiz_daily WHERE day = $1`, [day]).then((r) => r.rows[0]);
+    let d = await get();
+    if (!d) {
+        const built = await buildQuiz(db, 'all', new Map(), { levels: [...LEVELS, 2] });
+        const reserve = built.length > LEVELS.length ? built.pop() : null;
+        if (built.length < 5) throw new HttpError(503, 'Le défi du jour se prépare, réessaie dans un instant');
+        await db.query(`INSERT INTO quiz_daily (day, questions, reserve) VALUES ($1, $2, $3) ON CONFLICT (day) DO NOTHING`,
+            [day, JSON.stringify(built), reserve && JSON.stringify(reserve)]);
+        d = await get();
+    }
+    return d;
+}
+
+// More questions for the endless modes, never repeating a species of this game.
+async function moreQuestions(db, q, count = 10) {
+    const { rows: seenRows } = await db.query(`SELECT card_id, at FROM quiz_seen WHERE user_id = $1`, [q.user_id]);
+    const seen = new Map(seenRows.map((r) => [r.card_id, new Date(r.at).getTime()]));
+    const exclude = q.questions.flatMap((x) => [...x.cardIds, x.about]);
+    const levels = Array.from({ length: count }, (_, i) => levelAt(q.mode, q.questions.length + i));
+    return buildQuiz(db, q.theme, seen, { levels, kinds: kindsFor(q.mode), exclude });
 }
 
 // The species behind a question, shown after the answer so the player learns something.
@@ -835,9 +885,13 @@ async function lockQuiz(client, userId, id) {
     return q;
 }
 
+const ENDLESS = ['survival', 'blitz'];
 const quizProgress = (q) => ({
-    id: q.id, theme: q.theme, themeLabel: THEMES[q.theme]?.label, current: q.current, total: q.questions.length,
-    score: q.score, coins: q.coins, nuggets: q.nuggets, results: q.answers.map((a) => a.correct),
+    id: q.id, mode: q.mode, modeLabel: MODES[q.mode]?.label, theme: q.theme, themeLabel: THEMES[q.theme]?.label,
+    current: q.current, total: ENDLESS.includes(q.mode) ? null : q.questions.length,
+    score: q.score, coins: q.coins, nuggets: q.nuggets, points: q.points, combo: q.combo, multiplier: multiplier(q.combo),
+    bestCombo: q.best_combo, lives: q.lives, maxLives: MODES[q.mode]?.lives || null, jokers: q.jokers, reserve: !!q.reserve,
+    endsAt: q.ends_at, answered: q.answers.length, results: q.answers.map((a) => (a.skip ? null : a.correct)),
 });
 
 // ---- Friends & trades ----
@@ -2420,24 +2474,38 @@ const actions = {
 
     async quizStart(db, body, event) {
         const user = await requireUser(db, event);
-        const theme = THEMES[body.theme] ? body.theme : 'all';
+        const mode = MODES[body.mode] ? body.mode : 'classic';
+        const M = MODES[mode];
+        const theme = M.themes && THEMES[body.theme] ? body.theme : 'all';
         const id = await inTransaction(db, async (client) => {
             await client.query(`SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
             const { rows: [active] } = await client.query(`SELECT id FROM quizzes WHERE user_id = $1 AND status = 'active' LIMIT 1`, [user.id]);
-            if (active) return active.id; // finish the running quiz first
+            if (active) return active.id; // finish the running game first
             const day = await parisDay(client);
-            const { rows: [{ played }] } = await client.query(`SELECT COUNT(*)::int AS played FROM quizzes WHERE user_id = $1 AND day = $2`, [user.id, day]);
-            if (played >= quizPerDay(user)) {
-                throw new HttpError(429, `Tu as joué tes ${quizPerDay(user)} quiz du jour. Reviens demain pour de nouvelles questions !`
-                    + (passActive(user) ? '' : ` Avec le Pass Naturaliste, tu as ${PASS.quizzes} quiz de plus chaque jour.`));
+            const { rows: [{ played }] } = await client.query(
+                `SELECT COUNT(*)::int AS played FROM quizzes WHERE user_id = $1 AND day = $2 AND mode = $3`, [user.id, day, mode]);
+            const perDay = modePerDay(user, mode);
+            if (played >= perDay) {
+                if (mode === 'daily') throw new HttpError(429, 'Tu as déjà relevé le défi du jour. Un nouveau défi t\'attend demain !');
+                const bonus = mode === 'classic' ? PASS.quizzes : M.passBonus;
+                throw new HttpError(429, `Tu as joué tes ${perDay} parties ${mode === 'classic' ? 'de quiz' : M.label} du jour. Reviens demain ou essaie un autre mode !`
+                    + (passActive(user) || !bonus ? '' : ` Avec le Pass Naturaliste, tu as ${bonus} partie${bonus > 1 ? 's' : ''} de plus chaque jour.`));
             }
-            const { rows: seenRows } = await client.query(`SELECT card_id, at FROM quiz_seen WHERE user_id = $1`, [user.id]);
-            const seen = new Map(seenRows.map((r) => [r.card_id, new Date(r.at).getTime()]));
-            const questions = await buildQuiz(db, theme, seen);
+            let questions, reserve = null;
+            if (mode === 'daily') {
+                ({ questions, reserve } = await dailyQuestions(db, day));
+            } else {
+                const { rows: seenRows } = await client.query(`SELECT card_id, at FROM quiz_seen WHERE user_id = $1`, [user.id]);
+                const seen = new Map(seenRows.map((r) => [r.card_id, new Date(r.at).getTime()]));
+                const levels = mode === 'classic' ? [...LEVELS, 2] : Array.from({ length: 10 }, (_, i) => levelAt(mode, i));
+                questions = await buildQuiz(db, theme, seen, { levels, kinds: kindsFor(mode) });
+                if (mode === 'classic' && questions.length > LEVELS.length) reserve = questions.pop();
+            }
             if (questions.length < 5) throw new HttpError(503, 'Impossible de préparer un quiz pour ce thème, essaie un autre thème');
             const { rows: [q] } = await client.query(
-                `INSERT INTO quizzes (user_id, day, theme, questions) VALUES ($1, $2, $3, $4) RETURNING id`,
-                [user.id, day, theme, JSON.stringify(questions)]
+                `INSERT INTO quizzes (user_id, day, theme, questions, mode, lives, jokers, reserve)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+                [user.id, day, theme, JSON.stringify(questions), mode, M.lives || null, JSON.stringify(M.jokers), reserve && JSON.stringify(reserve)]
             );
             await client.query(
                 `INSERT INTO quiz_seen (user_id, card_id) SELECT $1, unnest($2::int[])
@@ -2450,41 +2518,136 @@ const actions = {
     },
 
     // Shows the current question and starts its timer (a reload keeps the same deadline).
+    // The blitz clock starts with the first question.
     async quizNext(db, body, event) {
         const user = await requireUser(db, event);
         return inTransaction(db, async (client) => {
-            const q = await lockQuiz(client, user.id, body.id);
+            let q = await lockQuiz(client, user.id, body.id);
             if (q.status === 'done') return { quiz: quizProgress(q), done: true };
-            let askedAt = q.asked_at;
-            if (!askedAt) {
-                ({ rows: [{ asked_at: askedAt }] } = await client.query(`UPDATE quizzes SET asked_at = now() WHERE id = $1 RETURNING asked_at`, [q.id]));
+            if (!q.questions[q.current]) {
+                // An endless run went past its prepared questions (a skip at the very end): add more.
+                const more = await moreQuestions(db, q);
+                if (!more.length) throw new HttpError(503, 'Plus de questions disponibles, réessaie dans un instant');
+                ({ rows: [q] } = await client.query(`UPDATE quizzes SET questions = questions || $2::jsonb WHERE id = $1 RETURNING *`, [q.id, JSON.stringify(more)]));
             }
-            return { quiz: quizProgress(q), question: publicQuestion(q.questions[q.current], q.current, askedAt), serverNow: new Date().toISOString() };
+            if (!q.asked_at) {
+                ({ rows: [q] } = await client.query(
+                    `UPDATE quizzes SET asked_at = now(),
+                            ends_at = CASE WHEN mode = 'blitz' THEN COALESCE(ends_at, now() + make_interval(secs => $2)) END
+                     WHERE id = $1 RETURNING *`, [q.id, MODES.blitz.seconds]));
+            }
+            return {
+                quiz: quizProgress(q), question: publicQuestion(q.questions[q.current], q.current, q.asked_at, q.cur, q.ends_at),
+                serverNow: new Date().toISOString(),
+            };
+        });
+    },
+
+    // Jokers, once per game each: 50/50 (half the points), +10 s, or skip the question.
+    async quizJoker(db, body, event) {
+        const user = await requireUser(db, event);
+        return inTransaction(db, async (client) => {
+            const q = await lockQuiz(client, user.id, body.id);
+            const joker = String(body.joker);
+            if (q.status === 'done') throw new HttpError(409, 'Ce quiz est déjà terminé');
+            if (!q.asked_at || Number(body.index) !== q.current) throw new HttpError(409, 'Cette question a déjà reçu une réponse');
+            if (!(q.jokers[joker] > 0)) throw new HttpError(409, 'Ce joker est déjà utilisé');
+            const question = q.questions[q.current];
+            if (isLate(question, q.asked_at, q.cur, q.ends_at)) throw new HttpError(409, 'Trop tard pour un joker');
+            const jokers = { ...q.jokers, [joker]: q.jokers[joker] - 1 };
+            let cur = { ...q.cur }, sets = '', extra = [];
+            if (joker === 'fifty') {
+                if (question.options.length < 4 || cur.removed?.length) throw new HttpError(409, 'Pas de 50/50 sur cette question');
+                const wrong = question.options.map((_, i) => i).filter((i) => i !== question.answer);
+                cur = { ...cur, fifty: true, removed: wrong.sort(() => crypto.randomInt(3) - 1).slice(0, 2) };
+            } else if (joker === 'time') {
+                if (q.mode === 'blitz') sets = `, ends_at = ends_at + make_interval(secs => ${BLITZ.timeJokerMs / 1000})`;
+                else cur = { ...cur, extraMs: (cur.extraMs || 0) + TIME_JOKER_MS };
+            } else if (joker === 'skip') {
+                if (ENDLESS.includes(q.mode)) {
+                    // Endless modes: the question is set aside, no life lost, the combo is kept.
+                    const answers = [...q.answers, { skip: true, choice: -1, correct: null, ms: Date.now() - new Date(q.asked_at).getTime() }];
+                    sets = `, answers = $4, current = current + 1, asked_at = NULL`;
+                    extra = [JSON.stringify(answers)];
+                } else {
+                    if (!q.reserve) throw new HttpError(409, 'Plus de question de réserve');
+                    // A new question of the same level takes the place of this one.
+                    const questions = [...q.questions];
+                    questions[q.current] = { ...q.reserve, level: question.level };
+                    sets = `, questions = $4, reserve = NULL, asked_at = NULL`;
+                    extra = [JSON.stringify(questions)];
+                }
+                cur = {};
+            } else throw new HttpError(400, 'Joker inconnu');
+            const { rows: [updated] } = await client.query(
+                `UPDATE quizzes SET jokers = $2, cur = $3${sets} WHERE id = $1 RETURNING *`,
+                [q.id, JSON.stringify(jokers), JSON.stringify(cur), ...extra]);
+            return {
+                quiz: quizProgress(updated), joker, removed: cur.removed || [],
+                question: updated.asked_at ? publicQuestion(updated.questions[updated.current], updated.current, updated.asked_at, updated.cur, updated.ends_at) : null,
+                serverNow: new Date().toISOString(),
+            };
         });
     },
 
     async quizAnswer(db, body, event) {
         const user = await requireUser(db, event);
+        let topUp = null;
+        {
+            // Endless modes: prepare the next questions before running out (outside the lock).
+            const { rows: [peek] } = await db.query(
+                `SELECT * FROM quizzes WHERE id = $1 AND user_id = $2 AND status = 'active' AND mode = ANY($3)`, [Number(body.id), user.id, ENDLESS]);
+            if (peek && peek.current >= peek.questions.length - 3) topUp = await moreQuestions(db, peek);
+        }
         const result = await inTransaction(db, async (client) => {
             const q = await lockQuiz(client, user.id, body.id);
             if (q.status === 'done') throw new HttpError(409, 'Ce quiz est déjà terminé');
             if (Number(body.index) !== q.current || !q.asked_at) throw new HttpError(409, 'Cette question a déjà reçu une réponse');
+            const endless = ENDLESS.includes(q.mode);
             const question = q.questions[q.current];
-            const late = isLate(question, q.asked_at);
+            const cur = q.cur || {};
+            const now = Date.now();
+            const late = isLate(question, q.asked_at, cur, q.ends_at, now);
             const choice = Number.isInteger(body.choice) ? body.choice : -1;
-            const correct = !late && choice === question.answer;
-            const gained = correct ? LEVEL_COINS[question.level] : 0;
-            const answers = [...q.answers, { choice, correct, late, ms: Date.now() - new Date(q.asked_at).getTime() }];
-            const done = answers.length >= q.questions.length;
+            const correct = !late && choice === question.answer && !(cur.removed || []).includes(choice);
+            const ms = now - new Date(q.asked_at).getTime();
+            const combo = correct ? q.combo + 1 : 0;
             const score = q.score + (correct ? 1 : 0);
+            let points = 0, gained = 0;
+            if (correct) {
+                const allowed = q.mode === 'blitz' ? 0 : question.seconds * 1000 + (cur.extraMs || 0);
+                points = questionPoints(question.level, allowed ? 1 - ms / allowed : 0, combo, cur.fifty);
+                if (endless) {
+                    const R = RUN_REWARDS[q.mode];
+                    gained = R.perCorrect + (score % R.every === 0 ? R.everyCoins : 0);
+                } else gained = LEVEL_COINS[question.level];
+            }
+            let lives = q.lives;
+            if (q.mode === 'survival' && !correct) lives -= 1;
+            let endsAt = q.ends_at && new Date(q.ends_at).getTime();
+            if (q.mode === 'blitz' && !late) endsAt += correct ? BLITZ.correctMs : -BLITZ.wrongMs;
+            const answers = [...q.answers, { choice, correct, late, ms, points }];
+            let questions = q.questions;
+            if (topUp?.length && q.current >= questions.length - 3) questions = [...questions, ...topUp];
+            const done = q.mode === 'survival' ? lives <= 0 || q.current + 1 >= questions.length
+                : q.mode === 'blitz' ? late || endsAt <= now || q.current + 1 >= questions.length
+                    : q.current + 1 >= questions.length;
             let coins = q.coins + gained;
             let nuggets = 0, rewardCard = null;
+            const perfect = done && !endless && score === questions.length;
             if (done) {
-                const perfect = score === q.questions.length;
-                if (perfect) { coins += PERFECT_COINS; nuggets = PERFECT_NUGGETS; }
-                if (score >= CARD_SCORE) {
+                let cardWon;
+                if (endless) {
+                    const R = RUN_REWARDS[q.mode];
+                    nuggets = R.nuggets.filter(([n]) => score >= n).reduce((t, [, v]) => t + v, 0);
+                    cardWon = score >= R.card;
+                } else {
+                    if (perfect) { coins += PERFECT_COINS; nuggets = PERFECT_NUGGETS; }
+                    cardWon = score >= CARD_SCORE;
+                }
+                if (cardWon) {
                     // A card of a species the player recognised, new to the collection if possible (Rare at most).
-                    const known = q.questions.filter((_, i) => answers[i].correct).map((x) => x.about);
+                    const known = questions.filter((_, i) => answers[i]?.correct).map((x) => x.about);
                     const { rows: [c] } = await client.query(
                         `SELECT c.id FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1
                          WHERE c.id = ANY($2::int[]) AND c.rarity IN ('common', 'uncommon', 'rare')
@@ -2498,27 +2661,78 @@ const actions = {
             }
             const { rows: [updated] } = await client.query(
                 `UPDATE quizzes SET answers = $2, current = current + 1, asked_at = NULL, score = $3, coins = $4, nuggets = $5,
-                        reward_card = $6, status = $7, finished_at = CASE WHEN $7 = 'done' THEN now() END
+                        reward_card = $6, status = $7, finished_at = CASE WHEN $7 = 'done' THEN now() END,
+                        points = points + $8, combo = $9, best_combo = GREATEST(best_combo, $9), lives = $10,
+                        ends_at = $11, cur = '{}', questions = $12
                  WHERE id = $1 RETURNING *`,
-                [q.id, JSON.stringify(answers), score, coins, nuggets, rewardCard, done ? 'done' : 'active']
+                [q.id, JSON.stringify(answers), score, coins, nuggets, rewardCard, done ? 'done' : 'active',
+                    points, combo, lives, endsAt ? new Date(endsAt).toISOString() : null, JSON.stringify(questions)]
             );
+            if (q.questions.length < questions.length) {
+                await client.query(
+                    `INSERT INTO quiz_seen (user_id, card_id) SELECT $1, unnest($2::int[])
+                     ON CONFLICT (user_id, card_id) DO UPDATE SET at = now()`,
+                    [user.id, [...new Set(topUp.map((x) => x.about))]]);
+            }
             return {
-                correct, late, gained, answer: question.answer, facts: question.facts || null,
+                correct, late, gained, points, combo, multiplier: multiplier(combo), lifeLost: q.mode === 'survival' && !correct,
+                answer: question.answer, facts: question.facts || null,
                 reveal: question.hideLabels ? question.options.map((o) => o.label) : null,
-                about: question.about, done, quiz: quizProgress(updated), rewardCard, perfect: done && score === q.questions.length,
+                about: question.about, done, quiz: quizProgress(updated), rewardCard, perfect,
             };
         });
         const { about, rewardCard, ...res } = result;
         res.learn = await learnCard(db, about, user.id);
         if (res.done) {
-            const { rows: [q] } = await db.query(`SELECT questions, answers FROM quizzes WHERE id = $1`, [Number(body.id)]);
-            const ids = q.questions.map((x) => x.about);
-            const { rows: cards } = await db.query(`SELECT id, name, sci_name, thumb_url, type FROM cards WHERE id = ANY($1::int[])`, [ids]);
-            res.recap = ids.map((id, i) => ({ card: cards.find((c) => c.id === id), correct: q.answers[i]?.correct, kind: q.questions[i].kind }));
+            const id = Number(body.id);
+            const { rows: [q] } = await db.query(`SELECT mode, day, points, questions, answers FROM quizzes WHERE id = $1`, [id]);
+            const ids = q.questions.slice(0, q.answers.length).map((x) => x.about);
+            const [{ rows: cards }, { rows: [past] }, { rows: [rank] }] = await Promise.all([
+                db.query(`SELECT id, name, sci_name, thumb_url, type FROM cards WHERE id = ANY($1::int[])`, [ids]),
+                db.query(`SELECT COALESCE(SUM(points), 0)::int AS total,
+                                 MAX(points) FILTER (WHERE mode = $3)::int AS record
+                          FROM quizzes WHERE user_id = $1 AND status = 'done' AND id <> $2`, [user.id, id, q.mode]),
+                q.mode === 'daily' ? db.query(
+                    `SELECT COUNT(*) FILTER (WHERE points > $2)::int + 1 AS rank, COUNT(*)::int AS players
+                     FROM quizzes WHERE mode = 'daily' AND day = $1 AND status = 'done'`, [q.day, q.points]) : { rows: [null] },
+            ]);
+            res.recap = ids.map((cid, i) => ({ card: cards.find((c) => c.id === cid), correct: q.answers[i]?.correct, skip: !!q.answers[i]?.skip, kind: q.questions[i].kind }));
             res.rewardCard = rewardCard ? await learnCard(db, rewardCard, user.id) : null;
+            res.record = { previous: past.record, beaten: past.record == null || q.points > past.record };
+            res.level = { before: quizLevel(past.total), after: quizLevel(past.total + q.points) };
+            res.dailyRank = rank;
             res.user = await publicUser(db, await requireUser(db, event));
         }
         return res;
+    },
+
+    // Quiz leaderboards: today's daily challenge, best survival and blitz runs of the week, naturalist levels.
+    async quizBoard(db, body, event) {
+        const user = await requireUser(db, event);
+        const boards = {
+            daily: `SELECT user_id, points AS score, score AS extra FROM quizzes
+                    WHERE mode = 'daily' AND status = 'done' AND day = (now() AT TIME ZONE 'Europe/Paris')::date`,
+            survival: `SELECT user_id, MAX(points)::int AS score, MAX(score)::int AS extra FROM quizzes
+                       WHERE mode = 'survival' AND status = 'done' AND day >= (now() AT TIME ZONE 'Europe/Paris')::date - 6 GROUP BY 1`,
+            blitz: `SELECT user_id, MAX(points)::int AS score, MAX(score)::int AS extra FROM quizzes
+                    WHERE mode = 'blitz' AND status = 'done' AND day >= (now() AT TIME ZONE 'Europe/Paris')::date - 6 GROUP BY 1`,
+            level: `SELECT user_id, SUM(points)::int AS score, COUNT(*)::int AS extra FROM quizzes WHERE status = 'done' GROUP BY 1`,
+        };
+        const board = boards[body.board] ? body.board : 'daily';
+        const { rows } = await db.query(
+            `WITH s AS (${boards[board]}),
+             r AS (
+                SELECT u.username, ${AVATAR_SQL('u')} AS avatar, s.score, s.extra, u.id = $1 AS me,
+                       RANK() OVER (ORDER BY s.score DESC, s.extra DESC)::int AS rank, COUNT(*) OVER ()::int AS players
+                FROM s JOIN users u ON u.id = s.user_id
+                WHERE s.score > 0 AND (u.username NOT LIKE 'zz\\_test\\_%' OR u.id = $1)
+             )
+             SELECT * FROM r WHERE rank <= 20 OR me ORDER BY rank, username`, [user.id]);
+        const strip = ({ players, ...r }) => (board === 'level' ? { ...r, level: quizLevel(r.score) } : r);
+        return {
+            board, players: rows[0]?.players || 0,
+            top: rows.filter((r) => r.rank <= 20).map(strip), me: (rows.find((r) => r.me) && strip(rows.find((r) => r.me))) || null,
+        };
     },
 
     async shop(db, body, event) {
