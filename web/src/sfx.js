@@ -256,6 +256,32 @@ export const sfx = {
     // quiz
     correct: play(() => { bell(hz(76), 0, 0.12, 0.8); bell(hz(83), 0.1, 0.13, 1.1); }, 25),
     wrong: play(() => { tone({ f: 220, to: 150, dur: 0.35, type: 'sawtooth', gain: 0.16, reverb: 0.1 }); tone({ f: 233, to: 155, dur: 0.35, type: 'sawtooth', gain: 0.12, reverb: 0.1 }); }, [60, 40, 60]),
+    // quiz game: 3-2-1 countdown, combo steps, jokers, lost life, last seconds, game over, record, level up
+    count: play((last) => (last
+        ? (tone({ f: hz(84), dur: 0.5, type: 'square', gain: 0.09, reverb: 0.4 }), tone({ f: hz(91), dur: 0.6, gain: 0.12, reverb: 0.5 }), boom(0, 0.3))
+        : tone({ f: hz(72), dur: 0.18, type: 'square', gain: 0.07, reverb: 0.3 })), (last) => (last ? 60 : 15)),
+    combo: play((step) => {
+        const root = 76 + Math.min(step, 4) * 2;
+        [0, 4, 7, 12].forEach((m, i) => tone({ f: hz(root + m), start: i * 0.05, dur: 0.25, type: 'square', gain: 0.05, reverb: 0.4 }));
+        sparkle(0.15, 4 + step * 2);
+    }, 30),
+    joker: play((kind) => {
+        if (kind === 'fifty') { noise({ dur: 0.3, f: 2500, sweep: 400, q: 2, gain: 0.25, reverb: 0.3 }); bell(hz(79), 0.1, 0.08); }
+        else if (kind === 'time') [0, 0.08, 0.16].forEach((s, i) => tone({ f: hz(79 + i * 5), start: s, dur: 0.2, type: 'triangle', gain: 0.12, reverb: 0.4 }));
+        else { noise({ dur: 0.25, f: 800, sweep: 5000, q: 1.5, gain: 0.25, reverb: 0.2 }); tone({ f: hz(72), to: hz(84), dur: 0.2, gain: 0.08 }); }
+    }, 25),
+    lifeLost: play(() => { boom(0, 0.45, 90); tone({ f: hz(64), to: hz(52), dur: 0.5, type: 'triangle', gain: 0.15, reverb: 0.4 }); }, [80, 60, 120]),
+    tick: play((urgent) => tone({ f: urgent ? 1500 : 1100, dur: 0.05, type: 'square', gain: urgent ? 0.05 : 0.03, reverb: 0.05 })),
+    gameOver: play(() => {
+        [[72, 0], [67, 0.18], [64, 0.36], [60, 0.54]].forEach(([m, s]) => tone({ f: hz(m), start: s, dur: 0.3, type: 'square', gain: 0.07, reverb: 0.3 }));
+        boom(0.7, 0.5, 80);
+    }, [100, 80, 300]),
+    record: play(() => {
+        [[72, 0], [76, 0.1], [79, 0.2], [84, 0.3], [88, 0.45], [91, 0.6]].forEach(([m, s]) => tone({ f: hz(m), start: s, dur: 0.3, type: 'sawtooth', gain: 0.05, reverb: 0.5 }));
+        [72, 79, 84, 88].forEach((m) => tone({ f: hz(m), start: 0.75, dur: 1.8, type: 'triangle', gain: 0.07, attack: 0.02, reverb: 0.6 }));
+        boom(0.75, 0.45); sparkle(0.8, 20);
+    }, [60, 60, 60, 60, 300]),
+    levelUp: play(() => { [67, 72, 76, 79, 84].forEach((m, i) => bell(hz(m), i * 0.08, 0.1)); sparkle(0.4, 14, 2600); }, [40, 40, 40, 200]),
 
     // battle
     attack: play((pan) => noise({ dur: 0.18, f: 900, sweep: 3500, q: 1.2, gain: 0.5, attack: 0.03, reverb: 0.1, pan })),
