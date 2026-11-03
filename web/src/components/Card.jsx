@@ -19,6 +19,9 @@ function fallbackToOriginal(e) {
     if (original !== e.currentTarget.src) e.currentTarget.src = original;
 }
 
+// Full art pictures cover the whole card: a 500px thumbnail looks blurry there, ask Wikimedia for a bigger one.
+const sharper = (url) => url?.replace(/\/\d+px-([^/]+)$/, '/960px-$1');
+
 // Special finish (cards.art): 'full' / 'illus' = the picture fills the whole card and the text sits
 // on top of it; 'holo' = the regular layout with a holographic foil (some commons and uncommons).
 export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo' };
@@ -76,7 +79,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                     </div>
                 </div>
                 <div className="nd-window">
-                    <img src={card.thumb_url} alt={card.name} loading="lazy" draggable="false" onError={fallbackToOriginal} />
+                    <img src={bleed ? sharper(card.thumb_url) : card.thumb_url} alt={card.name} loading="lazy" draggable="false" onError={fallbackToOriginal} />
                 </div>
                 <div className="nd-strip">
                     <span className="nd-sci">{card.sci_name || t.label}</span>
