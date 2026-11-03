@@ -61,7 +61,7 @@ export default function HoneyShopPanel({ garden, busy, onBuy, onEquip, onClose }
 }
 
 function Preview({ slot, id, me, sample }) {
-    if (slot === 'frame') return sample ? <div className="w-[5.4rem] pointer-events-none"><Card card={sample} frame={id} /></div> : null;
+    if (slot === 'frame') return sample ? <div className="w-[6.2rem] pointer-events-none"><Card card={sample} frame={id} /></div> : null;
     const look = slot === 'scene' ? { ...me, scene: id, fx: 'aucun' } : { ...me, fx: id };
     return <AvatarFigure avatar={look} size={84} />;
 }
@@ -69,7 +69,7 @@ function Preview({ slot, id, me, sample }) {
 function Tile({ name, price, honey, preview, have, worn, busy, onBuy, onEquip }) {
     return (
         <li className={`p-3 rounded-2xl ring-1 flex flex-col items-center ${worn ? 'bg-[#ff9ec2]/12 ring-[#ff9ec2]/50' : have ? 'bg-[#8ee6a8]/[0.07] ring-[#8ee6a8]/30' : 'bg-white/[0.04] ring-white/10'}`}>
-            <div className="grid place-items-center h-[7.6rem]">{preview}</div>
+            <div className="grid place-items-center h-[8.8rem]">{preview}</div>
             <p className="mt-1.5 font-bold text-white text-sm text-center leading-tight">{name}</p>
             {worn ? (
                 <span className="mt-2 w-full flex items-center justify-center gap-1 py-2 rounded-full text-sm font-bold text-[#ffc4dc]"><Check className="w-4 h-4" />Équipé</span>

@@ -96,6 +96,7 @@ const DECOR = {
     sapin: { name: 'Sapin illuminé', price: 320, beauty: 5, season: 'hiver' },
 };
 const SEASONS = { printemps: 'Printemps', ete: 'Été', automne: 'Automne', hiver: 'Hiver' };
+const SEASON_IN = { printemps: 'au printemps', ete: 'en été', automne: 'en automne', hiver: 'en hiver' };
 const SEASON_START = { printemps: 3, ete: 6, automne: 9, hiver: 12 }; // month the season starts
 // Current season by the Paris calendar, with the date it ends (first day of the next one).
 function seasonNow(now = Date.now()) {
@@ -570,7 +571,7 @@ export function gardenActions({ requireUser, publicUser, HttpError }) {
             return withGarden(db, event, async (client, user, m) => {
                 need(m, 'decor', 4);
                 if (m.decor.includes(body.key)) throw new HttpError(409, 'Tu l\'as déjà');
-                if (item.season && item.season !== seasonNow().key) throw new HttpError(409, `Revient au ${SEASONS[item.season].toLowerCase()}`);
+                if (item.season && item.season !== seasonNow().key) throw new HttpError(409, `Revient ${SEASON_IN[item.season]}`);
                 if (m.honey < item.price) throw new HttpError(402, 'Pas assez de miel');
                 m.honey -= item.price;
                 m.decor = [...m.decor, body.key];

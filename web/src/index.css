@@ -95,7 +95,8 @@ body {
 }
 .nd-card > * { flex: 1 1 0; min-height: 0; }
 /* Honey-shop card frames: they replace the rarity colour of the border, which stays as a thin ring. */
-.nd-card[data-frame] .nd-card-inner { box-shadow: 0 0 0 0.9cqi var(--rar), 0 0 0 1.3cqi rgb(0 0 0 / 0.25); }
+.nd-card[data-frame] { padding: 5.6cqi; }
+.nd-card[data-frame] .nd-card-inner { box-shadow: 0 0 0 0.7cqi var(--rar), 0 0 0 1.1cqi rgb(0 0 0 / 0.3), 0 0 2cqi 1cqi rgb(0 0 0 / 0.35); }
 .nd-card[data-frame="bois"] {
     background:
         repeating-linear-gradient(100deg, rgb(255 255 255 / 0.07) 0 0.6cqi, transparent 0.6cqi 3cqi),
