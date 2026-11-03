@@ -595,6 +595,17 @@ async function badgeCounts(db, user, pub) {
 
 const MESSAGE_MAX = 1000;
 const MESSAGES_PER_MINUTE = 20;
+// The game's author: any player can write to them (feedback tab), and they can answer anyone.
+const OWNER = 'flohenn';
+const FEEDBACK_KINDS = {
+    guestbook: '📖 Livre d\'or',
+    thanks: '💚 Merci',
+    idea: '💡 À changer / idée',
+    bug: '🐞 Bug',
+    other: '✉️ Autre',
+};
+const FEEDBACK_PER_HOUR = 5;
+const isOwner = (u) => u.username.toLowerCase() === OWNER;
 const THREAD_LIMIT = 100;
 
 // ---------- gifts between friends ----------
@@ -2200,7 +2211,7 @@ const actions = {
         const { rowCount: read } = await db.query(
             `UPDATE messages SET read_at = now() WHERE from_id = $2 AND to_id = $1 AND read_at IS NULL`, [user.id, other.id]);
         const f = await relation(db, user.id, other.id);
-        return { username: other.username, friend: f?.status === 'accepted', messages: rows, read };
+        return { username: other.username, friend: f?.status === 'accepted' || isOwner(user) || isOwner(other), messages: rows, read };
     },
 
     async sendMessage(db, body, event) {
@@ -2208,7 +2219,9 @@ const actions = {
         const text = String(body.body || '').replace(/\r\n/g, '\n').trim();
         if (!text) throw new HttpError(400, 'Message vide');
         if (text.length > MESSAGE_MAX) throw new HttpError(400, `Message trop long (${MESSAGE_MAX} caractères maximum)`);
-        const other = await requireFriend(db, user.id, body.username);
+        const target = await findUser(db, body.username);
+        if (target.id === user.id) throw new HttpError(400, 'Tu ne peux pas t\'écrire à toi-même');
+        const other = isOwner(user) || isOwner(target) ? target : await requireFriend(db, user.id, body.username);
         const { rows: [{ n }] } = await db.query(
             `SELECT COUNT(*)::int AS n FROM messages WHERE from_id = $1 AND created_at > now() - interval '1 minute'`, [user.id]);
         if (n >= MESSAGES_PER_MINUTE) throw new HttpError(429, 'Doucement ! Attends un peu avant d\'envoyer d\'autres messages');
@@ -2217,6 +2230,24 @@ const actions = {
             [user.id, other.id, text]
         );
         return { message };
+    },
+
+    // Feedback tab: a tagged private message straight into the author's inbox.
+    async sendFeedback(db, body, event) {
+        const user = await requireUser(db, event);
+        const label = FEEDBACK_KINDS[body.kind];
+        if (!label) throw new HttpError(400, 'Choisis le type de message');
+        const text = String(body.body || '').replace(/\r\n/g, '\n').trim();
+        if (text.length < 3) throw new HttpError(400, 'Écris quelques mots');
+        const full = `${label}\n${text}`;
+        if (full.length > MESSAGE_MAX) throw new HttpError(400, `Message trop long (${MESSAGE_MAX - label.length - 1} caractères maximum)`);
+        if (isOwner(user)) throw new HttpError(400, 'Les avis arrivent dans ta propre messagerie : pas besoin de t\'en envoyer');
+        const owner = await findUser(db, OWNER);
+        const { rows: [{ n }] } = await db.query(
+            `SELECT COUNT(*)::int AS n FROM messages WHERE from_id = $1 AND to_id = $2 AND created_at > now() - interval '1 hour'`, [user.id, owner.id]);
+        if (n >= FEEDBACK_PER_HOUR) throw new HttpError(429, 'Merci ! Tu as déjà envoyé plusieurs messages, réessaie dans un moment');
+        await db.query(`INSERT INTO messages (from_id, to_id, body) VALUES ($1, $2, $3)`, [user.id, owner.id, full]);
+        return { ok: true, owner: owner.username };
     },
 
     // ---- Gifts ----

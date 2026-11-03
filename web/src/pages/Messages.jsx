@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, MessageCircle, Send, UserPlus } from 'lucide-react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, CheckCircle2, MessageCircle, MessageSquareHeart, Send, UserPlus } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import PlayerAvatar from '../components/PlayerAvatar.jsx';
 
@@ -157,8 +157,82 @@ function Thread({ username, onActivity }) {
     );
 }
 
+const FEEDBACK_KINDS = [
+    { key: 'idea', emoji: '💡', label: 'À changer / idée', hint: 'Qu\'est-ce qui te manque, t\'agace ou pourrait être mieux ?' },
+    { key: 'bug', emoji: '🐞', label: 'Bug', hint: 'Où ça s\'est passé, ce que tu faisais, sur téléphone ou ordinateur…' },
+    { key: 'thanks', emoji: '💚', label: 'Merci', hint: 'Un petit mot qui fait plaisir.' },
+    { key: 'guestbook', emoji: '📖', label: 'Livre d\'or', hint: 'Laisse une trace de ton passage sur NatureDex.' },
+    { key: 'other', emoji: '✉️', label: 'Autre', hint: 'Tout ce qui ne rentre pas dans les autres cases.' },
+];
+const FEEDBACK_MAX = 900;
+
+function Feedback() {
+    const [kind, setKind] = useState('idea');
+    const [text, setText] = useState('');
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState('');
+    const [sent, setSent] = useState(null);
+    const current = FEEDBACK_KINDS.find((k) => k.key === kind);
+
+    async function send(e) {
+        e.preventDefault();
+        if (text.trim().length < 3 || sending) return;
+        setSending(true);
+        setError('');
+        try {
+            const res = await api('sendFeedback', { kind, body: text });
+            setSent(res.owner);
+            setText('');
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setSending(false);
+        }
+    }
+
+    if (sent) {
+        return (
+            <div className="p-6 sm:p-8 text-center">
+                <CheckCircle2 className="w-12 h-12 mx-auto text-[#4fd18b]" />
+                <p className="mt-3 font-display text-2xl text-white">Merci pour ton message !</p>
+                <p className="mt-2 text-ink-soft">Il est bien arrivé. Si une réponse est nécessaire, elle t'attendra dans tes messages.</p>
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                    <Link to={`/messages/${encodeURIComponent(sent)}`} className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 text-sm font-semibold text-white">Voir la conversation</Link>
+                    <button onClick={() => setSent(null)} className="px-4 py-2 rounded-full nd-btn text-sm font-semibold">Écrire autre chose</button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <form onSubmit={send} className="p-5 sm:p-7 max-w-2xl">
+            <p className="font-display text-2xl text-white">Ton avis compte</p>
+            <p className="mt-1.5 text-ink-soft">Une idée, un bug, un merci ou un mot pour le livre d'or : ton message arrive directement dans la messagerie de l'équipe de NatureDex. Surtout, dis-nous ce qu'il faudrait changer !</p>
+            <div className="mt-5 flex flex-wrap gap-2" role="radiogroup" aria-label="Type de message">
+                {FEEDBACK_KINDS.map((k) => (
+                    <button key={k.key} type="button" role="radio" aria-checked={kind === k.key} onClick={() => setKind(k.key)}
+                        className={`px-3.5 py-2 rounded-full text-sm font-semibold transition-colors ${kind === k.key ? 'bg-[#4fd18b] text-[#05130d]' : 'bg-white/5 hover:bg-white/10 text-white'}`}>
+                        <span className="mr-1.5">{k.emoji}</span>{k.label}
+                    </button>
+                ))}
+            </div>
+            <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, FEEDBACK_MAX))} rows={6} placeholder={current.hint}
+                className="mt-4 w-full resize-y px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+            <div className="mt-1 flex items-center justify-between gap-3">
+                <span className="text-xs text-ink-soft">{text.length} / {FEEDBACK_MAX}</span>
+                {error && <span className="text-sm font-semibold text-rust">{error}</span>}
+            </div>
+            <button disabled={text.trim().length < 3 || sending} className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-full nd-btn font-semibold disabled:opacity-40">
+                <Send className="w-4 h-4" />{sending ? 'Envoi…' : 'Envoyer'}
+            </button>
+        </form>
+    );
+}
+
 export default function Messages() {
     const { username } = useParams();
+    const [params, setParams] = useSearchParams();
+    const feedback = !username && params.get('onglet') === 'avis';
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
 
@@ -175,8 +249,20 @@ export default function Messages() {
                 <p className="uppercase tracking-[0.25em] text-xs font-bold text-brass-deep">Messagerie</p>
                 <h1 className="mt-1 font-display text-4xl sm:text-5xl font-medium text-white">Messages</h1>
                 <p className="mt-3 text-ink-soft">Discute avec tes amis : prépare un échange, montre tes plus belles cartes.</p>
+                <div className="mt-5 inline-flex p-1 rounded-full bg-white/5 ring-1 ring-white/10">
+                    {[['', 'Conversations', MessageCircle], ['avis', 'Ton avis', MessageSquareHeart]].map(([key, label, Icon]) => {
+                        const on = (key === 'avis') === feedback;
+                        return (
+                            <button key={key} onClick={() => setParams(key ? { onglet: key } : {})}
+                                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${on ? 'bg-[#4fd18b] text-[#05130d]' : 'text-white hover:bg-white/10'}`}>
+                                <Icon className="w-4 h-4" />{label}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
             {error && <p className="mt-4 text-sm font-semibold text-rust">{error}</p>}
+            {feedback ? <section className="mt-6 rounded-3xl nd-glass overflow-hidden"><Feedback /></section> : (
             <div className={`${username ? 'mt-0 lg:mt-6' : 'mt-6'} lg:grid lg:grid-cols-[19rem_1fr] lg:gap-4`}>
                 <section className={`rounded-3xl nd-glass overflow-hidden lg:h-[34rem] lg:overflow-y-auto ${username ? 'hidden lg:block' : ''}`}>
                     <Conversations data={data} active={username} />
@@ -189,6 +275,7 @@ export default function Messages() {
                     )}
                 </section>
             </div>
+            )}
         </div>
     );
 }
