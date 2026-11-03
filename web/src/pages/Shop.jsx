@@ -153,7 +153,9 @@ function PassCard({ shop, user, assoc, ret, onUser }) {
     const perks = [
         [CalendarCheck, <>Bonus du jour doublé : <Amount seeds={p.dailyBase + p.dailyCoins} /> + <Amount nuggets={p.dailyNuggets} /></>],
         [Compass, <><b className="text-white">{p.catchBase + p.catches} captures</b> par jour en Exploration au lieu de {p.catchBase}</>],
-        [Brain, <><b className="text-white">{p.quizBase + p.quizzes} quiz</b> par jour au lieu de {p.quizBase}</>],
+        [Brain, <>Plus de parties de quiz chaque jour : {(p.quizModes || []).map((m, i) => (
+            <span key={m.label}>{i > 0 && ', '}<b className="text-white">{m.base + m.bonus} en {m.label}</b> au lieu de {m.base}</span>
+        ))}, pour viser le podium du concours de la semaine</>],
         [Clock, <>Un booster gratuit <b className="text-white">toutes les {p.chargeMinutes} min</b> au lieu de {p.chargeBase === 60 ? '1 h' : `${p.chargeBase} min`}</>],
         [Leaf, <>Badge <b className="text-white">Mécène</b> à côté de ton pseudo</>],
         [HeartHandshake, <><b className="text-[#a8f0c6]">{euros(p.donation)} chaque mois</b> pour {assoc.name}</>],

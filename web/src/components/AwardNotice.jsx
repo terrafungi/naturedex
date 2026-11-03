@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, useLocation } from 'react-router-dom';
-import { Crown, Frame } from 'lucide-react';
+import { Brain, Crown, Frame } from 'lucide-react';
 import { Nugget, NUGGET_COLOR } from './Currency.jsx';
 import { api, useGame } from '../api.jsx';
 import { sfx } from '../sfx.js';
@@ -18,27 +18,28 @@ function weekLabel(week) {
     return `du ${day(start, start.getUTCMonth() !== end.getUTCMonth())} au ${day(end, true)}`;
 }
 
-// Pop-up for the winners of the weekly showcase contest: one prize at a time, collected here.
-// Shown after the gift pop-up; « Plus tard » keeps the prize (and the Vitrines badge) until the
-// next visit of the Vitrines page.
+// Pop-up for the winners of the weekly showcase and quiz contests: one prize at a time, collected here.
+// Shown after the gift pop-up; « Plus tard » keeps the prize (and the Vitrines / Quiz badge) until the
+// next visit of that page.
 export default function AwardNotice() {
     const { user, awards, setAwards, gifts, setUser } = useGame();
     const [later, setLater] = useState([]);
     const { pathname } = useLocation();
-    useEffect(() => { if (pathname === '/vitrines') setLater([]); }, [pathname]);
+    useEffect(() => { if (pathname === '/vitrines' || pathname === '/quiz') setLater([]); }, [pathname]);
     const [done, setDone] = useState(null); // prize just collected
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
-    const award = done || (gifts.length || hasNews(user) ? null : awards.find((a) => !later.includes(a.week)));
+    const award = done || (gifts.length || hasNews(user) ? null : awards.find((a) => !later.includes(`${a.kind}:${a.week}`)));
+    const quiz = award?.kind === 'quiz';
 
     async function claim() {
         setBusy(true);
         setError('');
         try {
-            const r = await api('claimShowcaseAward', { week: award.week });
+            const r = await api('claimShowcaseAward', { week: award.week, kind: award.kind });
             sfx.coin();
             setDone(award);
-            setAwards((list) => list.filter((a) => a.week !== award.week));
+            setAwards((list) => list.filter((a) => a.kind !== award.kind || a.week !== award.week));
             setUser(r.user);
         } catch (e) {
             setError(e.message);
@@ -46,7 +47,7 @@ export default function AwardNotice() {
     }
     function close() {
         if (done) setDone(null);
-        else setLater((l) => [...l, award.week]);
+        else setLater((l) => [...l, `${award.kind}:${award.week}`]);
         setError('');
     }
 
@@ -65,10 +66,10 @@ export default function AwardNotice() {
                             {award.rank === 1 ? <Crown className="w-8 h-8" /> : award.rank}
                         </motion.span>
                         <h2 id="award-notice-title" className="mt-4 font-display text-2xl text-white">
-                            {done ? 'Récompense récupérée !' : award.rank === 1 ? 'Ta vitrine est n°1 !' : 'Ta vitrine est sur le podium !'}
+                            {done ? 'Récompense récupérée !' : quiz ? (award.rank === 1 ? 'Tu es n°1 du quiz !' : 'Tu es sur le podium du quiz !') : award.rank === 1 ? 'Ta vitrine est n°1 !' : 'Ta vitrine est sur le podium !'}
                         </h2>
                         <p className="mt-2 text-sm text-white/75">
-                            {PLACES[award.rank - 1]} place du concours des vitrines de la semaine {weekLabel(award.week)}, avec {award.votes} ♥.
+                            {PLACES[award.rank - 1]} place du concours {quiz ? 'de quiz' : 'des vitrines'} de la semaine {weekLabel(award.week)}, avec {quiz ? `${award.points.toLocaleString('fr-FR')} points` : `${award.votes} ♥`}.
                         </p>
                         <p className="mt-4 flex items-center justify-center gap-1.5 font-display text-3xl font-semibold tabular-nums" style={{ color: NUGGET_COLOR }}>
                             {done ? '+' : ''}{award.nuggets.toLocaleString('fr-FR')}<Nugget className="w-7 h-7" />
@@ -77,8 +78,8 @@ export default function AwardNotice() {
                         <div className="mt-5 flex flex-col gap-2">
                             {done ? (
                                 <>
-                                    <Link to="/vitrines" onClick={close} className="nd-cta-gold py-3 rounded-full font-bold flex items-center justify-center gap-2">
-                                        <Frame className="w-4 h-4" />Voir les vitrines
+                                    <Link to={quiz ? '/quiz' : '/vitrines'} onClick={close} className="nd-cta-gold py-3 rounded-full font-bold flex items-center justify-center gap-2">
+                                        {quiz ? <><Brain className="w-4 h-4" />Retour au quiz</> : <><Frame className="w-4 h-4" />Voir les vitrines</>}
                                     </Link>
                                     <button type="button" onClick={close} className="py-3 rounded-full font-bold ring-1 ring-white/15 text-white/85 hover:bg-white/5">Fermer</button>
                                 </>

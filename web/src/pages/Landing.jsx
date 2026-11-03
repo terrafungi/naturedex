@@ -183,7 +183,7 @@ const FEATURES = [
     { to: '/terrain', Icon: Camera, color: '#7cc6ff', title: 'Sur le terrain', text: 'Photographie une vraie espèce : l\'IA la reconnaît et ta photo devient une carte unique.' },
     { to: '/jardin', Icon: Sprout, color: '#8ee6a8', title: 'Jardin', text: 'Plante, récolte, et transforme tes plantes en boosters.' },
     { to: '/combat', Icon: Swords, color: '#ff8a65', title: 'Combat', text: 'Au tour par tour, sans hasard. Saisons, classement et badges.' },
-    { to: '/quiz', Icon: Brain, color: '#c79bff', title: 'Quiz du jour', text: '10 questions sur le vivant, de facile à expert.' },
+    { to: '/quiz', Icon: Brain, color: '#c79bff', title: 'Quiz Arena', text: '4 modes de jeu et un concours chaque semaine : le podium gagne des pépites.' },
     { to: '/encheres', Icon: Gavel, color: '#f4c25b', title: 'Enchères', text: 'Vends tes doubles, trouve les espèces qui te manquent.' },
     { to: '/vitrines', Icon: Frame, color: '#ffb4d0', title: 'Vitrines', text: 'Compose et partage tes plus belles cartes.' },
     { to: '/amis', Icon: Users, color: '#a8f0c6', title: 'Amis et messages', text: 'Échange, discute et compare vos carnets.' },
@@ -222,7 +222,7 @@ function Features() {
 const PASS_PERKS = [
     [CalendarCheck, 'Bonus du jour doublé', '200 graines + 40 pépites chaque jour'],
     [Compass, '15 captures par jour', 'en Exploration, au lieu de 10'],
-    [Brain, '5 quiz par jour', 'au lieu de 3'],
+    [Brain, 'Plus de parties de quiz', '5 en Classique (au lieu de 3), 3 en Survie (au lieu de 2), 5 en Blitz (au lieu de 3)'],
     [Clock, 'Booster gratuit toutes les 45 min', 'au lieu de toutes les heures'],
     [Shirt, '5 objets d\'avatar exclusifs', 'Mécène, Lauriers d\'or, Faon, garde forestier, Baskets ailées'],
     [Leaf, 'Badge Mécène', 'à côté de ton pseudo'],

@@ -818,6 +818,7 @@ async function quizState(db, user) {
         return {
             key, label: m.label, perDay, left: Math.max(0, perDay - today.filter((q) => q.mode === key).length),
             themes: !!m.themes, lives: m.lives || null, seconds: m.seconds || null, length: m.length || null,
+            passBonus: key === 'classic' ? PASS.quizzes : m.passBonus || 0,
             record: records.find((r) => r.mode === key) || null,
         };
     });
@@ -832,6 +833,7 @@ async function quizState(db, user) {
         stats: totals,
         level: quizLevel(totals.points),
         modes,
+        contest: await quizContest(db, userId),
         kinds: Object.entries(KIND_LABELS).map(([kind, label]) => ({ kind, label, ...(kinds.find((k) => k.kind === kind) || { answered: 0, correct: 0 }) })),
         themes: Object.entries(THEMES).map(([key, t]) => ({ key, label: t.label })),
         rewards: {
@@ -1264,11 +1266,58 @@ async function showcaseOfWeek(db) {
     return null;
 }
 
-// Prizes won and not yet collected (pop-up + Vitrines badge).
+// Weekly quiz contest: the 3 players with the most quiz points (every mode) over the Paris week.
+const QUIZ_PRIZES = [300, 200, 100];
+const QUIZ_WEEK_POINTS = `SELECT user_id, SUM(points)::int AS points, SUM(score)::int AS correct FROM quizzes
+    WHERE status = 'done' AND day >= $1::date AND day < $1::date + 7 GROUP BY 1`;
+
+async function quizWeekRollover(db, { week = null, tests = false } = {}) {
+    return inTransaction(db, async (client) => {
+        const { rows: [w] } = await client.query(
+            `INSERT INTO quiz_weeks (week) VALUES (COALESCE($1::date, (${PARIS_WEEK} - interval '7 days')::date))
+             ON CONFLICT DO NOTHING RETURNING week::text AS week`, [week]);
+        if (!w) return null;
+        const { rows } = await client.query(
+            `WITH s AS (${QUIZ_WEEK_POINTS})
+             SELECT s.user_id, s.points FROM s JOIN users u ON u.id = s.user_id
+             WHERE s.points > 0 AND (u.username LIKE 'zz\\_test\\_%') = $2
+             ORDER BY s.points DESC, s.correct DESC, s.user_id LIMIT $3`,
+            [w.week, tests, QUIZ_PRIZES.length]);
+        for (const [i, r] of rows.entries()) {
+            await client.query(
+                `INSERT INTO quiz_awards (week, user_id, rank, points, nuggets) VALUES ($1, $2, $3, $4, $5)`,
+                [w.week, r.user_id, i + 1, r.points, QUIZ_PRIZES[i]]);
+        }
+        return { week: w.week, winners: rows.length };
+    });
+}
+
+// The running quiz week (end time, prizes, the caller's place) and last week's podium.
+async function quizContest(db, userId) {
+    const { rows: last } = await db.query(
+        `SELECT a.rank, a.points, a.nuggets, u.username, a.week::text AS week FROM quiz_awards a JOIN users u ON u.id = a.user_id
+         WHERE a.week = (SELECT MAX(week) FROM quiz_weeks WHERE week < (${PARIS_WEEK})::date)
+           AND u.username NOT LIKE 'zz\\_test\\_%'
+         ORDER BY a.rank`);
+    const { rows: [e] } = await db.query(
+        `SELECT ${parisWeekStart(`(${PARIS_WEEK} + interval '7 days')`)} AS "endsAt", (${PARIS_WEEK})::date::text AS week`);
+    const { rows: [me] } = await db.query(
+        `WITH s AS (${QUIZ_WEEK_POINTS}),
+         r AS (SELECT s.user_id, s.points, RANK() OVER (ORDER BY s.points DESC, s.correct DESC)::int AS rank
+               FROM s JOIN users u ON u.id = s.user_id
+               WHERE s.points > 0 AND (u.username NOT LIKE 'zz\\_test\\_%' OR u.id = $2))
+         SELECT rank, points FROM r WHERE user_id = $2`, [e.week, userId]);
+    return { prizes: QUIZ_PRIZES, endsAt: e.endsAt, last, me: me || null };
+}
+
+// Prizes won and not yet collected (pop-up + Vitrines / Quiz badge), from both weekly contests.
 async function unclaimedAwards(db, userId) {
     const { rows } = await db.query(
-        `SELECT week::text AS week, rank, votes, nuggets FROM showcase_awards
-         WHERE user_id = $1 AND claimed_at IS NULL ORDER BY week, rank`, [userId]);
+        `SELECT 'showcase' AS kind, week::text AS week, rank, votes, NULL::int AS points, nuggets FROM showcase_awards
+         WHERE user_id = $1 AND claimed_at IS NULL
+         UNION ALL
+         SELECT 'quiz', week::text, rank, NULL, points, nuggets FROM quiz_awards
+         WHERE user_id = $1 AND claimed_at IS NULL ORDER BY 2, 3`, [userId]);
     return rows;
 }
 
@@ -1779,7 +1828,8 @@ const actions = {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.week || ''))) throw new HttpError(400, 'Semaine invalide');
         return inTransaction(db, async (client) => {
             const { rows: [a] } = await client.query(
-                `UPDATE showcase_awards SET claimed_at = now() WHERE user_id = $1 AND week = $2 AND claimed_at IS NULL RETURNING nuggets`,
+                `UPDATE ${body.kind === 'quiz' ? 'quiz_awards' : 'showcase_awards'} SET claimed_at = now()
+                 WHERE user_id = $1 AND week = $2 AND claimed_at IS NULL RETURNING nuggets`,
                 [user.id, body.week]);
             if (!a) throw new HttpError(409, 'Récompense déjà récupérée');
             const { rows: [u] } = await client.query(`UPDATE users SET nuggets = nuggets + $2 WHERE id = $1 RETURNING *`, [user.id, a.nuggets]);
@@ -2245,7 +2295,9 @@ const actions = {
             pub.social.newGifts ? unseenGifts(db, user.id) : [],
             unclaimedAwards(db, user.id),
         ]);
-        if (awards.length) badges['/vitrines'] = awards.length;
+        const count = (kind) => awards.filter((a) => a.kind === kind).length;
+        if (count('showcase')) badges['/vitrines'] = count('showcase');
+        if (count('quiz')) badges['/quiz'] = (badges['/quiz'] || 0) + count('quiz');
         return { user: pub, badges, gifts, awards };
     },
 
@@ -2748,6 +2800,8 @@ const actions = {
             blitz: `SELECT user_id, MAX(points)::int AS score, MAX(score)::int AS extra FROM quizzes
                     WHERE mode = 'blitz' AND status = 'done' AND day >= (now() AT TIME ZONE 'Europe/Paris')::date - 6 GROUP BY 1`,
             level: `SELECT user_id, SUM(points)::int AS score, COUNT(*)::int AS extra FROM quizzes WHERE status = 'done' GROUP BY 1`,
+            week: `SELECT user_id, SUM(points)::int AS score, SUM(score)::int AS extra FROM quizzes
+                   WHERE status = 'done' AND day >= (${PARIS_WEEK})::date GROUP BY 1`,
         };
         const board = boards[body.board] ? body.board : 'daily';
         const { rows } = await db.query(
@@ -2795,7 +2849,9 @@ const actions = {
                 id, ...a, donated: byAssoc[id]?.donated || 0, purchases: byAssoc[id]?.purchases || 0,
             })),
             totalDonated: totals.reduce((sum, t) => sum + t.donated, 0),
-            pass: { ...PASS, donation: donationOf(PASS.price), dailyBase: DAILY_COINS, quizBase: QUIZ_PER_DAY, catchBase: 10, chargeBase: CHARGE_MS / 60000 },
+            pass: { ...PASS, donation: donationOf(PASS.price), dailyBase: DAILY_COINS, quizBase: QUIZ_PER_DAY, catchBase: 10,
+                quizModes: Object.entries(MODES).map(([key, m]) => key === 'classic' ? { label: m.label, base: QUIZ_PER_DAY, bonus: PASS.quizzes } : { label: m.label, base: m.perDay, bonus: m.passBonus || 0 }).filter((m) => m.bonus > 0),
+                quizPrizes: QUIZ_PRIZES, chargeBase: CHARGE_MS / 60000 },
             purchases: mine.map(shapePurchase),
             user: await publicUser(db, await requireUser(db, event)),
         };
@@ -2927,6 +2983,7 @@ export const handler = async (event) => {
             await refreshDuePasses(getPool()).catch((err) => console.error('refreshDuePasses', err));
         }
         await showcaseWeekRollover(getPool()).catch((err) => console.error('showcaseWeekRollover', err));
+        await quizWeekRollover(getPool()).catch((err) => console.error('quizWeekRollover', err));
         await Promise.all([
             blogTick(getPool()).catch((err) => console.error('blogTick', err)),
             speciesEnrichTick(getPool()).catch((err) => console.error('speciesEnrich', err)),

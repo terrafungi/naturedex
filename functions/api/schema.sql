@@ -393,6 +393,23 @@ CREATE TABLE IF NOT EXISTS showcase_awards (
 );
 CREATE INDEX IF NOT EXISTS showcase_awards_unclaimed_idx ON showcase_awards (user_id) WHERE claimed_at IS NULL;
 
+-- Concours quiz
+-- Same as the showcase contest: the 3 players with the most quiz points over the Paris week win pépites.
+CREATE TABLE IF NOT EXISTS quiz_weeks (
+    week    DATE PRIMARY KEY,
+    done_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS quiz_awards (
+    week       DATE NOT NULL,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rank       INTEGER NOT NULL,
+    points     INTEGER NOT NULL,
+    nuggets    INTEGER NOT NULL,
+    claimed_at TIMESTAMPTZ,
+    PRIMARY KEY (week, user_id)
+);
+CREATE INDEX IF NOT EXISTS quiz_awards_unclaimed_idx ON quiz_awards (user_id) WHERE claimed_at IS NULL;
+
 -- Nouveautés
 -- Id of the last « Nouveautés » pop-up the player closed (shown once per account, on any device).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS news_seen TEXT;

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
-import { Amount } from '../components/Currency.jsx';
+import { Amount, Nugget, NUGGET_COLOR } from '../components/Currency.jsx';
 import PlayerAvatar from '../components/PlayerAvatar.jsx';
 import { sfx } from '../sfx.js';
 import { IUCN, RARITIES, TYPES } from '../game.jsx';
@@ -36,6 +36,7 @@ const JOKERS = [
     { key: 'skip', label: 'Passer', Icon: FastForward, hint: 'Change de question sans perdre de vie ni ton combo' },
 ];
 const BOARDS = [
+    { key: 'week', label: 'Concours', unit: 'pts', extra: (v) => `${v} bonnes`, note: 'Points gagnés depuis lundi dans tous les modes. Le podium gagne des pépites.' },
     { key: 'daily', label: 'Défi du jour', unit: 'pts', extra: (v) => `${v}/10` },
     { key: 'survival', label: 'Survie', unit: 'pts', extra: (v) => `${v} bonnes`, note: 'Meilleure partie des 7 derniers jours' },
     { key: 'blitz', label: 'Blitz', unit: 'pts', extra: (v) => `${v} bonnes`, note: 'Meilleure partie des 7 derniers jours' },
@@ -103,13 +104,56 @@ function XpBar({ level, from, to, animateFrom }) {
 
 // ---------- menu ----------
 
-function PassHint() {
+function PassHint({ mode }) {
     const { user } = useGame();
-    if (user?.pass) return null;
+    if (user?.pass || !mode.passBonus) return null;
     return (
         <Link to="/boutique" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[#f4d88f] hover:underline">
-            <Leaf className="w-4 h-4" />Encore envie ? Le Pass Naturaliste donne des parties en plus chaque jour.
+            <Leaf className="w-4 h-4" />Encore envie ? Le Pass Naturaliste donne {plural(mode.passBonus, 'partie')} de {mode.label} en plus chaque jour.
         </Link>
+    );
+}
+
+const MEDALS = ['#f2c14e', '#cfd8dc', '#d08b5b'];
+
+function timeLeft(endsAt) {
+    const ms = new Date(endsAt) - Date.now();
+    if (ms <= 0) return 'résultats imminents';
+    const h = Math.floor(ms / 3600_000);
+    return h >= 24 ? `fin dans ${Math.floor(h / 24)} j ${h % 24} h` : `fin dans ${h} h ${Math.floor(ms / 60_000) % 60} min`;
+}
+
+// Weekly contest: the 3 players with the most quiz points between Monday and Sunday win pépites.
+function Contest({ c }) {
+    return (
+        <section className="mt-6 rounded-3xl p-4 sm:p-5 bg-gradient-to-br from-[#f2c14e]/15 to-transparent ring-1 ring-[#f2c14e]/30">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <p className="flex items-center gap-2 font-display text-xl text-white"><Trophy className="w-5 h-5 text-[#f2c14e]" />Concours de la semaine</p>
+                <span className="text-xs font-semibold text-[#f3dc9b] bg-black/25 rounded-full px-2.5 py-1">{timeLeft(c.endsAt)} · lundi 0 h</span>
+                <span className="sm:ml-auto text-sm text-white/80">
+                    {c.me ? <>Toi : <b className="text-white">{c.me.rank}<sup>{c.me.rank === 1 ? 're' : 'e'}</sup></b> avec <b className="text-white">{fmt(c.me.points)} pts</b></> : 'Joue une partie pour entrer dans le classement'}
+                </span>
+            </div>
+            <p className="mt-2 text-sm text-white/75">Les 3 joueurs qui gagnent le plus de points de quiz entre lundi et dimanche, tous modes confondus, remportent :</p>
+            <ul className="mt-2 flex flex-wrap gap-2">
+                {c.prizes.map((n, i) => (
+                    <li key={i} className="flex items-center gap-1.5 rounded-full bg-black/25 pl-1 pr-3 py-1 text-sm font-bold tabular-nums" style={{ color: NUGGET_COLOR }}>
+                        <span className="grid place-items-center w-6 h-6 rounded-full text-xs text-[#2a1c00]" style={{ background: MEDALS[i] }}>{i + 1}</span>
+                        {n}<Nugget className="w-4 h-4" />
+                    </li>
+                ))}
+            </ul>
+            {c.last.length > 0 && (
+                <p className="mt-3 text-xs text-ink-soft">
+                    Gagnants de la semaine dernière :{' '}
+                    {c.last.map((w, i) => (
+                        <span key={w.username}>{i > 0 && ', '}
+                            <Link to={`/joueur/${encodeURIComponent(w.username)}`} className="font-semibold text-white hover:underline">{w.username}</Link> ({fmt(w.points)} pts)
+                        </span>
+                    ))}
+                </p>
+            )}
+        </section>
     );
 }
 
@@ -138,7 +182,7 @@ function ModeCard({ mode, on, onClick }) {
 }
 
 function Board() {
-    const [key, setKey] = useState('daily');
+    const [key, setKey] = useState('week');
     const [data, setData] = useState(null);
     useEffect(() => {
         let live = true;
@@ -207,6 +251,7 @@ function Rewards({ mode, r }) {
 }
 
 function Home({ state, onStart, busy, error }) {
+    const { user } = useGame();
     const [modeKey, setModeKey] = useState('daily');
     const [theme, setTheme] = useState('all');
     const s = state.stats;
@@ -259,6 +304,8 @@ function Home({ state, onStart, busy, error }) {
                 </div>
             </div>
 
+            {state.contest && <Contest c={state.contest} />}
+
             {error && <p className="mt-4 text-sm font-semibold text-[#ffb4a2]">{error}</p>}
 
             {state.active && (
@@ -310,14 +357,14 @@ function Home({ state, onStart, busy, error }) {
                                         style={{ background: `linear-gradient(135deg, #fff, ${st.color})`, boxShadow: `0 10px 40px -10px ${st.color}` }}>
                                         <st.Icon className="w-6 h-6" />{busy ? 'Préparation…' : mode.key === 'daily' ? 'Relever le défi' : 'Jouer'}
                                     </button>
-                                    <span className="text-sm text-white/60">{plural(mode.left, 'partie')} restante{mode.left > 1 ? 's' : ''} aujourd'hui</span>
+                                    <span className="text-sm text-white/60">{plural(mode.left, 'partie')} restante{mode.left > 1 ? 's' : ''} aujourd'hui{user?.pass && mode.passBonus > 0 && <span className="text-[#f4d88f]"> · dont +{mode.passBonus} avec ton Pass</span>}</span>
                                 </div>
                             </>
                         ) : (
                             <div>
                                 <div className="font-display text-xl text-white">{mode.key === 'daily' ? 'Défi du jour relevé !' : `Plus de parties ${mode.label} aujourd'hui`}</div>
                                 <p className="text-white/60 text-sm mt-1">{mode.key === 'daily' ? 'Regarde ton classement ci-dessous. Un nouveau défi arrive demain.' : 'Essaie un autre mode ou reviens demain.'}</p>
-                                {mode.key !== 'daily' && <PassHint />}
+                                {mode.key !== 'daily' && <PassHint mode={mode} />}
                             </div>
                         )}
                     </motion.div>
