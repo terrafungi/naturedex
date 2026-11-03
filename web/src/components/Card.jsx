@@ -19,8 +19,9 @@ function fallbackToOriginal(e) {
     if (original !== e.currentTarget.src) e.currentTarget.src = original;
 }
 
-// Special artwork (cards.art): the picture fills the whole card, the text sits on top of it.
-export const ART = { full: 'Full art', illus: 'Illustration' };
+// Special finish (cards.art): 'full' / 'illus' = the picture fills the whole card and the text sits
+// on top of it; 'holo' = the regular layout with a holographic foil (some commons and uncommons).
+export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo' };
 
 /** Full card. `card` comes from the catalog (light) or the API (full). */
 export function Card({ card, number, total, tilt = false, className = '' }) {
@@ -31,9 +32,10 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
     const st = card.atk != null ? card : card.stats?.atk != null ? card.stats : battleStats(card);
     const ab = ABILITIES[card.type];
     const art = ART[card.art];
+    const bleed = art && card.art !== 'holo';
     const foil = art || ['epic', 'legendary', 'secret'].includes(card.rarity);
-    const ink = art || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
-    const fact = art ? null : card.fact;
+    const ink = bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
+    const fact = bleed ? null : card.fact;
 
     function onMove(e) {
         if (!foil && !tilt) return;
@@ -56,7 +58,8 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
             className={`nd-card transition-transform duration-200 ease-out ${className}`}
             data-rarity={card.rarity}
             data-fact={fact ? '' : undefined}
-            data-art={art ? card.art : undefined}
+            data-art={bleed ? card.art : undefined}
+            data-holo={card.art === 'holo' ? '' : undefined}
             style={{ '--type': t.color }}
             onPointerMove={onMove}
             onPointerLeave={onLeave}
