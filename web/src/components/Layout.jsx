@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, BookOpen, Brain, Camera, Compass, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, Package, Plus, ShoppingBag, Sprout, Swords, Music, Smartphone, Trophy, User, Users, Volume2, VolumeX, X } from 'lucide-react';
+import { Award, BookOpen, Brain, Camera, Compass, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, MessageSquareHeart, Package, Plus, ShoppingBag, Sprout, Swords, Music, Smartphone, Trophy, User, Users, Volume2, VolumeX, X } from 'lucide-react';
 import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 import { canVibrate, music, setPref, sfx, usePrefs } from '../sfx.js';
@@ -24,6 +24,7 @@ export const NAV = [
     { to: '/encheres', label: 'Enchères', Icon: Gavel },
     { to: '/amis', label: 'Amis', Icon: Users },
     { to: '/messages', label: 'Messages', Icon: MessageCircle },
+    { to: '/ecrivez-nous', label: 'Écrivez-nous', short: 'Écrire', Icon: MessageSquareHeart },
     { to: '/defis', label: 'Défis', Icon: Trophy },
     { href: 'https://naturedex.fr/api/blog', label: 'Blog', Icon: BookOpen },
     { to: '/trophees', label: 'Trophées', Icon: Award },

@@ -22,6 +22,7 @@ import Trophies from './pages/Trophies.jsx';
 import Leaderboard from './pages/Leaderboard.jsx';
 import Invite from './pages/Invite.jsx';
 import Messages from './pages/Messages.jsx';
+import Contact from './pages/Contact.jsx';
 import Auctions from './pages/Auctions.jsx';
 import Friends from './pages/Friends.jsx';
 import Quiz from './pages/Quiz.jsx';
@@ -69,6 +70,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/inviter" element={<Private><Invite /></Private>} />
                         <Route path="/messages" element={<Private><Messages /></Private>} />
                         <Route path="/messages/:username" element={<Private><Messages /></Private>} />
+                        <Route path="/ecrivez-nous" element={<Private><Contact /></Private>} />
                         <Route path="/encheres" element={<Private><Auctions /></Private>} />
                         <Route path="/combat" element={<Private><Combat /></Private>} />
                         <Route path="/combat/:id" element={<Private><Battle /></Private>} />
