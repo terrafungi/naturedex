@@ -97,6 +97,7 @@ const GAMES = {
     bee: { name: "Vol de l'abeille", max: 150, honey: (s) => Math.min(25, Math.floor(s / 5)), xp: (s) => Math.min(15, Math.floor(s / 8)) },
     pests: { name: 'Chasse aux nuisibles', max: 90, honey: (s) => Math.min(20, Math.floor(s / 4)), xp: (s) => Math.min(15, Math.floor(s / 5)), compost: (s) => Math.min(4, Math.floor(s / 20)) },
     memory: { name: 'Mémoire des graines', max: 100, honey: (s) => Math.min(20, Math.floor(s / 5)), xp: (s) => Math.min(15, Math.floor(s / 7)) },
+    match: { name: 'Cascade des fleurs', max: 20000, honey: (s) => Math.min(25, Math.floor(s / 250)), xp: (s) => Math.min(15, Math.floor(s / 400)) },
 };
 const GAME_HONEY_DAY = 80;
 const GAME_XP_DAY = 120;

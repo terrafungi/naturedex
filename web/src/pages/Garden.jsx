@@ -501,7 +501,7 @@ export default function Garden() {
                         [Bug, 'Protège', `Les nuisibles mangent ${Math.round(garden.rules.pestCut * 100)} % de la récolte : touche-les pour les chasser (+compost).`],
                         [ScrollText, 'Livre', 'Ta récolte remplit la grange. Les habitants l\'échangent contre graines, miel et XP.'],
                         [Honey, 'Embellis', "Le miel achète potions et décorations, qui augmentent les chances de récolte dorée."],
-                        [Gamepad2, 'Joue', 'Trois mini-jeux, des records, des quêtes du jour et un coffre à ouvrir.'],
+                        [Gamepad2, 'Joue', 'Quatre mini-jeux, des records, des quêtes du jour et un coffre à ouvrir.'],
                     ].map(([Icon, title, text]) => (
                         <li key={title} className="p-4 rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
                             <p className="flex items-center gap-2 font-display text-lg font-bold text-white"><Icon className="w-5 h-5 text-[#8ee6a8] shrink-0" />{title}</p>

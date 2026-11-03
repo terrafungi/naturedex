@@ -211,6 +211,7 @@ const GAME_INFO = {
     bee: { emoji: '🐝', color: '#ffc93c', text: "Pilote l'abeille, butine le pollen, évite les guêpes. 45 secondes." },
     pests: { emoji: '🐌', color: '#7dff9a', text: 'Chasse escargots, chenilles et criquets. Épargne les coccinelles ! 30 secondes.' },
     memory: { emoji: '🃏', color: '#b98cff', text: 'Retrouve les 8 paires de plantes, en peu de coups et vite.' },
+    match: { emoji: '🌸', color: '#ff8fc0', text: 'Aligne fleurs, feuilles et champignons, déclenche des cascades.' },
 };
 export function ArcadePanel({ garden, onPlay, onClose }) {
     const c = garden.caps;

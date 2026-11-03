@@ -1,5 +1,5 @@
 /**
- * The garden arcade: three short games played full screen. The score goes to the server
+ * The garden arcade: four short games played full screen. The score goes to the server
  * (gameReward), which clamps it and pays honey, XP and compost within the daily caps.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -8,11 +8,13 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Play, RotateCcw, Trophy, X } from 'lucide-react';
 import { sfx } from '../sfx.js';
 import { Compost, Honey, PlantArt, SEED_ORDER } from './art.jsx';
+import MatchGame, { MATCH_MOVES, MatchStars } from './Match3.jsx';
 
 const INTRO = {
     bee: { emoji: '🐝', title: "Vol de l'abeille", rules: ['Glisse le doigt (ou la souris) pour guider l\'abeille.', 'Pollen = 1 point, pollen doré = 5 points.', 'Attention aux guêpes : −5 et un petit vertige.'], bg: 'from-[#5fb7e8] to-[#bff0c8]' },
     pests: { emoji: '🐌', title: 'Chasse aux nuisibles', rules: ['Touche les nuisibles qui sortent de terre.', 'Enchaîne sans rater pour un bonus de série.', 'Ne touche pas les coccinelles 🐞 : elles protègent ton jardin (−3).'], bg: 'from-[#4a2c17] to-[#2b6b3a]' },
     memory: { emoji: '🃏', title: 'Mémoire des graines', rules: ['Retourne les cartes deux par deux.', 'Retrouve les 8 paires de plantes.', 'Moins de coups et plus de vitesse = plus de points.'], bg: 'from-[#2a1b4a] to-[#0f3a2a]' },
+    match: { emoji: '🌸', title: 'Cascade des fleurs', rules: ['Échange deux voisins pour aligner 3 éléments identiques ou plus.', '4 alignés = graine rayée, en L ou en T = bombe de pollen, 5 alignés = graine arc-en-ciel.', `${MATCH_MOVES} coups : enchaîne les cascades pour multiplier tes points.`], bg: 'from-[#3a1f5c] via-[#1d4a3a] to-[#0d2a1c]' },
 };
 
 export default function GameOverlay({ game, best, max, onFinish, onClose }) {
@@ -35,7 +37,7 @@ export default function GameOverlay({ game, best, max, onFinish, onClose }) {
         if (res?.record) sfx.record(); else sfx.win();
         setResult({ score, pending: false, ...res });
     }
-    const Game = { bee: BeeGame, pests: PestGame, memory: MemoryGame }[game];
+    const Game = { bee: BeeGame, pests: PestGame, memory: MemoryGame, match: MatchGame }[game];
 
     return createPortal(
         <motion.div className={`fixed inset-0 z-[120] bg-gradient-to-b ${info.bg} select-none`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -60,6 +62,7 @@ export default function GameOverlay({ game, best, max, onFinish, onClose }) {
                         <motion.div className="w-full max-w-sm rounded-[2rem] bg-[#081a11]/90 backdrop-blur ring-1 ring-white/15 p-6 text-center" initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ type: 'spring', damping: 15 }}>
                             <p className="uppercase tracking-[0.25em] text-xs font-bold text-white/60">Score</p>
                             <motion.p className="font-display text-7xl font-black text-white tabular-nums" initial={{ scale: 1.6 }} animate={{ scale: 1 }}>{Math.min(max, result.score)}</motion.p>
+                            {game === 'match' && <div className="mb-1"><MatchStars score={result.score} className="w-8 h-8" /></div>}
                             {result.record && <p className="mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#e9c46a] text-[#3b2a05] text-sm font-black"><Trophy className="w-4 h-4" />Nouveau record !</p>}
                             {result.pending ? <p className="mt-4 text-white/60">Calcul des gains…</p> : result.error ? <p className="mt-4 text-[#ffb4a2] text-sm font-semibold">{result.error}</p> : (
                                 <>
