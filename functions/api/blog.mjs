@@ -29,6 +29,7 @@ export const CATEGORIES = {
     menacee: { label: 'Espèce menacée', count: 1, iucn: ['CR', 'EN', 'VU'], topic: "un article sur une espèce menacée : pourquoi elle est en danger, les menaces, ce qui est fait pour la protéger" },
     fossiles: { label: 'Fossiles & préhistoire', count: 1, types: ['fossil'], topic: "un article sur cette espèce disparue : époque, découverte, ce qu'on sait d'elle" },
     champignons: { label: 'Champignons', count: 1, types: ['fungus', 'mold'], topic: 'un article sur ce champignon : reconnaissance, habitat, rôle écologique, comestibilité ou toxicité si les sources en parlent' },
+    mineraux: { label: 'Minéraux & roches', count: 1, types: ['mineral'], topic: "un article sur ce minéral ou cette roche : formation, où on le trouve, couleurs et cristaux, usages, anecdotes" },
     invisible: { label: 'Monde invisible', count: 1, types: ['bacteria', 'virus'], topic: 'un article de vulgarisation sur ce micro-organisme : où il vit, ce qu\'il fait, pourquoi il compte' },
     botanique: { label: 'Botanique', count: 1, types: ['plant', 'tree', 'alga'], topic: 'un article de botanique sur cette plante : description, habitat, usages, anecdotes' },
     comportement: { label: 'Comportement animal', count: 1, types: ['mammal', 'bird', 'fish', 'reptile'], topic: "un article sur le comportement de l'animal : alimentation, reproduction, vie sociale, communication" },
@@ -99,12 +100,12 @@ export const DRUGS = /psilocyb|hallucinog|psychotrop|psychoacti|enth[ée]og|narc
 async function pickCards(db, cat) {
     const where = ['NOT EXISTS (SELECT 1 FROM blog_posts p WHERE c.id = ANY(p.card_ids))', 'c.image_url IS NOT NULL'];
     const params = [];
-    if (cat.types) { params.push(cat.types); where.push(`c.type = ANY($${params.length})`); }
+    if (cat.types) { params.push(cat.types); where.push(`c.type = ANY($${params.length})`); } else where.push(`c.type <> 'mineral'`); // the other angles are about living species
     if (cat.rarities) { params.push(cat.rarities); where.push(`c.rarity = ANY($${params.length})`); }
     if (cat.iucn) { params.push(cat.iucn); where.push(`c.iucn = ANY($${params.length})`); }
     if (cat.living) where.push(`c.iucn IS DISTINCT FROM 'EX' AND c.iucn IS DISTINCT FROM 'EW'`);
     if (cat.sameType) {
-        const { rows: [t] } = await db.query(`SELECT type FROM cards WHERE type NOT IN ('virus','mold','bacteria','alga') GROUP BY type ORDER BY random() LIMIT 1`);
+        const { rows: [t] } = await db.query(`SELECT type FROM cards WHERE type NOT IN ('virus','mold','bacteria','alga','mineral') GROUP BY type ORDER BY random() LIMIT 1`);
         params.push(t.type); where.push(`c.type = $${params.length}`);
     }
     const { rows } = await db.query(

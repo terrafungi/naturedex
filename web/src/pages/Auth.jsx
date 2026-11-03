@@ -70,7 +70,7 @@ function Intro({ catalog }) {
                 Collectionne <span className="nd-grad-text">{total ? total.toLocaleString('fr-FR') : 'des milliers d\'espèces'}</span>{total ? ' espèces' : ''} du vivant
             </h2>
             <p className="mt-2 text-sm text-ink-soft max-w-md mx-auto lg:mx-0">
-                Animaux, plantes, champignons, microbes, fossiles : chaque carte vient de Wikipédia. Ouvre des boosters, complète ton carnet, échange avec tes amis.
+                Animaux, plantes, champignons, microbes, fossiles, minéraux : chaque carte vient de Wikipédia. Ouvre des boosters, complète ton carnet, échange avec tes amis.
             </p>
             <ul className="mt-3 flex flex-wrap justify-center lg:justify-start gap-1.5 text-[11px] font-semibold text-white/80">
                 {['Exploration sur une vraie carte', 'Photos sur le terrain', 'Avatar 3D', 'Combats', 'Enchères', 'Quiz', 'Jardin'].map((f) => (

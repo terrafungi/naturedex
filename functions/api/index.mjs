@@ -283,7 +283,7 @@ const RARITY_ORDER = `CASE c.rarity WHEN 'secret' THEN 5 WHEN 'legendary' THEN 4
 const TYPE_NAMES = {
     mammal: 'Mammifères', bird: 'Oiseaux', reptile: 'Reptiles & amphibiens', fish: 'Poissons',
     arthropod: 'Insectes & arachnides', marine: 'Créatures marines', plant: 'Plantes', tree: 'Arbres',
-    alga: 'Algues', fungus: 'Champignons', mold: 'Moisissures & levures', bacteria: 'Bactéries', virus: 'Virus', fossil: 'Fossiles',
+    alga: 'Algues', fungus: 'Champignons', mold: 'Moisissures & levures', bacteria: 'Bactéries', virus: 'Virus', fossil: 'Fossiles', mineral: 'Minéraux',
 };
 const TIER_COINS = [30, 60, 120, 200, 300, 500, 800, 1200, 2000];
 const TIER_NUGGETS = [10, 25, 50, 80, 120, 200, 300, 500, 800];
@@ -303,8 +303,8 @@ const TROPHIES = [
     ], (g) => `Découvre ${n(g)} espèces différentes`),
     ...series('Collection', 'layers', 'owned', [[100, 'Petit tas'], [500, 'Classeur plein'], [2000, 'Malle aux trésors'], [5000, 'Cabinet de curiosités']],
         (g) => `Possède ${n(g)} cartes au total, doublons compris`),
-    ...series('Collection', 'globe', 'types', [[14, 'Arche de Noé']], () => 'Possède au moins une carte de chaque type'),
-    ...series('Collection', 'globe', 'types10', [[14, 'Tour du monde vivant']], () => 'Découvre 10 espèces de chaque type'),
+    ...series('Collection', 'globe', 'types', [[14, 'Arche de Noé']], () => 'Possède des cartes de 14 types différents'),
+    ...series('Collection', 'globe', 'types10', [[14, 'Tour du monde vivant']], () => 'Découvre 10 espèces dans 14 types différents'),
     ...series('Collection', 'copy', 'maxCount', [[5, 'Coup de cœur'], [10, 'Obsession']], (g) => `Possède ${g} exemplaires d'une même carte`),
     ...series('Boosters', 'package', 'opened', [
         [1, 'Premier booster'], [10, 'Déchireur d\'emballages'], [50, 'Accro aux boosters'], [100, 'Centurion'],

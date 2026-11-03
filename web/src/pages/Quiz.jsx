@@ -17,7 +17,7 @@ const THEME_STYLE = {
     faune: { Icon: PawPrint, color: '#e2683c', hint: 'Mammifères, oiseaux, reptiles, poissons' },
     flore: { Icon: Flower2, color: '#65a30d', hint: 'Plantes, arbres, algues, champignons' },
     petites: { Icon: Shell, color: '#4f46e5', hint: 'Insectes, araignées, vie marine' },
-    origines: { Icon: Bone, color: '#a8763e', hint: 'Fossiles, bactéries, virus, levures' },
+    origines: { Icon: Bone, color: '#a8763e', hint: 'Fossiles, minéraux, bactéries, virus' },
 };
 const MODE_STYLE = {
     classic: { Icon: Brain, color: '#4fd18b', deep: '#0f3d2a', tagline: '10 questions, de facile à expert. Le quiz de référence.' },

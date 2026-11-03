@@ -24,7 +24,7 @@ const DAILY_CATCHES = 10;
 const dailyCatches = (user) => DAILY_CATCHES + (passActive(user) ? PASS.catches : 0);
 const MAX_SPEED = 45; // m/s; faster jumps (teleport, plane) put catching on cooldown
 const MAX_COOLDOWN = 2 * 3600; // s
-const EXCLUDED_TYPES = ['virus', 'bacteria', 'mold', 'fossil'];
+const EXCLUDED_TYPES = ['virus', 'bacteria', 'mold', 'fossil', 'mineral'];
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 // catch chance of a good throw; a perfect one adds PERFECT_BONUS
 const CATCH_CHANCE = { common: 0.9, uncommon: 0.8, rare: 0.65, epic: 0.5, legendary: 0.35 };

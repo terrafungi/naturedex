@@ -18,7 +18,7 @@ const TYPES = {
     mammal: ['Mammifère', 'Mammifères'], bird: ['Oiseau', 'Oiseaux'], reptile: ['Reptile & amphibien', 'Reptiles & amphibiens'],
     fish: ['Poisson', 'Poissons'], arthropod: ['Insecte & arachnide', 'Insectes & arachnides'], marine: ['Créature marine', 'Créatures marines'],
     plant: ['Plante', 'Plantes'], tree: ['Arbre', 'Arbres'], alga: ['Algue', 'Algues'], fungus: ['Champignon', 'Champignons'],
-    mold: ['Moisissure & levure', 'Moisissures & levures'], bacteria: ['Bactérie', 'Bactéries'], virus: ['Virus', 'Virus'], fossil: ['Fossile', 'Fossiles'],
+    mold: ['Moisissure & levure', 'Moisissures & levures'], bacteria: ['Bactérie', 'Bactéries'], virus: ['Virus', 'Virus'], fossil: ['Fossile', 'Fossiles'], mineral: ['Minéral & roche', 'Minéraux & roches'],
 };
 const RARITIES = {
     common: 'Commune', uncommon: 'Peu commune', rare: 'Rare', epic: 'Épique', legendary: 'Légendaire', secret: 'Secrète',
@@ -67,7 +67,7 @@ async function hubPage(db) {
     ]);
     const total = counts.reduce((a, r) => a + r.n, 0);
     const title = `Encyclopédie des espèces : ${total.toLocaleString('fr-FR')} animaux, plantes et champignons | NatureDex`;
-    const description = `Fiches de ${total.toLocaleString('fr-FR')} espèces réelles : mammifères, oiseaux, insectes, plantes, champignons, bactéries, virus et fossiles, avec photo, nom scientifique et statut de conservation.`;
+    const description = `Fiches de ${total.toLocaleString('fr-FR')} espèces réelles : mammifères, oiseaux, insectes, plantes, champignons, bactéries, virus, fossiles et minéraux, avec photo, nom scientifique et statut de conservation.`;
     const body = `<main class="wrap">
 <p class="crumbs"><a href="${SITE}/">NatureDex</a> › Espèces</p>
 <h1>Toutes les espèces de NatureDex</h1>

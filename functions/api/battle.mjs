@@ -16,7 +16,7 @@ export const STRONG_MULT = 1.5;
 export const WEAK_MULT = 0.75;
 export const GUARD_FACTOR = 0.5;
 
-// Food chain / ecology: each type is strong against two others (×1.5 damage) and takes
+// Food chain / ecology: each type is strong against two others (roots and fungi also crack rock) (×1.5 damage) and takes
 // ×0.75 when it attacks a type that is strong against it.
 export const STRONG = {
     mammal: ['plant', 'bird'],
@@ -25,14 +25,15 @@ export const STRONG = {
     fish: ['marine', 'alga'],
     arthropod: ['plant', 'tree'],
     marine: ['fish', 'alga'],
-    plant: ['fossil', 'bacteria'],
+    plant: ['fossil', 'bacteria', 'mineral'],
     tree: ['fungus', 'mold'],
     alga: ['virus', 'fungus'],
-    fungus: ['tree', 'arthropod'],
+    fungus: ['tree', 'arthropod', 'mineral'],
     mold: ['virus', 'reptile'],
     bacteria: ['mold', 'fossil'],
     virus: ['bacteria', 'mammal'],
     fossil: ['reptile', 'marine'],
+    mineral: ['fossil', 'virus'],
 };
 export const WEAK = Object.fromEntries(Object.keys(STRONG).map((t) => [t, Object.keys(STRONG).filter((o) => STRONG[o].includes(t))]));
 
@@ -58,6 +59,7 @@ export const PROFILES = {
     bacteria: { atk: 0.95, def: 0.8, spd: 1.25, role: 'Croissance' },
     virus: { atk: 1.35, def: 0.6, spd: 1.05, role: 'Infection' },
     fossil: { atk: 1.3, def: 1.1, spd: 0.6, role: 'Colosse' },
+    mineral: { atk: 0.9, def: 1.5, spd: 0.6, role: 'Bastion' },
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -104,6 +106,7 @@ export const ABILITIES = {
     bacteria: { name: 'Prolifération', cost: 1, boost: 1, maxBoost: 3, text: "+30 % d'ATQ tant qu'elle reste en jeu (jusqu'à 3 fois)." },
     virus: { name: 'Contagion', cost: 2, power: 0.6, poison: 0.12, poisonTurns: 3, text: 'Attaque à 60 % et infecte (12 % des PV max par manche, 3 manches).' },
     fossil: { name: 'Impact ancestral', cost: 4, power: 2.4, text: 'Une frappe colossale à 240 % de puissance.' },
+    mineral: { name: 'Cristallisation', cost: 3, shield: 0.6, priority: true, text: 'Bouclier de 60 % de ses PV max, posé avant les attaques.' },
 };
 
 export const RULES = {

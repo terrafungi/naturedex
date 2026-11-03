@@ -284,7 +284,7 @@ function PassSection() {
 
 /* ---------- featured cards ---------- */
 
-const KINGDOM = { plant: 'Flore', tree: 'Flore', alga: 'Flore', fungus: 'Fonge', mold: 'Fonge', bacteria: 'Microbe', virus: 'Microbe', fossil: 'Fossile' };
+const KINGDOM = { plant: 'Flore', tree: 'Flore', alga: 'Flore', fungus: 'Fonge', mold: 'Fonge', bacteria: 'Microbe', virus: 'Microbe', fossil: 'Fossile', mineral: 'Minéral' };
 
 function FeatCard({ card }) {
     const t = TYPES[card.type];

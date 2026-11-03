@@ -58,14 +58,14 @@ export const THEMES = {
     faune: { label: 'Faune', types: ['mammal', 'bird', 'reptile', 'fish'] },
     flore: { label: 'Flore & champignons', types: ['plant', 'tree', 'fungus', 'alga', 'mold'] },
     petites: { label: 'Petites bêtes & océans', types: ['arthropod', 'marine', 'fish'] },
-    origines: { label: 'Préhistoire & microbes', types: ['fossil', 'bacteria', 'virus', 'mold', 'alga'] },
+    origines: { label: 'Préhistoire, microbes & minéraux', types: ['fossil', 'mineral', 'bacteria', 'virus', 'mold', 'alga'] },
 };
 
 const TYPE_ONE = {
     mammal: 'un mammifère', bird: 'un oiseau', reptile: 'un reptile ou un amphibien', fish: 'un poisson',
     arthropod: 'un insecte ou un arachnide', marine: 'une créature marine', plant: 'une plante', tree: 'un arbre',
     alga: 'une algue', fungus: 'un champignon', mold: 'une moisissure ou une levure', bacteria: 'une bactérie',
-    virus: 'un virus', fossil: 'une espèce fossile',
+    virus: 'un virus', fossil: 'une espèce fossile', mineral: 'un minéral ou une roche',
 };
 // Groups players tend to mix up: used for "which group?" and "odd one out" questions.
 const CONFUSABLE = {
@@ -74,7 +74,7 @@ const CONFUSABLE = {
     arthropod: ['marine', 'reptile', 'fossil'], marine: ['fish', 'arthropod', 'alga', 'mammal'],
     plant: ['tree', 'fungus', 'alga'], tree: ['plant', 'fungus'], alga: ['plant', 'bacteria', 'marine', 'mold'],
     fungus: ['mold', 'plant', 'bacteria'], mold: ['fungus', 'bacteria', 'alga'], bacteria: ['virus', 'mold', 'alga'],
-    virus: ['bacteria', 'mold'], fossil: ['reptile', 'mammal', 'marine', 'fish'],
+    virus: ['bacteria', 'mold'], fossil: ['reptile', 'mammal', 'marine', 'fish', 'mineral'], mineral: ['fossil'],
 };
 export const IUCN_LABELS = {
     LC: 'Préoccupation mineure', NT: 'Quasi menacée', VU: 'Vulnérable', CR: 'En danger critique',
@@ -95,8 +95,9 @@ async function getPool(db) {
         );
         for (const c of rows) {
             c.band = bandOf(c.views);
-            c.hasSci = !!c.sci_name && c.sci_name !== c.name;
-            c.genus = c.sci_name?.includes(' ') ? c.sci_name.split(' ')[0] : null;
+            // a mineral's sci_name is its chemical formula, not a Latin name
+            c.hasSci = !!c.sci_name && c.sci_name !== c.name && c.type !== 'mineral';
+            c.genus = c.hasSci && c.sci_name.includes(' ') ? c.sci_name.split(' ')[0] : null;
         }
         const byGenus = new Map();
         for (const c of rows) if (c.genus) byGenus.set(c.genus, [...(byGenus.get(c.genus) || []), c]);
