@@ -32,16 +32,16 @@ const PERFECT_BONUS = 0.25;
 
 // land cover class -> habitat shown to the player, naturalness 0..1, type affinities
 const HABITATS = {
-    10: { key: 'forest', label: 'Forêt', wild: 1, types: { tree: 3, fungus: 3, mammal: 2, bird: 1.5, arthropod: 1.5, fish: 0.2, marine: 0.1 } },
-    20: { key: 'scrub', label: 'Broussailles', wild: 0.8, types: { plant: 2, arthropod: 2, reptile: 2, bird: 1.5, mammal: 1.5, marine: 0.1 } },
-    30: { key: 'meadow', label: 'Prairie', wild: 0.55, types: { plant: 2.5, arthropod: 2.5, bird: 1.5, mammal: 1.2, marine: 0.1 } },
-    40: { key: 'fields', label: 'Champs', wild: 0.25, types: { plant: 2, arthropod: 2, bird: 1.5, mammal: 1.2, marine: 0.1 } },
-    50: { key: 'city', label: 'Ville', wild: 0, types: { bird: 2, plant: 1.5, arthropod: 1.5, tree: 1.2, mammal: 0.6, marine: 0.1 } },
+    10: { key: 'forest', label: 'Forêt', wild: 1, types: { tree: 3, fungus: 3, mammal: 2, bird: 1.5, arthropod: 1.5, fish: 0.2, marine: 0.1, gastropod: 0.8 } },
+    20: { key: 'scrub', label: 'Broussailles', wild: 0.8, types: { plant: 2, arthropod: 2, reptile: 2, bird: 1.5, mammal: 1.5, marine: 0.1, gastropod: 0.6 } },
+    30: { key: 'meadow', label: 'Prairie', wild: 0.55, types: { plant: 2.5, arthropod: 2.5, bird: 1.5, mammal: 1.2, marine: 0.1, gastropod: 0.6 } },
+    40: { key: 'fields', label: 'Champs', wild: 0.25, types: { plant: 2, arthropod: 2, bird: 1.5, mammal: 1.2, marine: 0.1, gastropod: 0.5 } },
+    50: { key: 'city', label: 'Ville', wild: 0, types: { bird: 2, plant: 1.5, arthropod: 1.5, tree: 1.2, mammal: 0.6, marine: 0.1, gastropod: 0.4 } },
     60: { key: 'rock', label: 'Rochers', wild: 0.6, types: { plant: 2, bird: 2, mammal: 1.5, reptile: 1.5, arthropod: 1.2 } },
     70: { key: 'snow', label: 'Neiges', wild: 0.7, types: { bird: 2, mammal: 2, plant: 1.2 } },
-    80: { key: 'water', label: 'Eau', wild: 0.75, types: { fish: 3, marine: 3, alga: 3, bird: 2.5, reptile: 1.5, plant: 0.8, tree: 0.3, fungus: 0.3 } },
-    90: { key: 'wetland', label: 'Zone humide', wild: 1, types: { bird: 3, reptile: 2.5, fish: 2, arthropod: 2, plant: 1.5, alga: 2 } },
-    95: { key: 'mangrove', label: 'Mangrove', wild: 1, types: { marine: 3, fish: 3, bird: 2.5, tree: 2, reptile: 2 } },
+    80: { key: 'water', label: 'Eau', wild: 0.75, types: { fish: 3, marine: 3, alga: 3, gastropod: 1, bird: 2.5, reptile: 1.5, plant: 0.8, tree: 0.3, fungus: 0.3 } },
+    90: { key: 'wetland', label: 'Zone humide', wild: 1, types: { bird: 3, reptile: 2.5, fish: 2, arthropod: 2, plant: 1.5, alga: 2, gastropod: 1 } },
+    95: { key: 'mangrove', label: 'Mangrove', wild: 1, types: { marine: 3, gastropod: 1, fish: 3, bird: 2.5, tree: 2, reptile: 2 } },
     100: { key: 'tundra', label: 'Lande', wild: 0.9, types: { plant: 2.5, bird: 2, mammal: 1.5, arthropod: 1 } },
 };
 

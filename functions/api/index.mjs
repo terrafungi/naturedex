@@ -282,7 +282,7 @@ const RARITY_ORDER = `CASE c.rarity WHEN 'secret' THEN 5 WHEN 'legendary' THEN 4
 // Permanent achievements, in series of growing goals. Each tier pays graines and pépites.
 const TYPE_NAMES = {
     mammal: 'Mammifères', bird: 'Oiseaux', reptile: 'Reptiles & amphibiens', fish: 'Poissons',
-    arthropod: 'Insectes & arachnides', marine: 'Créatures marines', plant: 'Plantes', tree: 'Arbres',
+    arthropod: 'Insectes & arachnides', gastropod: 'Gastéropodes', marine: 'Créatures marines', plant: 'Plantes', tree: 'Arbres',
     alga: 'Algues', fungus: 'Champignons', mold: 'Moisissures & levures', bacteria: 'Bactéries', virus: 'Virus', fossil: 'Fossiles', mineral: 'Minéraux',
 };
 const TIER_COINS = [30, 60, 120, 200, 300, 500, 800, 1200, 2000];

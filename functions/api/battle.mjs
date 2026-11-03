@@ -16,15 +16,16 @@ export const STRONG_MULT = 1.5;
 export const WEAK_MULT = 0.75;
 export const GUARD_FACTOR = 0.5;
 
-// Food chain / ecology: each type is strong against two others (roots and fungi also crack rock) (×1.5 damage) and takes
+// Food chain / ecology: each type is strong against two others (roots and fungi also crack rock, thrushes and slow-worms eat snails) (×1.5 damage) and takes
 // ×0.75 when it attacks a type that is strong against it.
 export const STRONG = {
     mammal: ['plant', 'bird'],
-    bird: ['arthropod', 'fish'],
-    reptile: ['mammal', 'bird'],
+    bird: ['arthropod', 'fish', 'gastropod'],
+    reptile: ['mammal', 'bird', 'gastropod'],
     fish: ['marine', 'alga'],
     arthropod: ['plant', 'tree'],
     marine: ['fish', 'alga'],
+    gastropod: ['plant', 'alga'],
     plant: ['fossil', 'bacteria', 'mineral'],
     tree: ['fungus', 'mold'],
     alga: ['virus', 'fungus'],
@@ -51,6 +52,7 @@ export const PROFILES = {
     fish: { atk: 0.95, def: 0.9, spd: 1.15, role: 'Agile' },
     arthropod: { atk: 1.05, def: 0.8, spd: 1.15, role: 'Nuée' },
     marine: { atk: 0.9, def: 1.2, spd: 0.9, role: 'Contrôle' },
+    gastropod: { atk: 0.85, def: 1.3, spd: 0.65, role: 'Tenace' },
     plant: { atk: 0.8, def: 1.15, spd: 1.05, role: 'Soutien' },
     tree: { atk: 0.85, def: 1.45, spd: 0.7, role: 'Rempart' },
     alga: { atk: 0.85, def: 1.0, spd: 1.15, role: 'Soin' },
@@ -98,6 +100,7 @@ export const ABILITIES = {
     fish: { name: 'Esquive', cost: 2, power: 0.8, dodge: true, priority: true, text: 'Évite toutes les attaques de la manche, puis contre-attaque à 80 %.' },
     arthropod: { name: 'Essaim', cost: 2, power: 1, splash: 0.5, text: 'Attaque normale, et 50 % des dégâts sur chaque carte en réserve adverse.' },
     marine: { name: "Jet d'encre", cost: 2, power: 0.6, drain: 2, text: "Attaque à 60 % et vole 2 ⚡ d'énergie à l'adversaire." },
+    gastropod: { name: 'Mucus', cost: 2, shield: 0.3, heal: 0.15, priority: true, text: 'Bouclier de 30 % et soin de 15 % de ses PV max, avant les attaques.' },
     plant: { name: 'Pollen', cost: 2, healTeam: 0.2, text: 'Soigne toute ton équipe de 20 % de ses PV max.' },
     tree: { name: 'Écorce', cost: 2, shield: 0.25, thorns: 2, priority: true, text: 'Bouclier de 25 % et renvoie 50 % des dégâts subis pendant 2 manches.' },
     alga: { name: 'Photosynthèse', cost: 2, heal: 0.4, priority: true, text: 'Se soigne de 40 % de ses PV max, avant les attaques.' },

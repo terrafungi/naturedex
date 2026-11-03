@@ -51,6 +51,7 @@ export const TYPES = [
     { key: 'reptile', anchors: ['Reptilia', 'Squamata', 'Testudines', 'Crocodilia', 'Amphibia'], ranks: ['species'] },
     { key: 'fish', anchors: ['Actinopterygii', 'Chondrichthyes', 'Coelacanthiformes', 'Dipnoi', 'Petromyzontiformes', 'Myxini'], ranks: ['species'] },
     { key: 'arthropod', anchors: ['Insecta', 'Arachnida', 'Myriapoda', 'Entognatha', 'Merostomata'], ranks: ['species'] },
+    { key: 'gastropod', anchors: ['Gastropoda'], ranks: ['species', 'genus'] },
     { key: 'marine', anchors: ['Mollusca', 'Cnidaria', 'Echinodermata', 'Porifera', 'Crustacea', 'Annelida', 'Ctenophora', 'Tunicata', 'Bryozoa', 'Brachiopoda'], ranks: ['species', 'genus'] },
 ];
 

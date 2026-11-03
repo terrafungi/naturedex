@@ -16,7 +16,7 @@ const INDEXABLE = `c.art IS DISTINCT FROM 'illus' AND (length(coalesce(c.extract
 
 const TYPES = {
     mammal: ['Mammifère', 'Mammifères'], bird: ['Oiseau', 'Oiseaux'], reptile: ['Reptile & amphibien', 'Reptiles & amphibiens'],
-    fish: ['Poisson', 'Poissons'], arthropod: ['Insecte & arachnide', 'Insectes & arachnides'], marine: ['Créature marine', 'Créatures marines'],
+    fish: ['Poisson', 'Poissons'], arthropod: ['Insecte & arachnide', 'Insectes & arachnides'], gastropod: ['Gastéropode', 'Gastéropodes'], marine: ['Créature marine', 'Créatures marines'],
     plant: ['Plante', 'Plantes'], tree: ['Arbre', 'Arbres'], alga: ['Algue', 'Algues'], fungus: ['Champignon', 'Champignons'],
     mold: ['Moisissure & levure', 'Moisissures & levures'], bacteria: ['Bactérie', 'Bactéries'], virus: ['Virus', 'Virus'], fossil: ['Fossile', 'Fossiles'], mineral: ['Minéral & roche', 'Minéraux & roches'],
 };
