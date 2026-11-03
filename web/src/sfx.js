@@ -190,6 +190,15 @@ export const sfx = {
         }
     }, (level, ms) => level >= 4 && heartbeats(ms / 1000)),
 
+    // a secret's seal cracks (step 1..3): glassy snap, thump and a rising chime, bigger each time
+    crack: play((step) => {
+        noise({ dur: 0.1, filter: 'highpass', f: 2800, gain: 0.55, reverb: 0.3 });
+        noise({ start: 0.02, dur: 0.4, f: 2500 + step * 900, sweep: 9000, q: 4, gain: 0.12 + step * 0.04, reverb: 0.6 });
+        boom(0, 0.3 + step * 0.15, 80 + step * 20);
+        bell(hz(79 + step * 4), 0.04, 0.09, 1.4, (step - 2) * 0.4);
+        sparkle(0.08, 3 + step * 3, 2600, 3000, 0.03);
+    }, (step) => [50 + step * 40]),
+
     // the card shows its face: one recipe per rarity, each bigger than the last
     reveal: play((rarity) => {
         switch (rarity) {
@@ -216,6 +225,8 @@ export const sfx = {
             sparkle(0.5, 16, 2400, 3200, 0.04);
             break;
         case 'secret':
+            // the seal shatters: a shower of glass before the rainbow
+            for (let i = 0; i < 14; i++) noise({ start: i * 0.025, dur: 0.12, filter: 'highpass', f: 3000 + (i * 733) % 5000, gain: 0.18, reverb: 0.5, pan: Math.sin(i * 1.7) * 0.7 });
             boom(0, 0.8, 140); boom(0.12, 0.4, 70);
             noise({ dur: 2.4, filter: 'highpass', f: 4500, gain: 0.16, attack: 0.01, reverb: 0.6 });
             // rainbow glissando: pentatonic run over two octaves, then a shimmering major-7 pad

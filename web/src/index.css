@@ -547,6 +547,13 @@ body {
     filter: drop-shadow(0 0 18px rgb(255 95 210 / 0.7));
     animation: nd-hue 3s linear infinite;
 }
+/* "Légendaire !" banner: molten gold with a moving shine */
+.nd-legend-text {
+    background: linear-gradient(90deg, #b8862b, #fff3c4, #f2c14e, #ffe9a0, #b8862b) 0 0 / 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 16px rgb(255 200 60 / 0.75));
+    animation: nd-hue 2.5s linear infinite;
+}
 .nd-secret-glow .nd-card, .nd-secret-glow .nd-mystery { box-shadow: 0 0 60px 10px rgb(255 95 210 / 0.45), 0 0 120px 20px rgb(110 200 255 / 0.25); }
 
 /* Garden plot: tilled soil with furrows and a soft light from above. */
