@@ -109,7 +109,7 @@ async function pickCards(db, cat) {
     }
     const { rows } = await db.query(
         `SELECT * FROM (SELECT c.id, c.qid, c.name, c.sci_name, c.type, c.rarity, c.iucn, c.image_url, c.thumb_url, c.wiki_url
-           FROM cards c WHERE ${where.join(' AND ')} ORDER BY c.views DESC LIMIT 600) s ORDER BY random() LIMIT ${cat.count * (cat.seasonal || cat.mustContain ? 12 : 4)}`, params);
+           FROM cards c WHERE c.art IS DISTINCT FROM 'illus' AND ${where.join(' AND ')} ORDER BY c.views DESC LIMIT 600) s ORDER BY random() LIMIT ${cat.count * (cat.seasonal || cat.mustContain ? 12 : 4)}`, params);
     const picked = [];
     const month = new Date().toLocaleString('fr-FR', { month: 'long', timeZone: 'Europe/Paris' });
     const seasonal = new RegExp(`(^|[^\\p{L}])(${month}|${SEASONS[MONTHS.indexOf(month)]})([^\\p{L}]|$)`, 'iu');
@@ -147,7 +147,7 @@ async function pickNews(db) {
         if (text.length < 1200) continue;
         const { rows: cards } = await db.query(
             `SELECT id, qid, name, sci_name, type, rarity, iucn, image_url, thumb_url, wiki_url FROM cards
-             WHERE length(name) > 4 AND (position(lower(name) in lower($1)) > 0 OR (sci_name IS NOT NULL AND length(sci_name) > 6 AND position(lower(sci_name) in lower($1)) > 0))
+             WHERE art IS DISTINCT FROM 'illus' AND length(name) > 4 AND (position(lower(name) in lower($1)) > 0 OR (sci_name IS NOT NULL AND length(sci_name) > 6 AND position(lower(sci_name) in lower($1)) > 0))
              ORDER BY position(lower(name) in lower($2)) > 0 DESC, views DESC LIMIT 3`, [`${item.title} ${text}`, item.title]);
         if (!cards.length) continue;
         const main = cards[0];

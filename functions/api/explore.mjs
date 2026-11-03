@@ -345,7 +345,7 @@ export function exploreActions({ requireUser, inTransaction, HttpError, publicUs
             let card = spawn.card;
             if (result.caught) {
                 ({ rows: [card] } = await db.query(
-                    `SELECT id, num, name, sci_name, type, rarity, views, image_url, thumb_url, extract, wiki_url, iucn, stats FROM cards WHERE id = $1`, [spawn.card.id]));
+                    `SELECT id, num, name, sci_name, type, rarity, art, views, image_url, thumb_url, extract, wiki_url, iucn, stats FROM cards WHERE id = $1`, [spawn.card.id]));
             }
             const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
             return { ...result, card, maxTries: MAX_TRIES, user: await publicUser(db, fresh), daily: { caught: await caughtToday(db, user.id), max: dailyCatches(user) } };

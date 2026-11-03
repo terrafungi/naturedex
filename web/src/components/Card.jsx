@@ -19,6 +19,9 @@ function fallbackToOriginal(e) {
     if (original !== e.currentTarget.src) e.currentTarget.src = original;
 }
 
+// Special artwork (cards.art): the picture fills the whole card, the text sits on top of it.
+export const ART = { full: 'Full art', illus: 'Illustration' };
+
 /** Full card. `card` comes from the catalog (light) or the API (full). */
 export function Card({ card, number, total, tilt = false, className = '' }) {
     const ref = useRef(null);
@@ -27,8 +30,10 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
     const hp = card.hp ?? card.stats?.hp;
     const st = card.atk != null ? card : card.stats?.atk != null ? card.stats : battleStats(card);
     const ab = ABILITIES[card.type];
-    const foil = ['epic', 'legendary', 'secret'].includes(card.rarity);
-    const ink = card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
+    const art = ART[card.art];
+    const foil = art || ['epic', 'legendary', 'secret'].includes(card.rarity);
+    const ink = art || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
+    const fact = art ? null : card.fact;
 
     function onMove(e) {
         if (!foil && !tilt) return;
@@ -50,14 +55,18 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
             ref={ref}
             className={`nd-card transition-transform duration-200 ease-out ${className}`}
             data-rarity={card.rarity}
-            data-fact={card.fact ? '' : undefined}
+            data-fact={fact ? '' : undefined}
+            data-art={art ? card.art : undefined}
             style={{ '--type': t.color }}
             onPointerMove={onMove}
             onPointerLeave={onLeave}
         >
             <div className="nd-card-inner">
                 <div className="flex items-start justify-between gap-[2cqi]">
-                    <div className="nd-name line-clamp-2 min-w-0 break-words">{card.name}</div>
+                    <div className="min-w-0">
+                        <div className="nd-name line-clamp-2 break-words">{card.name}</div>
+                        {art && <span className="nd-art-tag"><Sparkles />{art}</span>}
+                    </div>
                     <div className="flex shrink-0 items-center gap-[1.5cqi]">
                         {hp != null && <div className="nd-hp"><small>PV </small>{hp}</div>}
                         <TypeBadge type={card.type} />
@@ -82,7 +91,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
                         <span className="flex items-center">{ab.cost}<Zap className="w-[4.2cqi] h-[4.2cqi] fill-current" /></span>
                     </div>
                 )}
-                {card.fact && <p className="nd-fact">{card.fact}</p>}
+                {fact && <p className="nd-fact">{fact}</p>}
                 <div className="nd-foot">
                     <span className="flex items-center gap-[1cqi]" title="Lectures Wikipédia par an (estimation)">
                         {card.views != null && <><Eye className="w-[3.6cqi] h-[3.6cqi]" />{formatViews(Number(card.views))}</>}

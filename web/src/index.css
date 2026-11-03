@@ -158,6 +158,39 @@ body {
 }
 .nd-card .nd-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; font-size: 3.2cqi; color: #5d6762; }
 
+/* full art / illustration: the picture covers the whole card, the text floats over it */
+.nd-card[data-art] { padding: 1.8cqi; }
+.nd-card[data-art] .nd-card-inner { background: #1b211e; color: #fff; overflow: hidden; }
+.nd-card[data-art] .nd-card-inner > :not(.nd-window) { position: relative; z-index: 3; }
+.nd-card[data-art] .nd-window {
+    position: absolute; inset: 0; margin: 0; z-index: 0; aspect-ratio: auto;
+    border-radius: inherit; box-shadow: none; background: #1b211e;
+}
+.nd-card[data-art] .nd-window::before {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, rgb(0 0 0 / 0.62), rgb(0 0 0 / 0.12) 24%, transparent 42%, transparent 52%, rgb(0 0 0 / 0.55) 70%, rgb(0 0 0 / 0.85));
+}
+.nd-card[data-art] .nd-name, .nd-card[data-art] .nd-hp { text-shadow: 0 0.3cqi 1.6cqi rgb(0 0 0 / 0.75); }
+.nd-card[data-art] .nd-hp { color: #ffb4a8; }
+.nd-card[data-art] .nd-strip { margin-top: auto; background: linear-gradient(90deg, rgb(255 255 255 / 0.2), transparent); backdrop-filter: blur(2px); }
+.nd-card[data-art] .nd-stats span { background: rgb(255 255 255 / 0.16); }
+.nd-card[data-art] .nd-attack { border-color: rgb(255 255 255 / 0.2); }
+.nd-card[data-art] .nd-foot { margin-top: 1.4cqi; color: rgb(255 255 255 / 0.8); }
+.nd-art-tag {
+    display: inline-flex; align-items: center; gap: 0.8cqi; margin-top: 1cqi;
+    padding: 0.4cqi 1.8cqi; border-radius: 99px;
+    font-size: 2.8cqi; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #1b211e; background: linear-gradient(110deg, #ffe7a3, #fff 40%, #b8f0ff 60%, #ffc6ef);
+    box-shadow: 0 0.3cqi 1.2cqi rgb(0 0 0 / 0.35);
+}
+.nd-art-banner {
+    margin: 0.2rem auto 0.3rem; width: fit-content; padding: 0.15rem 0.9rem; border-radius: 99px;
+    font-family: var(--font-display); font-weight: 900; font-size: 1.1rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #1b211e; background: linear-gradient(110deg, #ffe7a3, #fff 40%, #b8f0ff 60%, #ffc6ef);
+    box-shadow: 0 0 18px rgb(255 231 163 / 0.6);
+}
+.nd-art-tag svg { width: 2.8cqi; height: 2.8cqi; }
+
 .nd-type-icon {
     display: grid; place-items: center;
     width: 8cqi; height: 8cqi; border-radius: 50%;
@@ -217,10 +250,12 @@ body {
 /* epic + legendary + secret: holographic foil that follows the pointer */
 .nd-card[data-rarity="epic"],
 .nd-card[data-rarity="legendary"],
-.nd-card[data-rarity="secret"] { --mx: 50%; --my: 50%; }
+.nd-card[data-rarity="secret"],
+.nd-card[data-art] { --mx: 50%; --my: 50%; }
 .nd-card[data-rarity="epic"]::after,
 .nd-card[data-rarity="legendary"]::after,
-.nd-card[data-rarity="secret"]::after {
+.nd-card[data-rarity="secret"]::after,
+.nd-card[data-art]::after {
     content: "";
     position: absolute; inset: 0;
     border-radius: inherit;
@@ -236,6 +271,7 @@ body {
     transition: opacity 0.3s;
 }
 .nd-card[data-rarity="epic"]::after { opacity: 0.32; }
+.nd-card[data-art]::after { opacity: 0.14; }
 .nd-card[data-rarity="legendary"] {
     background: linear-gradient(135deg, #f6e3a1, #c9a24a 30%, #fff1c1 50%, #a77f28 70%, #f0d58a);
 }

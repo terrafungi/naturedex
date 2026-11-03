@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { Card, CardBack } from './Card.jsx';
+import { ART, Card, CardBack } from './Card.jsx';
 import { RARITIES } from '../game.jsx';
 import { Pack } from './Pack.jsx';
 import ShareButton from './ShareButton.jsx';
@@ -176,6 +176,7 @@ function RarityBanner({ card, demo }) {
                 style={{ color: fx.level ? fx.color : '#e7ece8', textShadow: fx.level >= 2 ? `0 0 ${fx.level * 8}px ${fx.color}` : 'none' }}>
                 {r.symbol} {r.label}{fx.level >= 4 ? ' !' : ''}
             </div>
+            {ART[card.art] && <div className="nd-art-banner">✦ {ART[card.art]} ✦</div>}
             <div className="text-white/60 text-sm">Touche ou glisse la carte pour continuer</div>
             {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>

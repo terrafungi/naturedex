@@ -49,7 +49,7 @@ async function getPool(db) {
         const { rows } = await db.query(
             `SELECT id, name, sci_name, type, rarity, views::int AS views, thumb_url, iucn,
                     (stats->>'mass_kg')::float AS mass, extract IS NOT NULL AND length(extract) > 80 AS has_extract
-             FROM cards WHERE views >= 800`
+             FROM cards WHERE views >= 800 AND art IS DISTINCT FROM 'illus'`
         );
         for (const c of rows) {
             c.band = bandOf(c.views);

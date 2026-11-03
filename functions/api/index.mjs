@@ -713,7 +713,7 @@ const AUCTION_FIELDS = `a.id, a.start_price, a.buyout, a.bid, a.bids, a.status, 
     (SELECT username FROM users WHERE id = a.bidder_id) AS leader,
     (SELECT MAX(amount) FROM auction_bids b WHERE b.auction_id = a.id AND b.user_id = $1) AS my_bid,
     COALESCE(uc.count, 0) AS have,
-    json_build_object('id', c.id, 'num', c.num, 'name', c.name, 'sci_name', c.sci_name, 'type', c.type, 'rarity', c.rarity,
+    json_build_object('id', c.id, 'num', c.num, 'name', c.name, 'sci_name', c.sci_name, 'type', c.type, 'rarity', c.rarity, 'art', c.art,
                       'views', c.views, 'thumb_url', c.thumb_url, 'hp', (c.stats->>'hp')::int) AS card`;
 const AUCTION_SORTS = {
     ending: 'a.ends_at',
@@ -723,10 +723,10 @@ const AUCTION_SORTS = {
 };
 const shapeAuction = ({ bid, start_price, ...a }) => ({ ...a, bid, start_price, minBid: minBid({ bid, start_price }) });
 
-const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.image_url, c.thumb_url,
+const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c.views, c.image_url, c.thumb_url,
                      c.extract, c.wiki_url, c.iucn, c.stats`;
 
-const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp,
+const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp,
     (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd`;
 let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
@@ -818,7 +818,7 @@ async function quizState(db, user) {
 // The species behind a question, shown after the answer so the player learns something.
 async function learnCard(db, cardId, userId) {
     const { rows: [c] } = await db.query(
-        `SELECT c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, c.image_url, c.iucn, c.wiki_url, c.extract,
+        `SELECT c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c.views, c.thumb_url, c.image_url, c.iucn, c.wiki_url, c.extract,
                 c.stats, (c.stats->>'hp')::int AS hp, COALESCE(uc.count, 0) AS count
          FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $2 WHERE c.id = $1`,
         [cardId, userId]
@@ -881,7 +881,7 @@ async function moveCard(client, fromId, toId, cardId, qty) {
     return true;
 }
 
-const TRADE_CARD = `json_build_object('id', c.id, 'num', c.num, 'name', c.name, 'sci_name', c.sci_name, 'type', c.type, 'rarity', c.rarity,
+const TRADE_CARD = `json_build_object('id', c.id, 'num', c.num, 'name', c.name, 'sci_name', c.sci_name, 'type', c.type, 'rarity', c.rarity, 'art', c.art,
                                       'views', c.views, 'thumb_url', c.thumb_url, 'hp', (c.stats->>'hp')::int)`;
 
 async function loadTrades(db, userId, where) {
