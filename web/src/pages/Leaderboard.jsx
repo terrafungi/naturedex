@@ -15,7 +15,7 @@ const score = (board, v) => (board.format ? board.format(v) : n(v));
 
 // `unit` labels the score, `extra` the tie-breaker shown under the name.
 const BOARDS = [
-    { key: 'quiz', label: 'Quiz', Icon: Brain, unit: 'bonnes réponses', text: 'Total des bonnes réponses aux quiz du jour. À égalité, le plus de quiz parfaits passe devant.', extra: (v) => v ? plural(v, 'quiz parfait') : null },
+    { key: 'quiz', label: 'Quiz', Icon: Brain, unit: 'bonnes réponses', text: 'Total des bonnes réponses dans tous les modes du quiz (Classique, Défi du jour, Survie, Blitz). À égalité, le plus de quiz parfaits passe devant.', extra: (v) => v ? plural(v, 'quiz parfait') : null },
     { key: 'species', label: 'Espèces', Icon: Layers, unit: 'espèces', text: 'Nombre d\'espèces différentes découvertes dans le carnet.', extra: (v) => plural(v, 'carte') },
     { key: 'cards', label: 'Cartes', Icon: Gem, unit: 'cartes', text: 'Nombre total de cartes possédées, doublons compris.', extra: (v) => plural(v, 'espèce') },
     { key: 'prestige', label: 'Prestige', Icon: Crown, unit: 'points', text: 'Chaque espèce découverte rapporte des points selon sa rareté : Peu commune 1, Rare 3, Épique 8, Légendaire 25, Secrète 100.', extra: (v) => v ? plural(v, 'légendaire') : null },
@@ -148,6 +148,9 @@ export default function Leaderboard() {
                 </div>
             )}
             <p className="mt-4 text-sm text-ink-soft">{board.text}</p>
+            {boardKey === 'quiz' && (
+                <p className="mt-2 text-sm"><Link to="/quiz" className="inline-flex items-center gap-1.5 font-semibold text-[#a8f0c6] hover:underline"><Brain className="w-4 h-4" />Classements par mode et niveaux de naturaliste dans Quiz Arena</Link></p>
+            )}
             {boardKey === 'donors' && (
                 <p className="mt-2 text-sm"><Link to="/boutique" className="inline-flex items-center gap-1.5 font-semibold text-[#a8f0c6] hover:underline"><HeartHandshake className="w-4 h-4" />Soutenir une association depuis la boutique</Link></p>
             )}
@@ -162,7 +165,7 @@ export default function Leaderboard() {
                         <p className="text-sm text-white/85">
                             {me
                                 ? <>Ta position : <strong className="text-white">{me.rank}<sup>{me.rank === 1 ? 'er' : 'e'}</sup></strong> sur {plural(data.players, 'joueur')}, avec {score(board, me.score)} {board.unit}.</>
-                                : <>Tu n'es pas encore classé{boardKey === 'quiz' ? ' : termine un quiz du jour pour entrer dans la course' : boardKey === 'donors' ? (data.donor?.hidden ? ' : tu as choisi de ne pas apparaître ici' : ' : chaque achat en boutique soutient une association') : ''}.{data.players > 0 && <> {plural(data.players, 'joueur')} classé{data.players > 1 ? 's' : ''}.</>}</>}
+                                : <>Tu n'es pas encore classé{boardKey === 'quiz' ? ' : termine une partie de quiz pour entrer dans la course' : boardKey === 'donors' ? (data.donor?.hidden ? ' : tu as choisi de ne pas apparaître ici' : ' : chaque achat en boutique soutient une association') : ''}.{data.players > 0 && <> {plural(data.players, 'joueur')} classé{data.players > 1 ? 's' : ''}.</>}</>}
                         </p>
                     </div>
 
