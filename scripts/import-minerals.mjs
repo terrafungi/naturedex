@@ -3,9 +3,10 @@
  *
  *   DATABASE_URL="$(openkbs postgres connection)" node scripts/import-minerals.mjs          # preview only
  *   DATABASE_URL="$(openkbs postgres connection)" node scripts/import-minerals.mjs --apply  # write the cards
+ *   … --kinds meteorite --apply   # only some kinds, ranked against the mineral cards already in the catalog
  *
  * Candidates: Wikidata mineral species (Q12089225), mineral varieties (Q429795: ruby, amethyst, agate…)
- * and rock types (subclasses of rock, Q8063), each with a fr.wikipedia article and a Commons photo (P18).
+ * rock types (subclasses of rock, Q8063) and named meteorites (Q60186: Hoba, Ensisheim…), each with a fr.wikipedia article and a Commons photo (P18).
  * Man-made materials, archaeology terms and generic rock families are left out (EXCLUDE).
  * - Popularity: fr.wikipedia views of the last 60 days x 365/60, like the yearly figures of the other cards.
  * - Rarity: same percentiles as build-catalog.mjs inside the type, the 3 most read become secret cards.
@@ -18,6 +19,7 @@ import { sleep, cache, sparql, commonsImage, qidOf, hpFor } from './build-catalo
 const APPLY = process.argv.includes('--apply');
 const UA_CONTACT = 'NatureDex/1.0 (https://naturedex.fr; contact@naturedex.fr)';
 const SECRETS = 3;
+const KINDS = process.argv.includes('--kinds') ? process.argv[process.argv.indexOf('--kinds') + 1].split(',') : null;
 
 // fr.wikipedia titles that are rock "types" in Wikidata but not natural stones worth a card.
 const EXCLUDE = /^(Béton|Opus caementicium|Coulis|Gravats|Pierre artificielle|Pierre naturelle|Pierre de Coade|Plastiglomérat|Liste |Éclat \(|Lame \(|Denticulé|Déblais|Dragon-cochon|Bi \(|Suiseki|Sieidi|Bétyle|Roches vivantes|Roche (magmatique|sédimentaire|métamorphique|volcanique|carbonatée|siliceuse|siliciclastique|aphanitique|verte)|Minerai$|Porphyrique|Sial |Mudrock|Cumulat)/;
@@ -27,7 +29,8 @@ async function fetchCandidates() {
         ['mineral', '?item wdt:P31 wd:Q12089225.'],
         ['variety', '?item wdt:P31 wd:Q429795.'],
         ['rock', '?item wdt:P279+ wd:Q8063.'],
-    ];
+        ['meteorite', '?item wdt:P31/wdt:P279* wd:Q60186.'],
+    ].filter(([kind]) => !KINDS || KINDS.includes(kind));
     const out = new Map();
     for (const [kind, clause] of kinds) {
         const rows = await sparql(`SELECT ?item (SAMPLE(?title0) AS ?title) (SAMPLE(?sl0) AS ?sl) (SAMPLE(?img0) AS ?img) (SAMPLE(?f0) AS ?formula) WHERE {
@@ -139,10 +142,20 @@ async function main() {
         };
     }).sort((a, b) => b.views - a.views || b.stats.sitelinks - a.stats.sitelinks);
 
+    // A later batch is slotted into the existing mineral cards: the best rarity whose least-read card it beats, never secret.
+    const { rows: tiers } = await db.query(`SELECT rarity, MIN(views)::bigint AS min FROM cards WHERE type = 'mineral' AND rarity <> 'secret' GROUP BY 1`);
+    if (KINDS && tiers.length) {
+        const order = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
+        const min = Object.fromEntries(tiers.map((t) => [t.rarity, Number(t.min)]));
+        cards.forEach((c) => {
+            c.rarity = order.find((r) => r in min && c.views >= min[r]) || 'common';
+            c.stats.hp = hpFor(c.views, c.rarity);
+        });
+    }
     // Same cuts as build-catalog.mjs assignRarity, inside the type.
     const n = cards.length;
     const cut = { legendary: Math.max(1, Math.round(n * 0.01)), epic: Math.max(2, Math.round(n * 0.06)), rare: Math.round(n * 0.20), uncommon: Math.round(n * 0.50) };
-    cards.forEach((c, i) => {
+    if (!KINDS || !tiers.length) cards.forEach((c, i) => {
         c.rarity = i < SECRETS ? 'secret' : i < cut.legendary ? 'legendary' : i < cut.epic ? 'epic' : i < cut.rare ? 'rare' : i < cut.uncommon ? 'uncommon' : 'common';
         c.stats.hp = hpFor(c.views, c.rarity);
     });
