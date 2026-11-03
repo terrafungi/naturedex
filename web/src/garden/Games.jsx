@@ -11,7 +11,7 @@ import { Compost, Honey, PlantArt, SEED_ORDER } from './art.jsx';
 import MatchGame, { MATCH_MOVES, MatchStars } from './Match3.jsx';
 
 const INTRO = {
-    bee: { emoji: '🐝', title: "Vol de l'abeille", rules: ['Glisse le doigt (ou la souris) pour guider l\'abeille.', 'Pollen = 1 point, pollen doré = 5 points.', 'Attention aux guêpes : −5 et un petit vertige.'], bg: 'from-[#5fb7e8] to-[#bff0c8]' },
+    bee: { emoji: '🐝', title: "Vol de l'abeille", rules: ['Pose le doigt n\'importe où et glisse : il sert de joystick (à la souris, l\'abeille suit le curseur).', 'Pollen = 1 point, pollen doré = 5 points.', 'Attention aux guêpes : −5 et un petit vertige.'], bg: 'from-[#5fb7e8] to-[#bff0c8]' },
     pests: { emoji: '🐌', title: 'Chasse aux nuisibles', rules: ['Touche les nuisibles qui sortent de terre.', 'Enchaîne sans rater pour un bonus de série.', 'Ne touche pas les coccinelles 🐞 : elles protègent ton jardin (−3).'], bg: 'from-[#4a2c17] to-[#2b6b3a]' },
     memory: { emoji: '🃏', title: 'Mémoire des graines', rules: ['Retourne les cartes deux par deux.', 'Retrouve les 8 paires de plantes.', 'Moins de coups et plus de vitesse = plus de points.'], bg: 'from-[#2a1b4a] to-[#0f3a2a]' },
     match: { emoji: '🌸', title: 'Cascade des fleurs', rules: ['Échange deux voisins pour aligner 3 éléments identiques ou plus.', '4 alignés = graine rayée, en L ou en T = bombe de pollen, 5 alignés = graine arc-en-ciel.', `${MATCH_MOVES} coups : enchaîne les cascades pour multiplier tes points.`], bg: 'from-[#3a1f5c] via-[#1d4a3a] to-[#0d2a1c]' },
@@ -116,13 +116,32 @@ function BeeGame({ max, onEnd }) {
         const hills = Array.from({ length: 3 }, (_, i) => ({ off: Math.random() * 1000, speed: 10 + i * 18, color: ['#9fdc8f', '#6cc26a', '#47a457'][i], h: 0.18 + i * 0.07 }));
         const flowers = Array.from({ length: 14 }, () => ({ x: Math.random() * 1, y: 0.82 + Math.random() * 0.15, c: ['#ff8fc0', '#ffd166', '#ffffff', '#b98cff'][Math.floor(Math.random() * 4)] }));
         let score = 0, time = 45, spawn = 0, golden = 3, wasp = 2, last = performance.now(), raf = 0, done = false, tickAt = 0;
-        const move = (e) => {
-            const r = c.getBoundingClientRect();
-            bee.tx = e.clientX - r.left;
-            bee.ty = e.clientY - r.top - (e.pointerType === 'touch' ? 50 : 0);
+        // Mouse: the bee follows the cursor. Touch/pen: a floating joystick wherever the finger lands,
+        // so the finger never hides the bee.
+        const STICK_R = 60, STICK_DEAD = 6, STICK_SPEED = 560; // px, px, px/s at full tilt
+        let stick = null; // { id, ox, oy, dx, dy } relative to the canvas
+        const local = (e) => { const r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+        const down = (e) => {
+            if (e.pointerType === 'mouse') return move(e);
+            if (stick) return;
+            const [x, y] = local(e);
+            stick = { id: e.pointerId, ox: x, oy: y, dx: 0, dy: 0 };
+            c.setPointerCapture?.(e.pointerId);
         };
+        const move = (e) => {
+            const [x, y] = local(e);
+            if (e.pointerType === 'mouse') { bee.tx = x; bee.ty = y; return; }
+            if (!stick || e.pointerId !== stick.id) return;
+            let dx = x - stick.ox, dy = y - stick.oy;
+            const d = Math.hypot(dx, dy);
+            if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
+            stick.dx = dx; stick.dy = dy;
+        };
+        const up = (e) => { if (stick && e.pointerId === stick.id) stick = null; };
+        c.addEventListener('pointerdown', down);
         c.addEventListener('pointermove', move);
-        c.addEventListener('pointerdown', move);
+        c.addEventListener('pointerup', up);
+        c.addEventListener('pointercancel', up);
         const pop = (x, y, text, color) => fx.push({ x, y, text, color, life: 0.8 });
         function frame(t) {
             raf = requestAnimationFrame(frame);
@@ -138,6 +157,11 @@ function BeeGame({ max, onEnd }) {
             if (golden <= 0) { golden = 4 + Math.random() * 3; items.push({ kind: 'gold', x: W + 20, y: 80 + Math.random() * (H * 0.6), vy: 0, r: 14, phase: Math.random() * 6 }); }
             if (wasp <= 0) { wasp = Math.max(0.9, 2.6 - (45 - time) * 0.04); items.push({ kind: 'wasp', x: W + 30, y: 60 + Math.random() * (H * 0.7), vy: (Math.random() - 0.5) * 80, r: 17, phase: Math.random() * 6 }); }
             // bee
+            if (stick && Math.hypot(stick.dx, stick.dy) > STICK_DEAD) {
+                // the bee chases a point just ahead of it: steady speed = STICK_SPEED at full tilt
+                bee.tx = Math.max(20, Math.min(W - 20, bee.x + (stick.dx / STICK_R) * STICK_SPEED / 9));
+                bee.ty = Math.max(70, Math.min(H - 30, bee.y + (stick.dy / STICK_R) * STICK_SPEED / 9));
+            } else if (stick) { bee.tx = bee.x; bee.ty = bee.y; }
             bee.x += (bee.tx - bee.x) * Math.min(1, dt * 9);
             bee.y += (bee.ty - bee.y) * Math.min(1, dt * 9);
             bee.x = Math.max(20, Math.min(W - 20, bee.x));
@@ -217,6 +241,12 @@ function BeeGame({ max, onEnd }) {
                 g.fillStyle = '#fff'; g.beginPath(); g.arc(13, -3, 5, 0, 7); g.fill();
                 g.fillStyle = '#111'; g.beginPath(); g.arc(14.5, -3, 2.5, 0, 7); g.fill();
                 g.restore();
+            }
+            // joystick
+            if (stick) {
+                g.fillStyle = 'rgba(255,255,255,0.18)'; g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 2;
+                g.beginPath(); g.arc(stick.ox, stick.oy, STICK_R, 0, 7); g.fill(); g.stroke();
+                g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.arc(stick.ox + stick.dx, stick.oy + stick.dy, 22, 0, 7); g.fill();
             }
             // floating texts
             g.font = '900 22px system-ui, sans-serif'; g.textAlign = 'center';
