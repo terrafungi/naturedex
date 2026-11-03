@@ -198,7 +198,7 @@ export function fieldActions({ requireUser, inTransaction, HttpError, publicUser
             const fr = guesses.map((c) => String(c.french || '').trim().toLowerCase()).filter(Boolean);
             const { rows: found } = sci.length ? await db.query(
                 `SELECT ${FIELD_CARD}, lower(split_part(c.sci_name, ' ', 1) || ' ' || split_part(c.sci_name, ' ', 2)) AS key, lower(c.name) AS fr
-                 FROM cards c WHERE lower(split_part(c.sci_name, ' ', 1) || ' ' || split_part(c.sci_name, ' ', 2)) = ANY($1) OR lower(c.name) = ANY($2)`,
+                 FROM cards c WHERE c.type <> 'mineral' AND (lower(split_part(c.sci_name, ' ', 1) || ' ' || split_part(c.sci_name, ' ', 2)) = ANY($1) OR lower(c.name) = ANY($2))`,
                 [sci, fr]) : { rows: [] };
             const matched = [];
             guesses.forEach((g, i) => {

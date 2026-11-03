@@ -117,7 +117,7 @@ export default function CardPage() {
                     </div>
                 </div>
             </div>
-            <FieldSection cardId={card.id} />
+            {card.type !== 'mineral' && <FieldSection cardId={card.id} />}
         </div>
     );
 }
