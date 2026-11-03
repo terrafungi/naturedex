@@ -223,7 +223,7 @@ const PASS_PERKS = [
     [CalendarCheck, 'Bonus du jour doublé', '200 graines + 40 pépites chaque jour'],
     [Compass, '15 captures par jour', 'en Exploration, au lieu de 10'],
     [Brain, 'Plus de parties de quiz', '5 en Classique (au lieu de 3), 3 en Survie (au lieu de 2), 5 en Blitz (au lieu de 3)'],
-    [Clock, 'Booster gratuit toutes les 45 min', 'au lieu de toutes les heures'],
+    [Clock, 'Booster gratuit toutes les 15 min', 'au lieu de toutes les 30 min'],
     [Shirt, '5 objets d\'avatar exclusifs', 'Mécène, Lauriers d\'or, Faon, garde forestier, Baskets ailées'],
     [Leaf, 'Badge Mécène', 'à côté de ton pseudo'],
     [HeartHandshake, '0,80 € par mois pour la nature', 'reversés à la LPO, au WWF France ou à Humanité & Biodiversité'],
@@ -660,7 +660,7 @@ function FinalCta() {
                     <div>
                         <Sparkles className="w-8 h-8 text-amber-300" />
                         <h2 className="mt-4 font-display text-4xl sm:text-6xl font-semibold tracking-[-0.01em] text-white leading-[1]">Ton premier booster<br /><span className="nd-grad-text">t'attend.</span></h2>
-                        <p className="mt-5 text-white/70 text-lg max-w-md">Crée ton compte en 10 secondes, avec un pseudo et un mot de passe. 10 ouvertures gratuites t'attendent, rechargées toutes les heures.</p>
+                        <p className="mt-5 text-white/70 text-lg max-w-md">Crée ton compte en 10 secondes, avec un pseudo et un mot de passe. 10 ouvertures gratuites t'attendent, rechargées toutes les 30 minutes.</p>
                         <div className="mt-8 flex flex-wrap gap-3">
                             <Link to="/connexion?mode=register" className="nd-btn inline-flex items-center gap-2.5 px-7 py-4 rounded-2xl font-bold text-lg">
                                 <PackageOpen className="w-5 h-5" />Commencer la collection

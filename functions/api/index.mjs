@@ -45,7 +45,7 @@ const headers = {
 const BOOSTER_PRICE = 100; // graines for one opening once the free charges are spent
 const DAILY_COINS = 100;
 const MAX_CHARGES = 10;
-const CHARGE_MS = 60 * 60 * 1000; // a full refill takes 10 h: one in the evening, one in the morning
+const CHARGE_MS = 30 * 60 * 1000; // a full refill takes 5 h
 const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
 // Rewarded ads can't be verified server-side (web ads have no callback), so the reward is small and capped.
 const AD_DAILY = 5; // bonus boosters per Paris day
@@ -125,7 +125,7 @@ async function requireUser(db, event) {
     return rows[0];
 }
 
-// Free openings: `charges` as of `charges_at`, plus one every hour (45 min with the Pass) up to the cap.
+// Free openings: `charges` as of `charges_at`, plus one every 30 min (15 min with the Pass) up to the cap.
 const chargeMs = (user) => (passActive(user) ? PASS.chargeMinutes * 60000 : CHARGE_MS);
 function chargeState(user, now = Date.now()) {
     const from = new Date(user.charges_at).getTime(), step = chargeMs(user);

@@ -23,7 +23,7 @@ export function useCountdown(iso, onDone) {
     return h ? `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s` : `${m}m ${String(s).padStart(2, '0')}s`;
 }
 
-// Ten free openings, refilled one by one every hour.
+// Ten free openings, refilled one by one every 30 min (15 with the pass).
 function ChargeGauge({ user }) {
     return (
         <div className="relative w-full max-w-xs mt-6">
@@ -150,7 +150,7 @@ export default function Boosters() {
                     </p>
                     {!user.pass && (
                         <Link to="/boutique" className="relative mt-1 text-xs font-semibold text-[#f4d88f] hover:underline">
-                            Avec le Pass Naturaliste : +1 toutes les 45 min
+                            Avec le Pass Naturaliste : +1 toutes les 15 min
                         </Link>
                     )}
                     <button
