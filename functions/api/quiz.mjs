@@ -57,13 +57,13 @@ export const THEMES = {
     all: { label: 'Tout le vivant', types: null },
     faune: { label: 'Faune', types: ['mammal', 'bird', 'reptile', 'fish'] },
     flore: { label: 'Flore & champignons', types: ['plant', 'tree', 'fungus', 'alga', 'mold'] },
-    petites: { label: 'Petites bêtes & océans', types: ['arthropod', 'gastropod', 'marine', 'fish'] },
+    petites: { label: 'Petites bêtes & océans', types: ['arthropod', 'terrestrial', 'aquatic', 'marine', 'fish'] },
     origines: { label: 'Préhistoire, microbes & minéraux', types: ['fossil', 'mineral', 'bacteria', 'virus', 'mold', 'alga'] },
 };
 
 const TYPE_ONE = {
     mammal: 'un mammifère', bird: 'un oiseau', reptile: 'un reptile ou un amphibien', fish: 'un poisson',
-    arthropod: 'un insecte ou un arachnide', gastropod: 'un gastéropode (escargot, limace…)', marine: 'une créature marine', plant: 'une plante', tree: 'un arbre',
+    arthropod: 'un insecte ou un arachnide', terrestrial: 'un mollusque ou une petite bête terrestre (escargot, limace, ver de terre…)', aquatic: 'un mollusque aquatique (coquillage, pieuvre…)', marine: 'une créature marine', plant: 'une plante', tree: 'un arbre',
     alga: 'une algue', fungus: 'un champignon', mold: 'une moisissure ou une levure', bacteria: 'une bactérie',
     virus: 'un virus', fossil: 'une espèce fossile', mineral: 'un minéral ou une roche',
 };
@@ -71,8 +71,8 @@ const TYPE_ONE = {
 const CONFUSABLE = {
     mammal: ['reptile', 'bird', 'fossil', 'marine', 'fish'], bird: ['reptile', 'mammal', 'fossil'],
     reptile: ['fish', 'mammal', 'fossil', 'bird'], fish: ['marine', 'reptile', 'mammal', 'fossil'],
-    arthropod: ['marine', 'gastropod', 'reptile', 'fossil'], marine: ['fish', 'gastropod', 'arthropod', 'alga', 'mammal'],
-    gastropod: ['marine', 'arthropod', 'fossil'],
+    arthropod: ['marine', 'terrestrial', 'reptile', 'fossil'], marine: ['fish', 'aquatic', 'arthropod', 'alga', 'mammal'],
+    terrestrial: ['aquatic', 'arthropod', 'fossil'], aquatic: ['marine', 'terrestrial', 'fish', 'fossil'],
     plant: ['tree', 'fungus', 'alga'], tree: ['plant', 'fungus'], alga: ['plant', 'bacteria', 'marine', 'mold'],
     fungus: ['mold', 'plant', 'bacteria'], mold: ['fungus', 'bacteria', 'alga'], bacteria: ['virus', 'mold', 'alga'],
     virus: ['bacteria', 'mold'], fossil: ['reptile', 'mammal', 'marine', 'fish', 'mineral'], mineral: ['fossil'],

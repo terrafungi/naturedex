@@ -1,5 +1,5 @@
 import {
-    Bird, Biohazard, Bone, Bug, Fish, Flower2, Gem, PawPrint, Shell, Snail, TreeDeciduous, Turtle, Waves,
+    Bird, Biohazard, Bone, Bug, Fish, Flower2, Gem, PawPrint, Shell, Shrimp, Snail, TreeDeciduous, Turtle, Waves,
 } from 'lucide-react';
 
 const svgProps = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -38,8 +38,9 @@ export const TYPES = {
     reptile:   { label: 'Reptile & amphibien', color: '#22a35a', Icon: Turtle, attacks: ['Morsure', 'Mue', 'Langue collante', 'Carapace'] },
     fish:      { label: 'Poisson', color: '#0ea5e9', Icon: Fish, attacks: ['Banc tournoyant', 'Nage rapide', 'Aileron', 'Remous'] },
     arthropod: { label: 'Insecte & arachnide', color: '#e09b00', Icon: Bug, attacks: ['Piqûre', 'Essaim', 'Toile', 'Mandibules'] },
-    gastropod: { label: 'Gastéropode', color: '#b7791f', Icon: Snail, attacks: ['Bave', 'Râpe', 'Coquille', 'Repli'] },
-    marine:    { label: 'Créature marine', color: '#4f46e5', Icon: Shell, attacks: ['Tentacules', 'Jet d\'encre', 'Pince', 'Courant'] },
+    terrestrial: { label: 'Mollusque terrestre', color: '#b7791f', Icon: Snail, attacks: ['Bave', 'Râpe', 'Fouissage', 'Repli'] },
+    aquatic:   { label: 'Mollusque aquatique', color: '#c0567a', Icon: Shell, attacks: ['Ventouses', 'Coquille', 'Jet d\'encre', 'Filtration'] },
+    marine:    { label: 'Créature marine', color: '#4f46e5', Icon: Shrimp, attacks: ['Tentacules', 'Jet d\'encre', 'Pince', 'Courant'] },
     plant:     { label: 'Plante', color: '#65a30d', Icon: Flower2, attacks: ['Pollinisation', 'Épines', 'Lianes', 'Parfum'] },
     tree:      { label: 'Arbre', color: '#15803d', Icon: TreeDeciduous, attacks: ['Racines profondes', 'Chute de glands', 'Sève', 'Canopée'] },
     alga:      { label: 'Algue', color: '#0d9488', Icon: Waves, attacks: ['Photosynthèse', 'Marée verte', 'Enlacement', 'Bloom'] },

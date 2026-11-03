@@ -51,8 +51,10 @@ export const TYPES = [
     { key: 'reptile', anchors: ['Reptilia', 'Squamata', 'Testudines', 'Crocodilia', 'Amphibia'], ranks: ['species'] },
     { key: 'fish', anchors: ['Actinopterygii', 'Chondrichthyes', 'Coelacanthiformes', 'Dipnoi', 'Petromyzontiformes', 'Myxini'], ranks: ['species'] },
     { key: 'arthropod', anchors: ['Insecta', 'Arachnida', 'Myriapoda', 'Entognatha', 'Merostomata'], ranks: ['species'] },
-    { key: 'gastropod', anchors: ['Gastropoda'], ranks: ['species', 'genus'] },
-    { key: 'marine', anchors: ['Mollusca', 'Cnidaria', 'Echinodermata', 'Porifera', 'Crustacea', 'Annelida', 'Ctenophora', 'Tunicata', 'Bryozoa', 'Brachiopoda'], ranks: ['species', 'genus'] },
+    // Land-dwelling small animals: land snails and slugs, earthworms, woodlice, land crabs.
+    { key: 'terrestrial', anchors: ['Stylommatophora', 'Veronicellidae', 'Rathouisiidae', 'Cyclophoroidea', 'Helicinidae', 'Pomatiidae', 'Aciculidae', 'Diplommatinidae', 'Carychium', 'Zospeum', 'Crassiclitellata', 'Lumbricidae', 'Eudrilidae', 'Enchytraeidae', 'Oniscidea', 'Gecarcinidae', 'Coenobitidae'], ranks: ['species', 'genus'] },
+    { key: 'aquatic', anchors: ['Mollusca'], ranks: ['species', 'genus'] },
+    { key: 'marine', anchors: ['Cnidaria', 'Echinodermata', 'Porifera', 'Crustacea', 'Annelida', 'Ctenophora', 'Tunicata', 'Bryozoa', 'Brachiopoda'], ranks: ['species', 'genus'] },
 ];
 
 export const IUCN = {

@@ -62,7 +62,7 @@ export const STAGES = [
     { name: 'La mare', text: 'Une première sortie au bord de l\'eau. Repère qui est fort contre qui.', ai: 1, coins: 60, team: [['fish', 'common', 0.6], ['reptile', 'common', 0.6], ['arthropod', 'common', 0.6]] },
     { name: 'Lisière du bois', text: 'Prédateurs, oiseaux et fleurs : chaque type a sa proie.', ai: 1, coins: 70, team: [['mammal', 'common', 0.5], ['bird', 'common', 0.5], ['plant', 'common', 0.5]] },
     { name: 'Sous-bois humide', text: 'Les décomposeurs attaquent le bois mort. Un arbre ne craint pas les moisissures.', ai: 1, coins: 80, team: [['fungus', 'common', 0.4], ['mold', 'common', 0.4], ['tree', 'common', 0.4]] },
-    { name: 'Le récif', text: 'L\'adversaire change de carte quand il est en danger. Anticipe-le.', ai: 2, coins: 90, team: [['marine', 'uncommon', 0.6], ['fish', 'uncommon', 0.6], ['alga', 'common', 0.2]] },
+    { name: 'Le récif', text: 'L\'adversaire change de carte quand il est en danger. Anticipe-le.', ai: 2, coins: 90, team: [['marine', 'uncommon', 0.6], ['fish', 'uncommon', 0.6], ['aquatic', 'common', 0.2]] },
     { name: 'Le laboratoire', text: 'Boss : bactéries, virus et moisissures empoisonnent. Garde des soins.', ai: 2, coins: 120, nuggets: 50, boss: true, team: [['bacteria', 'uncommon', 0.3], ['virus', 'uncommon', 0.3], ['mold', 'uncommon', 0.3]] },
     { name: 'La prairie en fleurs', text: 'Une nuée d\'insectes frappe aussi ta réserve.', ai: 2, coins: 110, team: [['arthropod', 'uncommon', 0.2], ['bird', 'uncommon', 0.2], ['plant', 'rare', 0.6]] },
     { name: 'Le marais', text: 'Des reptiles blindés : il faudra plus que des attaques simples.', ai: 2, coins: 120, team: [['reptile', 'rare', 0.5], ['fish', 'uncommon', 0.1], ['arthropod', 'rare', 0.5]] },

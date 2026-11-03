@@ -623,7 +623,7 @@ function Types({ show }) {
     return (
         <section className="max-w-7xl mx-auto px-5 py-20">
             <SectionTitle kicker="Les familles" sub="Du mammifère au virus, chaque type a sa couleur, ses attaques et ses propres Légendaires.">
-                14 types à <span className="nd-grad-text">compléter</span>
+                17 types à <span className="nd-grad-text">compléter</span>
             </SectionTitle>
             <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 auto-rows-[150px] sm:auto-rows-[170px] gap-3 sm:gap-4">
                 {show.types.map(({ key, star, count }, i) => {

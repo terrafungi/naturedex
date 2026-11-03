@@ -227,7 +227,7 @@ function drawBooster(pools) {
 // share of the catalogue, so goals stay reachable with the daily coins.
 const CHALLENGES = [
     { key: 'forest', icon: 'leaf', title: 'Gardiens de la Forêt', text: 'Obtiens 3 cartes Forêt : plante, arbre ou champignon', goal: 3, reward: 60, types: ['plant', 'tree', 'fungus', 'mold'] },
-    { key: 'water', icon: 'drop', title: 'Sources de Vie', text: 'Obtiens 2 cartes Eau : poisson, créature marine ou algue', goal: 2, reward: 60, types: ['fish', 'marine', 'alga'] },
+    { key: 'water', icon: 'drop', title: 'Sources de Vie', text: 'Obtiens 2 cartes Eau : poisson, créature marine, mollusque aquatique ou algue', goal: 2, reward: 60, types: ['fish', 'marine', 'aquatic', 'alga'] },
     { key: 'sky', icon: 'bird', title: 'Maîtres du Ciel', text: 'Obtiens 2 cartes Oiseau', goal: 2, reward: 50, types: ['bird'] },
     { key: 'scales', icon: 'sun', title: 'Sang-froid', text: 'Obtiens 2 cartes Reptile ou amphibien', goal: 2, reward: 50, types: ['reptile'] },
     { key: 'bugs', icon: 'bug', title: 'Petites Bêtes', text: 'Obtiens 2 cartes Insecte ou arachnide', goal: 2, reward: 50, types: ['arthropod'] },
@@ -282,7 +282,7 @@ const RARITY_ORDER = `CASE c.rarity WHEN 'secret' THEN 5 WHEN 'legendary' THEN 4
 // Permanent achievements, in series of growing goals. Each tier pays graines and pépites.
 const TYPE_NAMES = {
     mammal: 'Mammifères', bird: 'Oiseaux', reptile: 'Reptiles & amphibiens', fish: 'Poissons',
-    arthropod: 'Insectes & arachnides', gastropod: 'Gastéropodes', marine: 'Créatures marines', plant: 'Plantes', tree: 'Arbres',
+    arthropod: 'Insectes & arachnides', terrestrial: 'Mollusques terrestres', aquatic: 'Mollusques aquatiques', marine: 'Créatures marines', plant: 'Plantes', tree: 'Arbres',
     alga: 'Algues', fungus: 'Champignons', mold: 'Moisissures & levures', bacteria: 'Bactéries', virus: 'Virus', fossil: 'Fossiles', mineral: 'Minéraux',
 };
 const TIER_COINS = [30, 60, 120, 200, 300, 500, 800, 1200, 2000];

@@ -34,7 +34,7 @@ export const CATEGORIES = {
     botanique: { label: 'Botanique', count: 1, types: ['plant', 'tree', 'alga'], topic: 'un article de botanique sur cette plante : description, habitat, usages, anecdotes' },
     comportement: { label: 'Comportement animal', count: 1, types: ['mammal', 'bird', 'fish', 'reptile'], topic: "un article sur le comportement de l'animal : alimentation, reproduction, vie sociale, communication" },
     oiseaux: { label: 'Oiseaux', count: 1, types: ['bird'], topic: "un article sur cet oiseau : reconnaissance, chant, migration, mode de vie" },
-    oceans: { label: 'Océans', count: 1, types: ['marine', 'fish'], topic: 'un article sur cette espèce marine et son milieu' },
+    oceans: { label: 'Océans', count: 1, types: ['marine', 'aquatic', 'fish'], topic: 'un article sur cette espèce marine et son milieu' },
     insectes: { label: 'Insectes & cie', count: 1, types: ['arthropod'], topic: "un article sur cet arthropode : anatomie, cycle de vie, rôle dans l'écosystème" },
     saison: { label: 'Nature du mois', count: 4, types: ['bird', 'tree', 'plant', 'fungus', 'arthropod'], seasonal: true, living: true, topic: 'un article « que voir dans la nature ce mois-ci » autour de ces espèces, en ne parlant de saison que si les textes le permettent' },
     jardin: { label: 'Jardin & biodiversité', count: 3, types: ['plant', 'tree', 'arthropod', 'bird'], mustContain: /jardin/i, living: true, topic: 'un article « biodiversité au jardin » : comment ces espèces vivent près de nous et comment les accueillir ou les observer' },

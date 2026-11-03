@@ -16,7 +16,7 @@ const THEME_STYLE = {
     all: { Icon: Globe2, color: '#4fd18b', hint: 'Toutes les familles mélangées' },
     faune: { Icon: PawPrint, color: '#e2683c', hint: 'Mammifères, oiseaux, reptiles, poissons' },
     flore: { Icon: Flower2, color: '#65a30d', hint: 'Plantes, arbres, algues, champignons' },
-    petites: { Icon: Shell, color: '#4f46e5', hint: 'Insectes, escargots, vie marine' },
+    petites: { Icon: Shell, color: '#4f46e5', hint: 'Insectes, escargots, vers de terre, coquillages, vie marine' },
     origines: { Icon: Bone, color: '#a8763e', hint: 'Fossiles, minéraux, bactéries, virus' },
 };
 const MODE_STYLE = {

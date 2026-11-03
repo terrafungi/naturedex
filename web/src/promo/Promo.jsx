@@ -146,7 +146,7 @@ function Hook({ t }) {
 function Count({ t }) {
     const n = Math.round(60106 * out(prog(t, 0.3, 1.9)));
     const cols = 4, cw = 300, gap = 26;
-    const kinds = ['mammal', 'bird', 'fish', 'arthropod', 'plant', 'tree', 'fungus', 'alga', 'bacteria', 'virus', 'fossil', 'marine', 'gastropod', 'reptile', 'mold', 'mineral'];
+    const kinds = ['mammal', 'bird', 'fish', 'arthropod', 'plant', 'tree', 'fungus', 'alga', 'bacteria', 'virus', 'fossil', 'marine', 'aquatic', 'terrestrial', 'reptile', 'mold', 'mineral'];
     return (
         <>
             <div style={{ position: 'absolute', inset: -400, transform: `rotate(-14deg) translateY(${-t * 150}px)`, opacity: 0.55 }}>
