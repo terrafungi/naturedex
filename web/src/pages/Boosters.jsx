@@ -5,7 +5,7 @@ import { Clapperboard, Gift, Sprout, Zap } from 'lucide-react';
 import { Amount, Plant, Seed } from '../components/Currency.jsx';
 import { api, useGame } from '../api.jsx';
 import { Pack } from '../components/Pack.jsx';
-import BoosterOpening from '../components/BoosterOpening.jsx';
+import BoosterOpening, { pendingBooster } from '../components/BoosterOpening.jsx';
 import { TYPES } from '../game.jsx';
 import { adsEnabled, loadAds, showRewardedAd } from '../ads.js';
 
@@ -44,7 +44,7 @@ function ChargeGauge({ user }) {
 
 export default function Boosters() {
     const { user, setUser, catalog, owned, ownedInfo, addCards } = useGame();
-    const [opening, setOpening] = useState(null);
+    const [opening, setOpening] = useState(() => pendingBooster(user.username)?.cards || null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const countdown = useCountdown(user.nextDailyAt);
@@ -242,6 +242,7 @@ export default function Boosters() {
                     <BoosterOpening
                         key={opening.map((c) => c.id).join('-')}
                         cards={opening}
+                        owner={user.username}
                         onClose={() => setOpening(null)}
                         canOpenAgain={canOpen}
                         onAgain={open}

@@ -365,10 +365,27 @@ function RarityBanner({ card, demo }) {
     );
 }
 
-export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, demo }) {
+// A booster still being revealed survives a reload or a discarded tab: the cards are already in the
+// collection, so the player gets back to the card they stopped at instead of losing the reveal.
+const PENDING_KEY = 'naturdex.pendingBooster';
+const PENDING_MS = 7 * 24 * 3600 * 1000;
+export function pendingBooster(owner) {
+    try {
+        const p = JSON.parse(localStorage.getItem(PENDING_KEY));
+        if (p && p.owner === owner && Date.now() - p.at < PENDING_MS && p.cards?.length) return p;
+    } catch { /* corrupted entry: ignore */ }
+    return null;
+}
+const sameCards = (a, b) => a.length === b.length && a.every((c, i) => c.id === b[i].id);
+
+export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, demo, owner }) {
     const frame = useMyFrame();
-    const [stage, setStage] = useState('pack'); // pack → reveal → summary
-    const [index, setIndex] = useState(0);
+    const [resumeAt] = useState(() => {
+        const p = !demo && owner != null && pendingBooster(owner);
+        return p && sameCards(p.cards, cards) ? Math.min(p.index, cards.length - 1) : null;
+    });
+    const [stage, setStage] = useState(resumeAt == null ? 'pack' : 'reveal'); // pack → reveal → summary
+    const [index, setIndex] = useState(resumeAt ?? 0);
     const [revealed, setRevealed] = useState(false);
     const [cracks, setCracks] = useState(0); // secret only: 1..CRACKS while its seal breaks
     const [dir, setDir] = useState(-1); // which side the current card flies off to
@@ -376,6 +393,16 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
     const lastCrack = useRef(0);
 
     const current = cards[index];
+
+    useEffect(() => {
+        if (demo || owner == null) return;
+        if (stage === 'summary') localStorage.removeItem(PENDING_KEY);
+        else localStorage.setItem(PENDING_KEY, JSON.stringify({ owner, cards, index, at: Date.now() }));
+    }, [demo, owner, cards, stage, index]);
+    function close() {
+        if (!demo) localStorage.removeItem(PENDING_KEY);
+        onClose();
+    }
     const fx = stage === 'reveal' ? fxOf(current) : FX.common;
 
     useEffect(() => {
@@ -455,7 +482,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                         transition={{ duration: fx.level === 5 ? 1.6 : 1, ease: 'easeOut' }} />
                 )}
             </AnimatePresence>
-            <button onClick={onClose} className="absolute top-4 right-4 z-10 p-2 rounded-full text-paper/70 hover:text-paper hover:bg-white/10" title="Fermer">
+            <button onClick={close} className="absolute top-4 right-4 z-10 p-2 rounded-full text-paper/70 hover:text-paper hover:bg-white/10" title="Fermer">
                 <X className="w-6 h-6" />
             </button>
 
@@ -557,7 +584,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                         Voir ma collection
                                     </Link>
                                 )}
-                                <button onClick={onClose} className="px-6 py-3 rounded-full text-paper/70 hover:text-paper">Fermer</button>
+                                <button onClick={close} className="px-6 py-3 rounded-full text-paper/70 hover:text-paper">Fermer</button>
                             </div>
                         </motion.div>
                     )}

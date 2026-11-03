@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { Amount, Nugget, Plant, Seed } from '../components/Currency.jsx';
 import { api, useGame } from '../api.jsx';
 import { sfx } from '../sfx.js';
-import BoosterOpening from '../components/BoosterOpening.jsx';
+import BoosterOpening, { pendingBooster } from '../components/BoosterOpening.jsx';
 import { Compost, Fertilizer, Honey, PlantArt, SEED_ORDER, SEED_TAGS, budgetOf, daylight, duration, growth, left, nuggetsFor, parisHour, per } from '../garden/art.jsx';
 import HoneyShopPanel from '../garden/HoneyShop.jsx';
 import { ArcadePanel, BarnPanel, HivePanel, LevelPanel, LevelUp, OrdersPanel, PlotPanel, QuestsPanel, WorkshopPanel } from '../garden/Panels.jsx';
@@ -209,7 +209,7 @@ export default function Garden() {
     const [panel, setPanel] = useState(null);
     const [plotSheet, setPlotSheet] = useState(null);
     const [picker, setPicker] = useState(null); // slot being planted ('all' = every empty plot)
-    const [opening, setOpening] = useState(null);
+    const [opening, setOpening] = useState(() => pendingBooster(user.username)?.cards || null);
     const [game, setGame] = useState(null);
     const [levelUps, setLevelUps] = useState(null);
     const [bursts, setBursts] = useState([]);
@@ -554,7 +554,7 @@ export default function Garden() {
                 {panel === 'level' && <LevelPanel key="level" garden={garden} onClose={() => setPanel(null)} />}
                 {levelUps && <LevelUp key="lvl" ups={levelUps} onClose={() => setLevelUps(null)} />}
                 {opening && (
-                    <BoosterOpening key={opening.map((c) => c.id).join('-')} cards={opening} onClose={() => setOpening(null)}
+                    <BoosterOpening key={opening.map((c) => c.id).join('-')} cards={opening} owner={user.username} onClose={() => setOpening(null)}
                         canOpenAgain={user.plants >= user.boosterPlants} onAgain={openBooster} />
                 )}
             </AnimatePresence>
