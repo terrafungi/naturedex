@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useInView } from 'motion/react';
-import { ArrowRight, Award, BookOpen, Brain, CalendarCheck, Camera, ChevronRight, Clock, Compass, Dices, Eye, Frame, Gavel, GalleryVerticalEnd, Gem, HeartHandshake, Leaf, PackageOpen, Shield, Shirt, Sparkles, Sprout, Swords, Users, Zap } from 'lucide-react';
+import { ArrowRight, Award, BookOpen, Brain, CalendarCheck, Camera, ChevronRight, Clock, Compass, Crown, Dices, Eye, Frame, Gavel, GalleryVerticalEnd, Gem, HeartHandshake, Leaf, PackageOpen, Shield, Shirt, Sparkles, Sprout, Swords, Users, Zap } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard, TypeBadge } from '../components/Card.jsx';
 import { ChallengeCard, SAMPLE_CHALLENGES } from '../components/Challenge.jsx';
@@ -9,6 +9,7 @@ import { Pack } from '../components/Pack.jsx';
 import BoosterOpening from '../components/BoosterOpening.jsx';
 import AvatarStage from '../components/AvatarStage.jsx';
 import PatronBadge from '../components/PatronBadge.jsx';
+import { ShowcaseThumb } from '../components/Showcase.jsx';
 import { defaultAvatar } from '../components/PlayerAvatar.jsx';
 import { RARITIES, TYPES, formatViews } from '../game.jsx';
 
@@ -367,6 +368,52 @@ function Featured({ cards }) {
     );
 }
 
+/* ---------- showcase of the week ---------- */
+
+// Last week's contest winner, open to everyone (the gallery itself needs an account).
+function WeekShowcase() {
+    const { user } = useGame();
+    const [w, setW] = useState(undefined);
+    useEffect(() => {
+        api('showcaseOfWeek').then((r) => setW(r.winner)).catch(() => setW(null));
+    }, []);
+    if (!w) return null;
+    const s = w.showcase;
+    const from = new Date(`${w.week}T12:00:00`);
+    const to = new Date(from.getTime() + 6 * 86400_000);
+    const day = (d, month) => d.toLocaleDateString('fr-FR', month ? { day: 'numeric', month: 'long' } : { day: 'numeric' });
+    const period = from.getMonth() === to.getMonth() ? `du ${day(from)} au ${day(to, true)}` : `du ${day(from, true)} au ${day(to, true)}`;
+    const profile = user ? `/joueur/${encodeURIComponent(w.username)}` : SIGNUP;
+
+    return (
+        <section id="vitrine-semaine" className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-6 pb-12 scroll-mt-24">
+            <div className="relative overflow-hidden rounded-[2rem] ring-1 ring-[#e9c46a]/30 bg-gradient-to-br from-[#e9c46a]/15 via-[#e9c46a]/[0.04] to-transparent p-5 sm:p-10">
+                <div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
+                    <Reveal>
+                        <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.18em] text-[#e9c46a]"><Crown className="w-3.5 h-3.5" />Vitrine de la semaine</p>
+                        <h2 className="mt-2 font-display text-[1.9rem] sm:text-5xl font-medium text-white leading-[1.05]">{s.title || `La vitrine de ${w.username}`}</h2>
+                        <p className="mt-4 text-white/80 text-lg">
+                            Par <Link to={profile} className="font-semibold text-[#f4d88f] hover:underline">{w.username}</Link>, {w.rank === 1 ? '1re' : `${w.rank}e`} place du concours {period}, avec <span className="font-semibold text-white">{w.votes} ♥</span>.
+                        </p>
+                        <p className="mt-3 text-sm text-ink-soft max-w-md">
+                            Chaque semaine, les joueurs exposent leurs plus belles cartes et votent pour leurs vitrines préférées. Les ♥ repartent à zéro tous les lundis et le podium gagne des pépites.
+                        </p>
+                        <Link to={user ? '/vitrines' : SIGNUP}
+                            className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold bg-[#e9c46a] text-[#2a1c00] hover:brightness-110">
+                            <Frame className="w-4 h-4" />{user ? 'Voter pour les vitrines' : 'Créer ma vitrine'}<ArrowRight className="w-4 h-4" />
+                        </Link>
+                    </Reveal>
+                    <Reveal delay={0.1} className={`mx-auto w-full ${s.format === 'carre' ? 'max-w-[360px]' : 'max-w-[280px]'}`}>
+                        <Link to={profile} className="block rounded-2xl overflow-hidden shadow-[0_30px_60px_-20px_rgba(0,0,0,0.85)] ring-[3px] ring-[#e9c46a] transition hover:-translate-y-1">
+                            <ShowcaseThumb showcase={s} username={w.username} width={720} />
+                        </Link>
+                    </Reveal>
+                </div>
+            </div>
+        </section>
+    );
+}
+
 /* ---------- blog ---------- */
 
 const BLOG_URL = 'https://naturedex.fr/api/blog';
@@ -642,6 +689,7 @@ export default function Landing() {
         <div className="overflow-x-clip">
             <Hero />
             {show ? <Featured cards={show.featured} /> : <div className="h-[420px]" />}
+            <WeekShowcase />
             <Features />
             {!user && show && <Demo show={show} />}
             <PassSection />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Crown, Flame, Frame, Globe2, Trophy, Users } from 'lucide-react';
+import { Clock, Crown, Flame, Frame, Globe2, Users } from 'lucide-react';
 import { api } from '../api.jsx';
 import { Nugget, NUGGET_COLOR } from '../components/Currency.jsx';
 import { ShowcaseThumb, VoteButton } from '../components/Showcase.jsx';
@@ -11,7 +11,6 @@ const profile = (name) => `/joueur/${encodeURIComponent(name)}`;
 const SORTS = [
     { key: 'recent', label: 'Récentes', Icon: Clock, text: 'Les dernières vitrines créées ou modifiées par les joueurs.' },
     { key: 'week', label: 'Top semaine', Icon: Flame, text: 'Les vitrines qui ont reçu le plus de ♥ cette semaine (depuis lundi). Le podium gagne des pépites !' },
-    { key: 'all', label: 'Top de tous les temps', short: 'Top absolu', Icon: Trophy, text: 'Les vitrines les plus aimées depuis toujours.' },
 ];
 const MEDALS = ['#e9c46a', '#c3ccd8', '#cd8a4a'];
 
@@ -68,6 +67,7 @@ function Contest({ contest, onWeek }) {
                 {onWeek && <button onClick={onWeek} className="ml-auto text-sm font-semibold text-[#a8f0c6] hover:underline">Voir le classement →</button>}
             </div>
             <p className="mt-2 text-sm text-white/75">Les 3 vitrines qui reçoivent le plus de ♥ entre lundi et dimanche gagnent :</p>
+            <p className="mt-1 text-xs text-ink-soft">Chaque lundi, tous les ♥ repartent à zéro et tu peux revoter. Une vitrine avec de nouvelles cartes repart aussi à zéro.</p>
             <ul className="mt-2 flex flex-wrap gap-2">
                 {contest.prizes.map((n, i) => (
                     <li key={i} className="flex items-center gap-1.5 rounded-full bg-black/25 pl-1 pr-3 py-1 text-sm font-bold tabular-nums" style={{ color: NUGGET_COLOR }}>
@@ -152,7 +152,7 @@ export default function Showcases() {
                 <Pill active={scope === 'all'} onClick={() => setScope('all')}><Globe2 className="w-4 h-4" />Tous les joueurs</Pill>
                 <Pill active={scope === 'friends'} onClick={() => setScope('friends')}><Users className="w-4 h-4" />Mes amis</Pill>
             </div>
-            <p className="mt-4 text-sm text-ink-soft">{current.text} Touche ♥ pour voter pour tes préférées (30 votes par jour, un par vitrine).</p>
+            <p className="mt-4 text-sm text-ink-soft">{current.text} Touche ♥ pour voter pour tes préférées (30 votes par jour, un par vitrine et par semaine).</p>
 
             {note && <p role="status" className="mt-4 p-3 rounded-2xl bg-[#e07a5f]/15 ring-1 ring-[#e07a5f]/30 text-sm text-[#ffc2ae]">{note}</p>}
             {error && <p className="mt-6 text-sm font-semibold text-rust">{error}</p>}

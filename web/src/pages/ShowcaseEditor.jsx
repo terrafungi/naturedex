@@ -113,11 +113,15 @@ export default function ShowcaseEditor() {
     }
 
     async function save() {
+        const ids = draft.cards.map((c) => c.id);
+        const before = saved?.cards.map((c) => c.id) || [];
+        const changed = saved && (before.length !== ids.length || ids.some((id) => !before.includes(id)));
+        if (changed && !window.confirm('Avec d\'autres cartes, c\'est une nouvelle vitrine : ses ♥ repartent à zéro. Continuer ?')) return;
         setBusy('save');
         try {
-            const r = await api('saveShowcase', { ...draft, cardIds: draft.cards.map((c) => c.id) });
+            const r = await api('saveShowcase', { ...draft, cardIds: ids });
             setSaved(r.showcase);
-            setNote('Vitrine enregistrée : elle s\'affiche sur ton profil.');
+            setNote(r.reset ? 'Nouvelle vitrine enregistrée : elle repart à 0 ♥.' : 'Vitrine enregistrée : elle s\'affiche sur ton profil.');
         } catch (e) { setNote(e.message); } finally { setBusy(''); }
     }
     async function unlock() {

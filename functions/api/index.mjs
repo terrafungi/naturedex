@@ -1239,8 +1239,29 @@ async function showcaseWeekRollover(db, { week = null, tests = false } = {}) {
                 `INSERT INTO showcase_awards (week, user_id, rank, votes, nuggets) VALUES ($1, $2, $3, $4, $5)`,
                 [w.week, r.owner_id, i + 1, r.votes, SHOWCASE_PRIZES[i]]);
         }
+        // The contest is over: every ♥ starts again from zero for the new week (and anyone can vote again).
+        await client.query(
+            `DELETE FROM showcase_votes v USING users u
+             WHERE u.id = v.owner_id AND v.created_at < ${parisWeekStart('($1::date + 7)')}
+               AND (u.username LIKE 'zz\\_test\\_%') = $2`, [w.week, tests]);
         return { week: w.week, winners: rows.length };
     });
+}
+
+// "Vitrine de la semaine": last contest's winner with their current showcase (public, home page).
+// Falls back to the next on the podium when the winner has since taken theirs down.
+async function showcaseOfWeek(db) {
+    const { rows } = await db.query(
+        `SELECT a.user_id, a.rank, a.votes, a.week::text AS week, u.username, ${SEASON_BADGE('u.id')}
+         FROM showcase_awards a JOIN users u ON u.id = a.user_id
+         WHERE a.week = (SELECT MAX(week) FROM showcase_weeks WHERE week < (${PARIS_WEEK})::date)
+           AND u.username NOT LIKE 'zz\\_test\\_%'
+         ORDER BY a.rank`);
+    for (const { user_id, ...w } of rows) {
+        const showcase = await loadShowcase(db, user_id);
+        if (showcase) return withBadge({ ...w, showcase });
+    }
+    return null;
 }
 
 // Prizes won and not yet collected (pop-up + Vitrines badge).
@@ -1831,6 +1852,10 @@ const actions = {
         if (SHOWCASE_PREMIUM[body.background] && !(await ownedBackgrounds(db, user.id)).includes(body.background)) {
             throw new HttpError(403, 'Débloque ce fond pour l\'utiliser');
         }
+        // Other cards = a new showcase, so it starts again at 0 ♥ (title, background or order changes keep them).
+        const { rows: [prev] } = await db.query(`SELECT card_ids FROM showcases WHERE user_id = $1`, [user.id]);
+        const same = prev && prev.card_ids.length === ids.length && ids.every((id) => prev.card_ids.includes(id));
+        if (!same) await db.query(`DELETE FROM showcase_votes WHERE owner_id = $1`, [user.id]);
         await db.query(
             `INSERT INTO showcases (user_id, title, background, layout, format, card_ids, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, now())
@@ -1838,12 +1863,13 @@ const actions = {
             [user.id, String(body.title || '').trim().replace(/\s+/g, ' ').slice(0, 40),
                 pick(body.background, SHOWCASE_BACKGROUNDS), pick(body.layout, SHOWCASE_LAYOUTS), pick(body.format, SHOWCASE_FORMATS), ids]
         );
-        return { showcase: await loadShowcase(db, user.id) };
+        return { showcase: await loadShowcase(db, user.id), reset: Boolean(prev) && !same };
     },
 
     async deleteShowcase(db, body, event) {
         const user = await requireUser(db, event);
         await db.query(`DELETE FROM showcases WHERE user_id = $1`, [user.id]);
+        await db.query(`DELETE FROM showcase_votes WHERE owner_id = $1`, [user.id]);
         return { showcase: null };
     },
 
@@ -1870,6 +1896,11 @@ const actions = {
     },
 
     // Public: the 3 latest blog articles, for the home page.
+    // Public: the showcase that won last week's contest, shown on the home page.
+    async showcaseOfWeek(db) {
+        return { winner: await showcaseOfWeek(db) };
+    },
+
     async blogLatest(db) {
         return { posts: await latestPosts(db, 3) };
     },
@@ -2885,7 +2916,7 @@ Object.assign(actions, fieldActions({ requireUser, inTransaction, HttpError, pub
 Object.assign(actions, exploreActions({ requireUser, inTransaction, HttpError, publicUser }));
 Object.assign(actions, avatarActions({ requireUser, inTransaction, HttpError, publicUser }));
 
-const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest']);
+const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest', 'showcaseOfWeek']);
 
 export const handler = async (event) => {
     if (event.source === 'schedule') {
