@@ -16,7 +16,7 @@ export const RARITY_STYLE = {
 };
 const TYPES = {
     mammal: ['Mammifère', '#e2683c'], bird: ['Oiseau', '#3b82f6'], reptile: ['Reptile & amphibien', '#22a35a'],
-    fish: ['Poisson', '#0ea5e9'], arthropod: ['Insecte & arachnide', '#e09b00'], terrestrial: ['Mollusque terrestre', '#b7791f'], aquatic: ['Mollusque aquatique', '#c0567a'], marine: ['Créature marine', '#4f46e5'],
+    fish: ['Poisson', '#0ea5e9'], arthropod: ['Insecte & arachnide', '#e09b00'], terrestrial: ['Mollusque terrestre', '#b7791f'], aquatic: ['Mollusque aquatique', '#c0567a'], marine: ['Créature aquatique', '#4f46e5'],
     plant: ['Plante', '#65a30d'], tree: ['Arbre', '#15803d'], alga: ['Algue', '#0d9488'], fungus: ['Champignon', '#c2410c'],
     mold: ['Moisissure & levure', '#889c24'], bacteria: ['Bactérie', '#8b5cf6'], virus: ['Virus', '#e11d74'], fossil: ['Fossile', '#a8763e'], mineral: ['Minéral', '#6d7fa3'],
 };

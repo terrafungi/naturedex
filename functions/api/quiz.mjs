@@ -63,7 +63,7 @@ export const THEMES = {
 
 const TYPE_ONE = {
     mammal: 'un mammifère', bird: 'un oiseau', reptile: 'un reptile ou un amphibien', fish: 'un poisson',
-    arthropod: 'un insecte ou un arachnide', terrestrial: 'un mollusque ou une petite bête terrestre (escargot, limace, ver de terre…)', aquatic: 'un mollusque aquatique (coquillage, pieuvre…)', marine: 'une créature marine', plant: 'une plante', tree: 'un arbre',
+    arthropod: 'un insecte ou un arachnide', terrestrial: 'un mollusque ou une petite bête terrestre (escargot, limace, ver de terre…)', aquatic: 'un mollusque aquatique (coquillage, pieuvre…)', marine: 'une créature aquatique (corail, méduse, crabe…)', plant: 'une plante', tree: 'un arbre',
     alga: 'une algue', fungus: 'un champignon', mold: 'une moisissure ou une levure', bacteria: 'une bactérie',
     virus: 'un virus', fossil: 'une espèce fossile', mineral: 'un minéral ou une roche',
 };

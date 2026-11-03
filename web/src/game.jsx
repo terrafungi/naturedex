@@ -40,7 +40,7 @@ export const TYPES = {
     arthropod: { label: 'Insecte & arachnide', color: '#e09b00', Icon: Bug, attacks: ['Piqûre', 'Essaim', 'Toile', 'Mandibules'] },
     terrestrial: { label: 'Mollusque terrestre', color: '#b7791f', Icon: Snail, attacks: ['Bave', 'Râpe', 'Fouissage', 'Repli'] },
     aquatic:   { label: 'Mollusque aquatique', color: '#c0567a', Icon: Shell, attacks: ['Ventouses', 'Coquille', 'Jet d\'encre', 'Filtration'] },
-    marine:    { label: 'Créature marine', color: '#4f46e5', Icon: Shrimp, attacks: ['Tentacules', 'Jet d\'encre', 'Pince', 'Courant'] },
+    marine:    { label: 'Créature aquatique', color: '#4f46e5', Icon: Shrimp, attacks: ['Tentacules', 'Jet d\'encre', 'Pince', 'Courant'] },
     plant:     { label: 'Plante', color: '#65a30d', Icon: Flower2, attacks: ['Pollinisation', 'Épines', 'Lianes', 'Parfum'] },
     tree:      { label: 'Arbre', color: '#15803d', Icon: TreeDeciduous, attacks: ['Racines profondes', 'Chute de glands', 'Sève', 'Canopée'] },
     alga:      { label: 'Algue', color: '#0d9488', Icon: Waves, attacks: ['Photosynthèse', 'Marée verte', 'Enlacement', 'Bloom'] },
