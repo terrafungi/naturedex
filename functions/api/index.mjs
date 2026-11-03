@@ -28,6 +28,7 @@ import { speciesRoute } from './species.mjs';
 import { speciesEnrichTick } from './species-enrich.mjs';
 import { fieldActions } from './field.mjs';
 import { exploreActions } from './explore.mjs';
+import { BOOSTER_PLANTS, CONVERT_BONUS, CONVERT_BONUS_MAX, NUGGETS_PER_SEED, convertBonusReady, gardenActions } from './garden.mjs';
 import { AVATAR_SQL, avatarActions, avatarOf } from './avatar.mjs';
 
 const scrypt = promisify(crypto.scrypt);
@@ -1071,83 +1072,6 @@ async function stripeWebhook(event) {
     return json({ received: true });
 }
 
-// ---------- garden ----------
-
-// Graines planted in plots grow into « plantes »; BOOSTER_PLANTS of them open a booster.
-// Every seed beats paying 100 graines directly, and the longer it grows the better it pays
-// (golden harvests included: ~76 graines a booster for the radish, ~45 for the moon rose).
-const BOOSTER_PLANTS = 10;
-const SEEDS = {
-    radis: { name: 'Radis éclair', cost: 25, minutes: 3, plants: 3 },
-    tournesol: { name: 'Tournesol', cost: 50, minutes: 60, plants: 7 },
-    chene: { name: 'Chêne', cost: 100, minutes: 8 * 60, plants: 16 },
-    rose: { name: 'Rose de lune', cost: 200, minutes: 24 * 60, plants: 40 },
-};
-const START_PLOTS = 3;
-const PLOT_PRICES = [300, 600, 1000, 1500, 2500, 4000]; // graines for plots 4 to 9
-const MAX_PLOTS = START_PLOTS + PLOT_PRICES.length;
-const WATER_CUT = 0.3; // one watering per plant takes 30 % off the time left
-const GOLDEN_CHANCE = 0.1; // harvest ×2
-const TREASURE_CHANCE = 0.01; // + one bonus booster
-// Two pépites make one graine: pépites come easily (recycling, auctions, rewards),
-// so they help the garden without replacing graines.
-const NUGGETS_PER_SEED = 2;
-// First Grainerie conversion of the Paris day: +50 % graines, on up to 200 pépites (+50 max).
-// Automatic conversions while planting never use it, so it is never wasted on a few pépites.
-const CONVERT_BONUS = 0.5;
-const CONVERT_BONUS_MAX = 50;
-const parisDate = (d) => new Date(d).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
-const convertBonusReady = (user) => !user.convert_bonus_at || parisDate(user.convert_bonus_at) !== parisDate(Date.now());
-
-// Converts just enough pépites to cover `cost` graines (inside a withGarden transaction).
-async function coverWithNuggets(client, user, cost) {
-    const missing = cost - user.coins;
-    if (missing <= 0) return 0;
-    const nuggets = missing * NUGGETS_PER_SEED;
-    if (nuggets > user.nuggets) throw new HttpError(402, 'Pas assez de graines ni de pépites');
-    await client.query(`UPDATE users SET nuggets = nuggets - $2, coins = coins + $3 WHERE id = $1`, [user.id, nuggets, missing]);
-    user.coins += missing;
-    user.nuggets -= nuggets;
-    return nuggets;
-}
-
-async function gardenState(db, user) {
-    const { rows } = await db.query(
-        `SELECT slot, kind, planted_at AS "plantedAt", ready_at AS "readyAt", watered FROM garden_plots WHERE user_id = $1`,
-        [user.id]
-    );
-    const bySlot = Object.fromEntries(rows.map((r) => [r.slot, r]));
-    return {
-        plots: Array.from({ length: user.plots }, (_, slot) => bySlot[slot] || null),
-        maxPlots: MAX_PLOTS,
-        nextPlotPrice: PLOT_PRICES[user.plots - START_PLOTS] ?? null,
-        seeds: SEEDS,
-        waterCut: WATER_CUT,
-        now: new Date().toISOString(),
-    };
-}
-
-// Runs `fn(client, lockedUser)` in a transaction holding the player's row, then returns
-// the fresh garden and wallet with whatever `fn` returned.
-async function withGarden(db, event, fn) {
-    const user = await requireUser(db, event);
-    const client = await db.connect();
-    let extra;
-    try {
-        await client.query('BEGIN');
-        const { rows: [locked] } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
-        extra = await fn(client, locked);
-        await client.query('COMMIT');
-    } catch (err) {
-        await client.query('ROLLBACK').catch(() => {});
-        throw err;
-    } finally {
-        client.release();
-    }
-    const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
-    return { ...extra, garden: await gardenState(db, fresh), user: await publicUser(db, fresh) };
-}
-
 const MAX_BINDERS = 50;
 
 function binderName(raw) {
@@ -1471,102 +1395,6 @@ const actions = {
         } finally {
             client.release();
         }
-    },
-
-    async garden(db, body, event) {
-        const user = await requireUser(db, event);
-        return { garden: await gardenState(db, user), user: await publicUser(db, user) };
-    },
-
-    // Pépites → graines, NUGGETS_PER_SEED pépites each (an odd pépite left over is kept).
-    async convert(db, body, event) {
-        const asked = Number(body.nuggets);
-        if (!Number.isInteger(asked) || asked < NUGGETS_PER_SEED) throw new HttpError(400, 'Montant invalide');
-        const nuggets = asked - (asked % NUGGETS_PER_SEED);
-        return withGarden(db, event, async (client, user) => {
-            if (nuggets > user.nuggets) throw new HttpError(402, 'Pas assez de pépites');
-            const seeds = nuggets / NUGGETS_PER_SEED;
-            const bonus = convertBonusReady(user) ? Math.min(CONVERT_BONUS_MAX, Math.floor(seeds * CONVERT_BONUS)) : 0;
-            await client.query(
-                `UPDATE users SET nuggets = nuggets - $2, coins = coins + $3, convert_bonus_at = CASE WHEN $4 THEN now() ELSE convert_bonus_at END WHERE id = $1`,
-                [user.id, nuggets, seeds + bonus, bonus > 0]
-            );
-            return { converted: nuggets, seeds: seeds + bonus, bonus };
-        });
-    },
-
-    // One plot (`slot`), or every empty plot the graines can pay for (« Replanter »).
-    // With `convert`, missing graines are made from pépites on the fly.
-    async plant(db, body, event) {
-        const seed = SEEDS[body.kind];
-        if (!seed) throw new HttpError(400, 'Graine inconnue');
-        return withGarden(db, event, async (client, user) => {
-            const budget = user.coins + (body.convert ? Math.floor(user.nuggets / NUGGETS_PER_SEED) : 0);
-            const { rows } = await client.query(`SELECT slot FROM garden_plots WHERE user_id = $1`, [user.id]);
-            const taken = new Set(rows.map((r) => r.slot));
-            let slots;
-            if (body.slot != null) {
-                const slot = Number(body.slot);
-                if (!Number.isInteger(slot) || slot < 0 || slot >= user.plots) throw new HttpError(400, 'Parcelle introuvable');
-                if (taken.has(slot)) throw new HttpError(409, 'Cette parcelle est déjà plantée');
-                slots = [slot];
-            } else {
-                slots = Array.from({ length: user.plots }, (_, i) => i).filter((i) => !taken.has(i))
-                    .slice(0, Math.floor(budget / seed.cost));
-                if (!slots.length && taken.size >= user.plots) throw new HttpError(409, 'Toutes les parcelles sont plantées');
-            }
-            const cost = slots.length * seed.cost;
-            if (!slots.length || budget < cost) throw new HttpError(402, body.convert ? 'Pas assez de graines ni de pépites' : 'Pas assez de graines');
-            const converted = body.convert ? await coverWithNuggets(client, user, cost) : 0;
-            await client.query(`UPDATE users SET coins = coins - $2 WHERE id = $1`, [user.id, cost]);
-            await client.query(
-                `INSERT INTO garden_plots (user_id, slot, kind, ready_at)
-                 SELECT $1, s, $3, now() + make_interval(mins => $4) FROM unnest($2::smallint[]) s`,
-                [user.id, slots, body.kind, seed.minutes]
-            );
-            return { planted: slots.length, converted };
-        });
-    },
-
-    async water(db, body, event) {
-        return withGarden(db, event, async (client, user) => {
-            const { rowCount } = await client.query(
-                `UPDATE garden_plots SET watered = true, ready_at = now() + (ready_at - now()) * $3
-                 WHERE user_id = $1 AND slot = $2 AND NOT watered AND ready_at > now()`,
-                [user.id, Number(body.slot), 1 - WATER_CUT]
-            );
-            if (!rowCount) throw new HttpError(409, 'Rien à arroser ici');
-        });
-    },
-
-    // Every ready plot (or just `slot`); each one may turn golden (×2) or hide a booster.
-    async harvest(db, body, event) {
-        return withGarden(db, event, async (client, user) => {
-            const { rows } = await client.query(
-                `DELETE FROM garden_plots WHERE user_id = $1 AND ready_at <= now() AND ($2::int IS NULL OR slot = $2)
-                 RETURNING slot, kind`,
-                [user.id, body.slot == null ? null : Number(body.slot)]
-            );
-            if (!rows.length) throw new HttpError(409, 'Rien n\'est encore prêt à récolter');
-            const harvest = rows.map(({ slot, kind }) => {
-                const golden = Math.random() < GOLDEN_CHANCE;
-                const base = SEEDS[kind]?.plants || 1;
-                return { slot, kind, plants: golden ? base * 2 : base, golden, treasure: Math.random() < TREASURE_CHANCE };
-            }).sort((a, b) => a.slot - b.slot);
-            const plants = harvest.reduce((n, h) => n + h.plants, 0);
-            const boosters = harvest.filter((h) => h.treasure).length;
-            await client.query(`UPDATE users SET plants = plants + $2, boosters = boosters + $3 WHERE id = $1`, [user.id, plants, boosters]);
-            return { harvest };
-        });
-    },
-
-    async unlockPlot(db, body, event) {
-        return withGarden(db, event, async (client, user) => {
-            const price = PLOT_PRICES[user.plots - START_PLOTS];
-            if (price == null) throw new HttpError(409, `${MAX_PLOTS} parcelles maximum`);
-            if (user.coins < price) throw new HttpError(402, 'Pas assez de graines');
-            await client.query(`UPDATE users SET coins = coins - $2, plots = plots + 1 WHERE id = $1`, [user.id, price]);
-        });
     },
 
     // Catalogue overview (tens of thousands of cards: never sent whole): counts per type
@@ -2985,6 +2813,7 @@ const actions = {
 Object.assign(actions, arenaActions({ requireUser, inTransaction, HttpError, publicUser, parisDay }));
 Object.assign(actions, fieldActions({ requireUser, inTransaction, HttpError, publicUser }));
 Object.assign(actions, exploreActions({ requireUser, inTransaction, HttpError, publicUser }));
+Object.assign(actions, gardenActions({ requireUser, publicUser, HttpError }));
 Object.assign(actions, avatarActions({ requireUser, inTransaction, HttpError, publicUser }));
 
 const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest', 'showcaseOfWeek']);

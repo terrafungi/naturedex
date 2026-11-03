@@ -567,3 +567,21 @@ CREATE INDEX IF NOT EXISTS ad_views_user_claimed ON ad_views (user_id, claimed_a
 -- Card source: 'frwiki' (build-catalog.mjs, fr.wikipedia articles) or 'wikispecies' (import-wikispecies.mjs:
 -- Wikispecies taxa with a photo and an English article, intro translated to French on first view).
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'frwiki';
+
+-- Jardin 2.0: garden level, grange, orders, hive, decorations, daily quests and caps.
+CREATE TABLE IF NOT EXISTS garden_meta (
+    user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    xp         INTEGER NOT NULL DEFAULT 0,
+    level      SMALLINT NOT NULL DEFAULT 1,
+    compost    INTEGER NOT NULL DEFAULT 0,
+    fertilizer INTEGER NOT NULL DEFAULT 0,
+    honey      INTEGER NOT NULL DEFAULT 0,
+    barn       JSONB NOT NULL DEFAULT '{}',
+    orders     JSONB NOT NULL DEFAULT '[]',
+    decor      JSONB NOT NULL DEFAULT '[]',
+    daily      JSONB NOT NULL DEFAULT '{}',
+    best       JSONB NOT NULL DEFAULT '{}'
+);
+ALTER TABLE garden_plots ADD COLUMN IF NOT EXISTS pest_at TIMESTAMPTZ;
+ALTER TABLE garden_plots ADD COLUMN IF NOT EXISTS pest_gone BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE garden_plots ADD COLUMN IF NOT EXISTS fertilized BOOLEAN NOT NULL DEFAULT false;
