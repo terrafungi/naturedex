@@ -324,6 +324,23 @@ body {
 }
 @keyframes nd-frame-spin { to { --spin: 360deg; } }
 .nd-card[data-rarity="secret"]::after { opacity: 0.4; }
+/* tilt mode (card sheet): turned by the finger, a glare follows it and the foil lights up */
+.nd-card[data-tilt] { --act: 0; touch-action: pan-y; will-change: transform; -webkit-user-select: none; user-select: none; }
+.nd-card[data-tilt] .nd-glare {
+    position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit;
+    mix-blend-mode: soft-light;
+    background: radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 50%), rgb(255 255 255 / 0.6) 5%, rgb(255 255 255 / 0.15) 30%, rgb(0 0 0 / 0.3) 95%);
+    opacity: calc(var(--act) * 0.75);
+}
+.nd-card[data-tilt]::after { transition: none; opacity: calc(0.55 + var(--act) * 0.15); }
+.nd-card[data-tilt][data-rarity="epic"]::after { opacity: calc(0.32 + var(--act) * 0.2); }
+.nd-card[data-tilt][data-rarity="secret"]::after { opacity: calc(0.4 + var(--act) * 0.35); }
+.nd-card[data-tilt][data-holo]::after { opacity: calc(0.45 + var(--act) * 0.25); }
+.nd-card[data-tilt][data-art]::after { opacity: calc(0.16 + var(--act) * 0.1); }
+.nd-card[data-tilt][data-art] .nd-window::after { opacity: calc(0.42 + var(--act) * 0.08); }
+/* full art: keep the photo sharp, the glare does the shine */
+.nd-card[data-tilt][data-art] .nd-glare { mix-blend-mode: overlay; }
+.nd-card[data-tilt][data-holo] .nd-window::after { opacity: calc(0.28 + var(--act) * 0.2); }
 .nd-card[data-rarity="secret"] .nd-card-inner {
     background:
         radial-gradient(1.2px 1.2px at 18% 22%, #fff, transparent), radial-gradient(1px 1px at 72% 12%, #fff, transparent),

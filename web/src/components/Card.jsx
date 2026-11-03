@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Camera, Eye, HelpCircle, MapPin, Sparkles, Zap } from 'lucide-react';
 import { RARITIES, TYPES, formatViews } from '../game.jsx';
 import { ABILITIES, battleStats } from '../battle.js';
@@ -40,33 +40,71 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
     const ink = bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
     const fact = bleed ? null : card.fact;
 
+    // Tilt mode (card sheet, booster): the card follows the finger / mouse in 3D on a spring, like a
+    // real foil card turned in the light, then wobbles back flat when let go.
+    const spring = useRef(null);
+    useEffect(() => () => cancelAnimationFrame(spring.current?.raf), []);
+
+    function step() {
+        const s = spring.current;
+        const el = ref.current;
+        if (!el) return;
+        let moving = false;
+        for (const k of ['x', 'y', 'a']) {
+            s.v[k] = (s.v[k] + (s.t[k] - s.p[k]) * 0.09) * 0.8;
+            s.p[k] += s.v[k];
+            if (Math.abs(s.v[k]) > 0.0005 || Math.abs(s.t[k] - s.p[k]) > 0.0005) moving = true;
+        }
+        const { x, y, a } = s.p;
+        el.style.transform = `perspective(1000px) rotateY(${x * 22}deg) rotateX(${-y * 16}deg) scale(${1 + a * 0.04})`;
+        el.style.setProperty('--mx', `${50 + x * 50}%`);
+        el.style.setProperty('--my', `${50 + y * 50}%`);
+        el.style.setProperty('--act', Math.max(0, a).toFixed(3));
+        if (moving) s.raf = requestAnimationFrame(step);
+        else {
+            s.raf = null;
+            s.p = { ...s.t };
+            if (!s.t.a) el.style.transform = '';
+        }
+    }
+    function aim(x, y, a) {
+        const s = spring.current ||= { p: { x: 0, y: 0, a: 0 }, v: { x: 0, y: 0, a: 0 }, t: {}, raf: null };
+        s.t = { x, y, a };
+        if (!s.raf) s.raf = requestAnimationFrame(step);
+    }
+
     function onMove(e) {
         if (!foil && !tilt) return;
         const el = ref.current;
         const box = el.getBoundingClientRect();
-        const x = (e.clientX - box.left) / box.width;
-        const y = (e.clientY - box.top) / box.height;
+        const x = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
+        const y = Math.min(1, Math.max(0, (e.clientY - box.top) / box.height));
+        if (tilt && !matchMedia('(prefers-reduced-motion: reduce)').matches) return aim(x * 2 - 1, y * 2 - 1, 1);
         el.style.setProperty('--mx', `${x * 100}%`);
         el.style.setProperty('--my', `${y * 100}%`);
-        if (tilt) el.style.transform = `perspective(900px) rotateY(${(x - 0.5) * 16}deg) rotateX(${(0.5 - y) * 16}deg)`;
     }
     function onLeave() {
-        if (tilt && ref.current) ref.current.style.transform = '';
+        if (tilt && spring.current) aim(0, 0, 0);
     }
 
     return (
         <div className="nd-box">
         <div
             ref={ref}
-            className={`nd-card transition-transform duration-200 ease-out ${className}`}
+            className={`nd-card ${tilt ? '' : 'transition-transform duration-200 ease-out'} ${className}`}
+            data-tilt={tilt ? '' : undefined}
             data-rarity={card.rarity}
             data-fact={fact ? '' : undefined}
             data-art={bleed ? card.art : undefined}
             data-holo={card.art === 'holo' ? '' : undefined}
             style={{ '--type': t.color }}
+            onPointerDown={onMove}
             onPointerMove={onMove}
+            onPointerUp={(e) => e.pointerType !== 'mouse' && onLeave()}
+            onPointerCancel={onLeave}
             onPointerLeave={onLeave}
         >
+            {tilt && <div className="nd-glare" aria-hidden />}
             <div className="nd-card-inner">
                 <div className="flex items-start justify-between gap-[2cqi]">
                     <div className="min-w-0">
