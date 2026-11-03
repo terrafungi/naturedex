@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { CosmeticLayer } from './Cosmetics.jsx';
 import { AvatarFigure, BGS, HAIR_COLORS, PANTS_STYLES, PantsArt, SHIRTS, SKINS, ShirtArt, defaultAvatar } from './PlayerAvatar.jsx';
 
 const TAU = Math.PI * 2;
@@ -784,12 +785,14 @@ export default function Avatar3D({ avatar, height = 360, className = '', interac
 
     return (
         <div ref={wrap} {...drag}
-            className={`relative overflow-hidden rounded-3xl select-none ${interactive ? 'cursor-grab active:cursor-grabbing' : ''} ${className}`}
+            className={`relative isolate overflow-hidden rounded-3xl select-none ${interactive ? 'cursor-grab active:cursor-grabbing' : ''} ${className}`}
             style={{
                 height, touchAction: 'pan-y',
                 background: `radial-gradient(120% 85% at 50% 28%, color-mix(in srgb, ${bg} 22%, #fff) 0%, color-mix(in srgb, ${bg} 55%, #fff) 48%, ${bg} 100%)`,
             }}>
-            {fallback && <div className="absolute inset-0 grid place-items-center"><AvatarFigure avatar={a} full size={height * 0.92} animate /></div>}
+            <CosmeticLayer kind="scene" id={a.scene} className="-z-10" />
+            {fallback && <div className="absolute inset-0 grid place-items-center"><AvatarFigure avatar={a} full bare size={height * 0.92} animate /></div>}
+            <CosmeticLayer kind="fx" id={a.fx} />
             {/* Soft floor, like a studio backdrop. */}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3" style={{ background: 'linear-gradient(to top, rgba(255,255,255,.28), transparent)' }} />
             {children}

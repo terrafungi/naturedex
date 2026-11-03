@@ -208,7 +208,7 @@ export default function Collection() {
                 <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
                     {page.cards.map((c) => (
                         <Link key={c.id} to={`/carte/${c.id}`} state={{ fromCollection: true }} onClick={remember} className="relative block transition-transform hover:-translate-y-1">
-                            <Card card={c} number={c.num} total={catalog.total} />
+                            <Card card={c} number={c.num} total={catalog.total} frame={user?.avatar?.frame} />
                             {c.count > 1 && (
                                 <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#04150d] text-xs font-bold shadow-lg shadow-emerald-500/30">×{c.count}</span>
                             )}

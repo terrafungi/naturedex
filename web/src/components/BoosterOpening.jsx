@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { ART, Card, CardBack } from './Card.jsx';
+import { ART, Card, CardBack, useMyFrame } from './Card.jsx';
 import { RARITIES } from '../game.jsx';
 import { Pack } from './Pack.jsx';
 import ShareButton from './ShareButton.jsx';
@@ -234,6 +234,7 @@ function Burst({ fx }) {
 }
 
 function FlipCard({ card, revealed, charging, cracks, onClick, demo }) {
+    const frame = useMyFrame();
     const fx = fxOf(card);
     // a secret charges up disguised as a legendary
     const chargeFx = fx.level === 5 ? { ...FX.legendary, charge: fx.charge } : fx;
@@ -266,7 +267,7 @@ function FlipCard({ card, revealed, charging, cracks, onClick, demo }) {
                         : { duration: fx.level >= 4 ? 0.9 : 0.6, ease: [0.3, 1.2, 0.5, 1] }}
                 >
                     <div style={{ backfaceVisibility: 'hidden' }}>
-                        <Card card={card} tilt />
+                        <Card card={card} tilt frame={demo ? undefined : frame} />
                     </div>
                     <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
                         <CardBack />
@@ -365,6 +366,7 @@ function RarityBanner({ card, demo }) {
 }
 
 export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, demo }) {
+    const frame = useMyFrame();
     const [stage, setStage] = useState('pack'); // pack → reveal → summary
     const [index, setIndex] = useState(0);
     const [revealed, setRevealed] = useState(false);
@@ -533,7 +535,7 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
                                 {cards.map((card, i) => (
                                     <motion.div key={i} className={`relative ${card.rarity === 'secret' ? 'nd-secret-glow' : card.rarity === 'legendary' ? 'nd-legend-glow' : card.rarity === 'epic' ? 'nd-epic-glow' : ''}`} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
-                                        {demo ? <Card card={card} /> : <Link to={`/carte/${card.id}`}><Card card={card} /></Link>}
+                                        {demo ? <Card card={card} /> : <Link to={`/carte/${card.id}`}><Card card={card} frame={frame} /></Link>}
                                         {card.isNew && <span className="absolute -top-2 -left-2 px-2 py-0.5 rounded-full bg-rust text-paper text-[10px] font-black uppercase">Nouveau</span>}
                                         {!demo && <ShareButton card={card} compact className="absolute -bottom-2 -right-2 z-10" />}
                                         {!demo && <FavoriteStar card={card} className="absolute -bottom-2 -left-2 z-10 !w-9 !h-9" />}

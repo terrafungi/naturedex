@@ -7,13 +7,14 @@
 import { Component, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowRight, Box, Bug, Clock, CloudRain, Droplets, FlaskConical, Gamepad2, Gift, Grid3x3, Lock, Moon, Package, Plus, Recycle, ScrollText, Sparkles, Sprout, Sun, Warehouse, X } from 'lucide-react';
+import { ArrowRight, Box, Bug, Clock, CloudRain, Droplets, FlaskConical, Gamepad2, Gift, Grid3x3, Lock, Moon, Package, Plus, Recycle, ScrollText, ShoppingBag, Sparkles, Sprout, Sun, Warehouse, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Amount, Nugget, Plant, Seed } from '../components/Currency.jsx';
 import { api, useGame } from '../api.jsx';
 import { sfx } from '../sfx.js';
 import BoosterOpening from '../components/BoosterOpening.jsx';
 import { Compost, Fertilizer, Honey, PlantArt, SEED_ORDER, SEED_TAGS, budgetOf, daylight, duration, growth, left, nuggetsFor, parisHour, per } from '../garden/art.jsx';
+import HoneyShopPanel from '../garden/HoneyShop.jsx';
 import { ArcadePanel, BarnPanel, HivePanel, LevelPanel, LevelUp, OrdersPanel, PlotPanel, QuestsPanel, WorkshopPanel } from '../garden/Panels.jsx';
 
 const Island3D = lazy(() => import('../garden/Island3D.jsx'));
@@ -193,6 +194,7 @@ const DOCK = [
     { key: 'barn', label: 'Grange', Icon: Warehouse, color: '#e07a5f' },
     { key: 'workshop', label: 'Atelier', Icon: FlaskConical, color: '#7dff9a' },
     { key: 'hive', label: 'Ruche', Icon: Honey, color: '#ffb627' },
+    { key: 'shop', label: 'Boutique', Icon: ShoppingBag, color: '#ff9ec2' },
     { key: 'arcade', label: 'Jeux', Icon: Gamepad2, color: '#ff7a6b' },
     { key: 'quests', label: 'Quêtes', Icon: Sparkles, color: '#c69bff' },
 ];
@@ -460,7 +462,7 @@ export default function Garden() {
                 <nav className="absolute bottom-3 inset-x-3 flex justify-center pointer-events-none" aria-label="Lieux du jardin">
                     <div className="pointer-events-auto flex gap-0.5 sm:gap-1 p-1.5 rounded-[1.4rem] nd-glass shadow-2xl max-w-full overflow-x-auto">
                         {DOCK.map(({ key, label, Icon, color }) => (
-                            <button key={key} type="button" onClick={() => { sfx.tap(); setPanel(key); }} className="relative flex flex-col items-center gap-0.5 w-[3.6rem] sm:w-16 py-1.5 rounded-2xl hover:bg-white/10 transition-colors">
+                            <button key={key} type="button" onClick={() => { sfx.tap(); setPanel(key); }} className="relative flex flex-col items-center gap-0.5 w-[3.3rem] min-[440px]:w-[3.6rem] sm:w-16 py-1.5 rounded-2xl hover:bg-white/10 transition-colors">
                                 <span className="grid place-items-center w-8 h-8 rounded-xl" style={{ background: `${color}22`, color }}><Icon className="w-[18px] h-[18px]" /></span>
                                 <span className="text-[10px] sm:text-[11px] font-semibold text-white/85">{label}</span>
                                 {counts[key] > 0 && <span className="absolute top-0.5 right-1.5 grid place-items-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#ff5a4b] text-[10px] font-black text-white ring-2 ring-[#0b2117]">{counts[key]}</span>}
@@ -535,8 +537,13 @@ export default function Garden() {
                         onCraft={async (all) => { const r = await run('craft', all ? { all: true } : {}, sfx.plant); if (r) toast(`+${r.crafted} engrais`, 'plant'); }} />
                 )}
                 {panel === 'hive' && (
-                    <HivePanel key="hive" garden={garden} busy={busy} onClose={() => setPanel(null)}
+                    <HivePanel key="hive" garden={garden} busy={busy} onClose={() => setPanel(null)} onShop={() => setPanel('shop')}
                         onBuy={async (key) => { if (await run('buyDecor', { key }, sfx.win)) toast(`${garden.decorShop[key].name} installé sur l'île !`, 'gold'); }} />
+                )}
+                {panel === 'shop' && (
+                    <HoneyShopPanel key="shop" garden={garden} busy={busy} onClose={() => setPanel(null)}
+                        onBuy={async (slot, it) => { if (await run('honeyBuy', { slot, id: it.id }, sfx.win)) toast(`${it.name} : acheté et équipé !`, 'gold'); }}
+                        onEquip={async (slot, id) => { if (await run('avatarEquip', { slot, id }, sfx.tap)) toast(id === 'aucun' ? 'Retiré' : 'Équipé !'); }} />
                 )}
                 {panel === 'arcade' && <ArcadePanel key="arcade" garden={garden} onClose={() => setPanel(null)} onPlay={(g) => { setPanel(null); setGame(g); }} />}
                 {panel === 'quests' && (

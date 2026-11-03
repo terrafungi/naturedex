@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Camera, Eye, HelpCircle, MapPin, Sparkles, Zap } from 'lucide-react';
 import { RARITIES, TYPES, formatViews } from '../game.jsx';
+import { useGame } from '../api.jsx';
 import { ABILITIES, battleStats } from '../battle.js';
 
 export function TypeBadge({ type, className = '' }) {
@@ -26,8 +27,12 @@ const sharper = (url) => url?.replace(/\/\d+px-([^/]+)$/, '/960px-$1');
 // on top of it; 'holo' = the regular layout with a holographic foil (some commons and uncommons).
 export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo' };
 
-/** Full card. `card` comes from the catalog (light) or the API (full). */
-export function Card({ card, number, total, tilt = false, className = '' }) {
+/** The signed-in player's card frame (honey shop), for their own cards. */
+export const useMyFrame = () => useGame()?.user?.avatar?.frame;
+
+/** Full card. `card` comes from the catalog (light) or the API (full). `frame`: the owner's
+ * honey-shop card frame (index.css), the rarity then shows as a thin ring inside it. */
+export function Card({ card, number, total, tilt = false, className = '', frame }) {
     const ref = useRef(null);
     const t = TYPES[card.type] || TYPES.plant;
     const r = RARITIES[card.rarity] || RARITIES.common;
@@ -97,6 +102,7 @@ export function Card({ card, number, total, tilt = false, className = '' }) {
             data-fact={fact ? '' : undefined}
             data-art={bleed ? card.art : undefined}
             data-holo={card.art === 'holo' ? '' : undefined}
+            data-frame={frame && frame !== 'aucun' ? frame : undefined}
             style={{ '--type': t.color }}
             onPointerDown={onMove}
             onPointerMove={onMove}

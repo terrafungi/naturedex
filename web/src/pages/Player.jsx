@@ -225,7 +225,7 @@ function BinderCards({ player, binder }) {
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {page.cards.map((c) => (
                     <div key={c.id} className="relative">
-                        <Card card={c} number={c.num} />
+                        <Card card={c} number={c.num} frame={player.avatar?.frame} />
                         {!player.me && !c.mine && (
                             <span className="absolute -top-2 -left-2 px-2 py-0.5 rounded-full bg-[#e76f51] text-white text-[10px] font-black uppercase shadow-lg">Il te manque</span>
                         )}

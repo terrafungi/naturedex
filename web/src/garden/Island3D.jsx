@@ -37,6 +37,11 @@ const DECOR_SPOTS = {
     arche: [[0, 5.0]],
     moulin: [[-2.9, -7.2]],
     cerisier: [[7.3, -2.9]],
+    // seasonal
+    tulipes: [[-4.5, 1.5]], nid: [[-7.7, 2.9]], oeufs: [[-2.0, 4.7]],
+    parasol: [[2.0, 4.8]], pasteques: [[3.9, 6.3]], tournesols: [[5.5, 2.3]],
+    feuilles: [[-6.7, -2.3]], chataignes: [[-2.3, -5.3]], citrouilles: [[1.6, -4.8]],
+    bonhomme: [[-0.7, -4.1]], cadeaux: [[-4.2, 6.0]], sapin: [[-4.7, -6.8]],
 };
 const POND = [-6.7, 0.3];
 const TREES = [[-8.2, -1.8, 'pine'], [-7.6, -4.6, 'round'], [-1.0, -8.6, 'pine'], [2.2, -8.4, 'round'], [7.9, 0.5, 'pine'], [8.3, 4.0, 'round'], [-8.0, 4.5, 'pine'], [-5.0, 7.3, 'round'], [5.0, 7.4, 'pine'], [-8.6, 1.6, 'round'], [8.6, -1.4, 'round']];
@@ -419,6 +424,140 @@ function buildDecor(k, key) {
                 k.mesh(k.G.cyl(0.07, 0.1, 0.8, 5), '#6b4226', [0.3, 1.4, 0], [0, 0, -0.6]),
                 ...[[0, 2.0, 0, 0.85], [-0.6, 1.75, 0.2, 0.6], [0.7, 1.8, -0.1, 0.65], [0.1, 2.5, 0.1, 0.5], [-0.2, 1.7, -0.6, 0.55]]
                     .map(([x, y, z, r], i) => k.mesh(k.G.ico(r, 1), pink[i % 3], [x, y, z])),
+            ]);
+        }
+        // ---- seasonal decorations
+        case 'tulipes': {
+            const colors = ['#ff5a7a', '#ffd166', '#ff8fc0', '#c78bff', '#ff7a3d'];
+            return k.group([
+                k.mesh(k.G.cyl(0.85, 0.9, 0.12, 14), '#6b4226', [0, 0.06, 0]),
+                ...Array.from({ length: 9 }, (_, i) => {
+                    const a = (i / 9) * TAU, r = i % 3 ? 0.55 : 0.2;
+                    return k.group([
+                        k.mesh(k.G.cyl(0.025, 0.025, 0.5, 4), '#4f9a3a', [0, 0.3, 0]),
+                        k.mesh(k.G.capsule(0.09, 0.08), colors[i % 5], [0, 0.6, 0]),
+                        k.mesh(k.G.box(0.04, 0.22, 0.12), '#5fae3f', [0.06, 0.25, 0], [0, 0, -0.4]),
+                    ], [Math.cos(a) * r, 0, Math.sin(a) * r]);
+                }),
+            ]);
+        }
+        case 'nid':
+            return k.group([
+                k.mesh(k.G.cyl(0.08, 0.12, 0.9, 6), WOOD_D, [0, 0.45, 0]),
+                k.mesh(k.G.torus(0.32, 0.12, 6, 14), '#a77b4a', [0, 0.95, 0], [Math.PI / 2, 0, 0]),
+                k.mesh(k.G.cyl(0.3, 0.2, 0.12, 12), '#7a5530', [0, 0.9, 0]),
+                ...[[-0.1, 0.02], [0.1, 0.05], [0, -0.1]].map(([x, z]) => k.mesh(k.G.sphere(0.09, 8, 6), '#bfe3f2', [x, 1.0, z], null, [1, 1.25, 1])),
+                k.group([k.mesh(k.G.sphere(0.14, 8, 6), '#e2733b', [0, 0, 0]), k.mesh(k.G.sphere(0.09, 8, 6), '#5a3a22', [0.12, 0.1, 0]), k.mesh(k.G.cone(0.03, 0.08, 4), '#ffb627', [0.22, 0.1, 0], [0, 0, -Math.PI / 2])], [0.42, 1.12, 0]),
+            ]);
+        case 'oeufs': {
+            const shells = ['#ff9ec2', '#9fd8ff', '#ffd166', '#a8f0c6', '#c78bff'];
+            return k.group([
+                k.mesh(k.G.cyl(0.6, 0.45, 0.35, 12), '#c99a5b', [0, 0.18, 0]),
+                k.mesh(k.G.torus(0.58, 0.05, 5, 16), '#a77b4a', [0, 0.36, 0], [Math.PI / 2, 0, 0]),
+                k.mesh(k.G.torus(0.4, 0.04, 5, 14, Math.PI), '#a77b4a', [0, 0.36, 0], null, [1, 1.4, 1]),
+                ...shells.map((c, i) => {
+                    const a = (i / 5) * TAU;
+                    return k.mesh(k.G.sphere(0.15, 10, 8), c, [Math.cos(a) * 0.3, 0.44, Math.sin(a) * 0.3], [0.3, a, 0.2], [1, 1.3, 1]);
+                }),
+                k.mesh(k.G.sphere(0.16, 10, 8), '#fff0f7', [0, 0.52, 0], null, [1, 1.3, 1]),
+            ]);
+        }
+        case 'parasol':
+            return k.group([
+                k.mesh(k.G.cyl(0.04, 0.04, 1.9, 6), '#f2e6d0', [0, 0.95, 0], [0, 0, 0.12]),
+                k.mesh(k.G.cone(0.97, 0.44, 16), '#ff5a5a', [0.11, 1.94, 0], [0, 0, 0.12]),
+                ...Array.from({ length: 4 }, (_, i) => k.mesh(k.G.box(0.98, 0.02, 0.2), '#fff6e8', [0.11, 1.76, 0], [0, (i / 4) * Math.PI, 0.12])),
+                k.mesh(k.G.rbox(1.1, 0.08, 0.6, 0.03), '#4ab8ff', [0.2, 0.05, 0.6]),
+                k.mesh(k.G.sphere(0.18, 10, 8), '#ffe74a', [-0.6, 0.18, 0.5]),
+            ]);
+        case 'pasteques':
+            return k.group([
+                k.mesh(k.G.sphere(0.42, 12, 10), '#2f7d3a', [0, 0.36, 0], null, [1.2, 0.85, 1]),
+                k.mesh(k.G.sphere(0.3, 12, 10), '#3a9a46', [0.65, 0.26, 0.25], null, [1.15, 0.85, 1]),
+                k.group([
+                    k.mesh(k.G.cyl(0.3, 0.3, 0.08, 14, 1), '#ff4a5a', [0, 0, 0], [Math.PI / 2, 0, 0]),
+                    k.mesh(k.G.torus(0.3, 0.04, 5, 16), '#2f7d3a', [0, 0, 0]),
+                ], [-0.55, 0.3, 0.35], [0, 0.5, 0], [1, 1, 1]),
+                k.mesh(k.G.box(0.5, 0.06, 0.25), '#ff4a5a', [0.1, 0.05, 0.7], [0, 0.4, 0]),
+            ]);
+        case 'tournesols':
+            return k.group([-0.7, 0, 0.7].map((x, i) => k.group([
+                k.mesh(k.G.cyl(0.04, 0.05, 1.6 + i % 2 * 0.3, 5), '#4f9a3a', [0, 0.8 + i % 2 * 0.15, 0]),
+                k.mesh(k.G.box(0.3, 0.04, 0.14), '#5fae3f', [0.12, 0.7, 0], [0, 0, -0.5]),
+                k.group([
+                    k.mesh(k.G.cyl(0.36, 0.36, 0.06, 14), '#ffc93c', [0, 0, 0], [Math.PI / 2, 0, 0]),
+                    ...Array.from({ length: 10 }, (_, j) => k.mesh(k.G.box(0.1, 0.28, 0.03), '#ffb627', [Math.cos(j / 10 * TAU) * 0.4, Math.sin(j / 10 * TAU) * 0.4, 0], [0, 0, j / 10 * TAU + Math.PI / 2])),
+                    k.mesh(k.G.cyl(0.2, 0.2, 0.1, 12), '#5a3a1a', [0, 0, 0.04], [Math.PI / 2, 0, 0]),
+                ], [0, 1.65 + i % 2 * 0.3, 0.05], [-0.25, 0, 0]),
+            ], [x, 0, 0])));
+        case 'feuilles': {
+            const tones = ['#e07a2e', '#c8502a', '#e9b23a', '#a8432a', '#d9932f'];
+            return k.group([
+                k.mesh(k.G.dome(0.75, 12), '#b5602a', [0, 0, 0], null, [1, 0.45, 1]),
+                ...Array.from({ length: 16 }, (_, i) => {
+                    const a = i * 2.4, r = 0.15 + (i % 5) * 0.16;
+                    return k.mesh(k.G.box(0.22, 0.02, 0.16), tones[i % 5], [Math.cos(a) * r, 0.36 - r * 0.38, Math.sin(a) * r], [0.3 * (i % 3 - 1), a, 0.4 * (i % 2 - 0.5)]);
+                }),
+                k.mesh(k.G.cyl(0.03, 0.03, 1.1, 4), WOOD_D, [0.75, 0.5, 0.2], [0, 0, -0.35]),
+                ...[-0.08, 0, 0.08].map((z) => k.mesh(k.G.box(0.02, 0.2, 0.02), '#d9b26a', [0.96 + z, 0.05, 0.2 + z])),
+            ]);
+        }
+        case 'chataignes':
+            return k.group([
+                ...[0, 1, 2].map((i) => k.mesh(k.G.cyl(0.03, 0.03, 0.75, 4), '#3a3a42', [Math.cos(i / 3 * TAU) * 0.35, 0.35, Math.sin(i / 3 * TAU) * 0.35], [Math.sin(i / 3 * TAU) * 0.2, 0, -Math.cos(i / 3 * TAU) * 0.2])),
+                k.mesh(k.G.cyl(0.45, 0.32, 0.28, 12), '#2f2f36', [0, 0.78, 0]),
+                k.mesh(k.G.cyl(0.4, 0.4, 0.04, 12), { color: '#ff6a2a', emissive: '#ff4a1a', emissiveIntensity: 0.8 }, [0, 0.9, 0]),
+                ...Array.from({ length: 6 }, (_, i) => k.mesh(k.G.sphere(0.08, 6, 5), '#6b3a1a', [Math.cos(i) * 0.22, 0.95, Math.sin(i) * 0.22], null, [1, 0.8, 1])),
+                k.mesh(k.G.rbox(0.5, 0.25, 0.35, 0.04), '#c99a5b', [0.75, 0.13, 0.1]),
+                placed(k.glowSprite('#ff8a3d', 1.6, 0), [0, 1.0, 0], { glow: 0.85, night: true }),
+            ]);
+        case 'citrouilles':
+            return k.group([[0, 0, 0.55], [0.7, 0.15, 0.38], [-0.6, 0.25, 0.32]].map(([x, z, r], i) => k.group([
+                ...Array.from({ length: 6 }, (_, j) => k.mesh(k.G.sphere(r, 10, 8), i === 1 ? '#f29a2e' : '#e8772a', [Math.cos(j / 6 * TAU) * r * 0.35, r * 0.75, Math.sin(j / 6 * TAU) * r * 0.35], null, [0.75, 0.8, 0.75])),
+                k.mesh(k.G.cyl(0.04, 0.06, 0.2, 5), '#4f6b2a', [0, r * 1.45, 0], [0, 0, 0.3]),
+                ...(i === 0 ? [
+                    k.mesh(k.G.cone(0.08, 0.1, 3), { color: '#ffd27a', emissive: '#ffb12e', emissiveIntensity: 0.9 }, [-0.16, r * 0.95, r * 0.66], [Math.PI / 2, 0, 0]),
+                    k.mesh(k.G.cone(0.08, 0.1, 3), { color: '#ffd27a', emissive: '#ffb12e', emissiveIntensity: 0.9 }, [0.16, r * 0.95, r * 0.66], [Math.PI / 2, 0, 0]),
+                    k.mesh(k.G.box(0.3, 0.06, 0.05), { color: '#ffd27a', emissive: '#ffb12e', emissiveIntensity: 0.9 }, [0, r * 0.6, r * 0.7]),
+                    placed(k.glowSprite('#ffb12e', 1.4, 0), [0, r * 0.8, r * 0.8], { glow: 0.7, night: true }),
+                ] : []),
+            ], [x, 0, z])));
+        case 'bonhomme':
+            return k.group([
+                k.mesh(k.G.sphere(0.5, 14, 10), '#f4f8ff', [0, 0.45, 0]),
+                k.mesh(k.G.sphere(0.36, 14, 10), '#f4f8ff', [0, 1.1, 0]),
+                k.mesh(k.G.sphere(0.26, 14, 10), '#f4f8ff', [0, 1.6, 0]),
+                k.mesh(k.G.cone(0.05, 0.25, 6), '#ff7a2e', [0, 1.6, 0.32], [Math.PI / 2, 0, 0]),
+                ...[-0.09, 0.09].map((x) => k.mesh(k.G.sphere(0.035, 5, 4), '#1e1e24', [x, 1.68, 0.23])),
+                ...[1.2, 1.05, 0.9].map((y) => k.mesh(k.G.sphere(0.04, 5, 4), '#1e1e24', [0, y, 0.35])),
+                k.mesh(k.G.torus(0.25, 0.06, 6, 14), '#e2453b', [0, 1.38, 0], [Math.PI / 2, 0, 0]),
+                k.mesh(k.G.box(0.1, 0.4, 0.04), '#e2453b', [0.15, 1.2, 0.26], [0, 0, 0.2]),
+                k.mesh(k.G.cyl(0.2, 0.22, 0.28, 12), '#2b2b33', [0, 1.92, 0]),
+                k.mesh(k.G.cyl(0.32, 0.32, 0.04, 14), '#2b2b33', [0, 1.79, 0]),
+                ...[-1, 1].map((sgn) => k.mesh(k.G.cyl(0.02, 0.03, 0.7, 4), WOOD_D, [sgn * 0.6, 1.2, 0], [0, 0, sgn * -1.0])),
+            ]);
+        case 'cadeaux':
+            return k.group([[0, 0, 0.7, '#e2453b', '#ffd166'], [0.75, 0.2, 0.5, '#4ab8ff', '#fff'], [-0.55, 0.35, 0.45, '#5fae3f', '#e2453b'], [0.1, -0.05, 0.4, '#c78bff', '#ffd166', 0.7]].map(([x, z, s, c, rib, y = 0], i) => k.group([
+                k.mesh(k.G.rbox(s, s * 0.8, s, 0.03), c, [0, s * 0.4, 0]),
+                k.mesh(k.G.box(s + 0.02, s * 0.8 + 0.02, s * 0.16), rib, [0, s * 0.4, 0]),
+                k.mesh(k.G.box(s * 0.16, s * 0.8 + 0.02, s + 0.02), rib, [0, s * 0.4, 0]),
+                k.mesh(k.G.torus(s * 0.14, s * 0.04, 4, 10), rib, [-s * 0.1, s * 0.86, 0], [0, 0.6, 0.4]),
+                k.mesh(k.G.torus(s * 0.14, s * 0.04, 4, 10), rib, [s * 0.1, s * 0.86, 0], [0, -0.6, -0.4]),
+            ], [x, y, z], [0, i * 0.7, 0])));
+        case 'sapin': {
+            const bulbs = ['#ff5a5a', '#ffd166', '#4ab8ff', '#ff9ec2', '#fff6c8'];
+            return k.group([
+                k.mesh(k.G.cyl(0.14, 0.18, 0.5, 7), '#6b4226', [0, 0.25, 0]),
+                k.mesh(k.G.cone(1.0, 1.1, 9), '#1f6b44', [0, 1.0, 0]),
+                k.mesh(k.G.cone(0.8, 1.0, 9), '#26804f', [0, 1.6, 0]),
+                k.mesh(k.G.cone(0.55, 0.85, 9), '#2f9a5e', [0, 2.15, 0]),
+                k.mesh(k.G.ico(0.17, 0), { color: '#ffe27a', emissive: '#ffc93c', emissiveIntensity: 1 }, [0, 2.65, 0]),
+                placed(k.glowSprite('#ffe27a', 1.3, 0), [0, 2.65, 0], { glow: 0.9, night: true }),
+                ...Array.from({ length: 14 }, (_, i) => {
+                    const y = 0.7 + (i / 14) * 1.8, r = 0.95 - (i / 14) * 0.75, a = i * 2.3;
+                    return k.mesh(k.G.sphere(0.065, 6, 5), { color: bulbs[i % 5], emissive: bulbs[i % 5], emissiveIntensity: 0.7 }, [Math.cos(a) * r, y, Math.sin(a) * r]);
+                }),
+                placed(k.glowSprite('#ffd166', 3.2, 0), [0, 1.5, 0], { glow: 0.35, night: true }),
             ]);
         }
         default:

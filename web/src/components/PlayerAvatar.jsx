@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { api } from '../api.jsx';
+import { FxArt, SceneArt, hasFx, hasScene } from './Cosmetics.jsx';
 
 // The drawn character. Prices and ownership come from the API (functions/api/avatar.mjs);
 // only the drawings live here, keyed by the same ids.
@@ -459,10 +460,14 @@ export function PantsArt({ id }) {
     );
 }
 
-/** `full`: whole character standing, pet at the feet (`size` is then the height). */
-export function AvatarFigure({ avatar, size = 40, className = '', ring, animate = false, full = false }) {
+/** `full`: whole character standing, pet at the feet (`size` is then the height). `bare`: without the
+ * honey-shop scene and effect (the 3D stage draws them itself). */
+export function AvatarFigure({ avatar, size = 40, className = '', ring, animate = false, full = false, bare = false }) {
     const uid = useId().replace(/:/g, '');
     const a = upgrade(avatar) || defaultAvatar('');
+    const scene = hasScene(a) && !bare;
+    // Effects move: only on avatars big enough to see them, never in long lists of small ones.
+    const fx = hasFx(a) && !bare && (full || size >= 48);
     const skin = SKINS[a.skin] || SKINS[0];
     const hairColor = HAIR_COLORS[a.hairColor] || HAIR_COLORS[0];
     const shirt = SHIRTS[a.shirt] || SHIRTS.foret;
@@ -482,6 +487,7 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring, animate 
             style={ring ? { boxShadow: `0 0 0 2px ${ring}` } : undefined} role="img" aria-label="Avatar">
             <defs>
                 <clipPath id={`c${uid}`}>{full ? <rect x="-10" y="-2" width="120" height="180" /> : <circle cx="50" cy="50" r="50" />}</clipPath>
+                {scene && full && <clipPath id={`s${uid}`}><circle cx="50" cy="82" r="58" /></clipPath>}
                 <clipPath id={`t${uid}`}><path d={full ? FULL_TORSO : TORSO} /></clipPath>
                 {/* Clay-like volume: a soft highlight from the top left, a shade along the bottom right, and a
                     small drop shadow so each layer (hat, pet, scarf…) stands out from the one beneath. */}
@@ -516,14 +522,16 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring, animate 
             <g clipPath={`url(#c${uid})`}>
                 {full ? (
                     <>
-                        <circle cx="50" cy="82" r="58" fill={BGS[a.bg] || BGS[0]} />
-                        <circle cx="50" cy="82" r="58" fill={`url(#b${uid})`} />
+                        {scene ? (
+                            <g clipPath={`url(#s${uid})`}><g transform="translate(-8 24) scale(1.16)"><SceneArt id={a.scene} u={uid} /></g></g>
+                        ) : <circle cx="50" cy="82" r="58" fill={BGS[a.bg] || BGS[0]} />}
+                        <circle cx="50" cy="82" r="58" fill={`url(#b${uid})`} opacity={scene ? 0.5 : 1} />
                         <ellipse cx="50" cy="163" rx="30" ry="4" fill="#00000030" />
                     </>
                 ) : (
                     <>
-                        <rect width="100" height="100" fill={BGS[a.bg] || BGS[0]} />
-                        <rect width="100" height="100" fill={`url(#b${uid})`} />
+                        {scene ? <SceneArt id={a.scene} u={uid} /> : <rect width="100" height="100" fill={BGS[a.bg] || BGS[0]} />}
+                        <rect width="100" height="100" fill={`url(#b${uid})`} opacity={scene ? 0.5 : 1} />
                     </>
                 )}
                 <g filter={v}><BackHair hair={a.hair} color={hairColor} /></g>
@@ -562,6 +570,7 @@ export function AvatarFigure({ avatar, size = 40, className = '', ring, animate 
                 <g filter={v}><Face id={a.face} hairColor={hairColor} /></g>
                 <g filter={v}><Hat id={a.hat} /></g>
                 {a.pet && a.pet !== 'aucun' && <g filter={v}><g className="nd-pet-hop"><g transform={full ? 'translate(88 148) scale(1.5)' : 'translate(73 79) scale(1.3)'}><Pet id={a.pet} /></g></g></g>}
+                {fx && (full ? <g transform="translate(-8 24) scale(1.16)"><FxArt id={a.fx} u={uid} /></g> : <FxArt id={a.fx} u={uid} />)}
             </g>
         </svg>
     );

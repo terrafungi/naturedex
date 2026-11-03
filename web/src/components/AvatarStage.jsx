@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { AvatarFigure, BGS } from './PlayerAvatar.jsx';
+import { CosmeticLayer } from './Cosmetics.jsx';
 
 // three.js is heavy: it is only downloaded when a big avatar view is opened.
 const Avatar3D = lazy(() => import('./Avatar3D.jsx'));
@@ -7,8 +8,10 @@ const Avatar3D = lazy(() => import('./Avatar3D.jsx'));
 /** The character in 3D on its coloured stage, like a trainer card. `children` are laid over the top. */
 export default function AvatarStage({ avatar, height = 380, interactive = true, children, className = '' }) {
     const fallback = (
-        <div className={`relative overflow-hidden rounded-3xl grid place-items-center ${className}`} style={{ height, background: BGS[avatar?.bg] || BGS[0] }}>
-            <AvatarFigure avatar={avatar} full size={height * 0.85} animate />
+        <div className={`relative isolate overflow-hidden rounded-3xl grid place-items-center ${className}`} style={{ height, background: BGS[avatar?.bg] || BGS[0] }}>
+            <CosmeticLayer kind="scene" id={avatar?.scene} className="-z-10" />
+            <AvatarFigure avatar={avatar} full bare size={height * 0.85} animate />
+            <CosmeticLayer kind="fx" id={avatar?.fx} />
             {children}
         </div>
     );

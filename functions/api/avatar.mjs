@@ -6,6 +6,7 @@
  * The drawings themselves live in web/src/components/PlayerAvatar.jsx, keyed by the same ids.
  */
 import { passActive } from './shop.mjs';
+import { COSMETIC, COSMETIC_SLOTS } from './cosmetics.mjs';
 
 const free = (id, name) => ({ id, name, price: 0 });
 const paid = (id, name, price) => ({ id, name, price });
@@ -113,6 +114,24 @@ export function avatarOf(user) {
     return Object.fromEntries(Object.entries(a).map(([k, v]) => [k, ITEM[k]?.[v]?.pass ? FALLBACK[k] : v]));
 }
 
+// Same character the browser draws for a player who never opened the editor (PlayerAvatar.jsx defaultAvatar).
+const hash = (s) => [...String(s || '')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+export function defaultAvatar(name) {
+    const h = hash(name);
+    return {
+        skin: h % OPTIONS.skin, hair: OPTIONS.hair[(h >>> 3) % OPTIONS.hair.length], hairColor: (h >>> 6) % 6, bg: (h >>> 9) % OPTIONS.bg,
+        shirt: ['foret', 'ciel', 'terre', 'feuille'][(h >>> 12) % 4], hat: 'aucun', face: 'aucun', neck: 'aucun', pet: 'aucun',
+        pants: 'jean', shoes: 'baskets',
+    };
+}
+
+// Wears a honey-shop cosmetic ('aucun' takes it off). Ownership is checked by the caller.
+export async function wearCosmetic(db, user, slot, id) {
+    const base = upgrade(user.avatar) || defaultAvatar(user.username);
+    const { rows: [fresh] } = await db.query(`UPDATE users SET avatar = $2 WHERE id = $1 RETURNING *`, [user.id, { ...base, [slot]: id }]);
+    return fresh;
+}
+
 function clean(raw, HttpError) {
     const a = upgrade(raw);
     if (!a || typeof a !== 'object') throw new HttpError(400, 'Avatar invalide');
@@ -128,6 +147,7 @@ function clean(raw, HttpError) {
         if (!ITEM[slot][id]) throw new HttpError(400, 'Cet objet n\'existe pas');
         out[slot] = id;
     }
+    for (const slot of COSMETIC_SLOTS) out[slot] = COSMETIC[slot][a[slot]] ? a[slot] : 'aucun';
     return out;
 }
 
@@ -177,8 +197,11 @@ export function avatarActions({ requireUser, inTransaction, HttpError, publicUse
         // { avatar } → saved; every item must be free, bought, or a Pass one while it is active
         async avatarSave(db, body, event) {
             const user = await requireUser(db, event);
-            const avatar = clean(body.avatar, HttpError);
+            // The editor does not know the honey-shop cosmetics: what it leaves out stays as it was.
+            const worn = Object.fromEntries(COSMETIC_SLOTS.map((slot) => [slot, body.avatar?.[slot] ?? user.avatar?.[slot]]));
+            const avatar = clean({ ...body.avatar, ...worn }, HttpError);
             const mine = await owned(db, user.id);
+            for (const slot of COSMETIC_SLOTS) if (avatar[slot] !== 'aucun' && !mine.has(key(slot, avatar[slot]))) avatar[slot] = 'aucun';
             for (const slot of SLOTS) {
                 const item = ITEM[slot][avatar[slot]];
                 if (item.pass && !passActive(user)) throw new HttpError(403, `${item.name} est réservé au Pass Naturaliste`);
@@ -189,6 +212,18 @@ export function avatarActions({ requireUser, inTransaction, HttpError, publicUse
         },
 
         avatarBuy,
+
+        // { slot: scene|fx|frame, id } → wears a cosmetic bought in the honey shop, or takes it off ('aucun')
+        async avatarEquip(db, body, event) {
+            const user = await requireUser(db, event);
+            const slot = String(body.slot);
+            if (!COSMETIC[slot]) throw new HttpError(400, 'Emplacement inconnu');
+            const id = body.id === 'aucun' ? 'aucun' : COSMETIC[slot][body.id]?.id;
+            if (!id) throw new HttpError(400, 'Objet inconnu');
+            if (id !== 'aucun' && !(await owned(db, user.id)).has(key(slot, id))) throw new HttpError(402, 'Achète-le d\'abord dans la boutique du miel');
+            const fresh = await wearCosmetic(db, user, slot, id);
+            return { avatar: avatarOf(fresh), user: await publicUser(db, fresh) };
+        },
         // Older clients still in a browser tab
         avatarBuyShirt: (db, body, event) => avatarBuy(db, { items: [{ slot: 'shirt', id: body.shirt }] }, event),
 

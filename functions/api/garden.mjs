@@ -11,6 +11,8 @@
  *   all under daily caps. Garden levels unlock seeds and tools and pay a one-time graines reward.
  */
 import crypto from 'node:crypto';
+import { COSMETICS, COSMETIC, cosmeticKey } from './cosmetics.mjs';
+import { wearCosmetic } from './avatar.mjs';
 
 export const BOOSTER_PLANTS = 10;
 // Two pépites make one graine: pépites come easily (recycling, auctions, rewards),
@@ -79,7 +81,30 @@ const DECOR = {
     arche: { name: 'Arche fleurie', price: 340, beauty: 10 },
     moulin: { name: 'Moulin à vent', price: 480, beauty: 12 },
     cerisier: { name: 'Cerisier en fleurs', price: 700, beauty: 15 },
+    // Seasonal: only sold during their season (Paris time), kept for good once bought.
+    tulipes: { name: 'Parterre de tulipes', price: 150, beauty: 3, season: 'printemps' },
+    nid: { name: "Nid d'oiseau", price: 220, beauty: 4, season: 'printemps' },
+    oeufs: { name: 'Œufs décorés', price: 320, beauty: 5, season: 'printemps' },
+    parasol: { name: 'Parasol', price: 150, beauty: 3, season: 'ete' },
+    pasteques: { name: 'Pastèques', price: 220, beauty: 4, season: 'ete' },
+    tournesols: { name: 'Haie de tournesols', price: 320, beauty: 5, season: 'ete' },
+    feuilles: { name: 'Tas de feuilles mortes', price: 150, beauty: 3, season: 'automne' },
+    chataignes: { name: 'Brasero à châtaignes', price: 220, beauty: 4, season: 'automne' },
+    citrouilles: { name: 'Citrouilles', price: 320, beauty: 5, season: 'automne' },
+    bonhomme: { name: 'Bonhomme de neige', price: 150, beauty: 3, season: 'hiver' },
+    cadeaux: { name: 'Cadeaux', price: 220, beauty: 4, season: 'hiver' },
+    sapin: { name: 'Sapin illuminé', price: 320, beauty: 5, season: 'hiver' },
 };
+const SEASONS = { printemps: 'Printemps', ete: 'Été', automne: 'Automne', hiver: 'Hiver' };
+const SEASON_START = { printemps: 3, ete: 6, automne: 9, hiver: 12 }; // month the season starts
+// Current season by the Paris calendar, with the date it ends (first day of the next one).
+function seasonNow(now = Date.now()) {
+    const [y, mo] = parisDate(now).split('-').map(Number);
+    const key = mo >= 3 && mo <= 5 ? 'printemps' : mo >= 6 && mo <= 8 ? 'ete' : mo >= 9 && mo <= 11 ? 'automne' : 'hiver';
+    const endMonth = { printemps: 6, ete: 9, automne: 12, hiver: 3 }[key];
+    const endYear = key === 'hiver' && mo === 12 ? y + 1 : y;
+    return { key, name: SEASONS[key], ends: `${endYear}-${String(endMonth).padStart(2, '0')}-01` };
+}
 const BEAUTY_STEP = 0.001;
 const BEAUTY_MAX = 0.05;
 const beautyOf = (decor) => decor.reduce((n, k) => n + (DECOR[k]?.beauty || 0), 0);
@@ -226,6 +251,11 @@ export function gardenActions({ requireUser, publicUser, HttpError }) {
         return ups;
     }
 
+    async function ownedCosmetics(db, userId) {
+        const { rows } = await db.query(`SELECT item FROM user_items WHERE user_id = $1 AND split_part(item, ':', 1) IN ('scene', 'fx', 'frame')`, [userId]);
+        return rows.map((r) => r.item);
+    }
+
     async function gardenState(db, user) {
         const [{ rows }, m] = await Promise.all([
             db.query(
@@ -278,6 +308,9 @@ export function gardenActions({ requireUser, publicUser, HttpError }) {
                 potionPrice: POTION_PRICE, questReward: QUEST_REWARD, beautyMax: BEAUTY_MAX, beautyStep: BEAUTY_STEP,
             },
             decorShop: DECOR,
+            season: seasonNow(),
+            seasons: Object.entries(SEASONS).map(([key, name]) => ({ key, name, month: SEASON_START[key] })),
+            cosmetics: { catalog: COSMETICS, owned: await ownedCosmetics(db, user.id) },
             games: Object.fromEntries(Object.entries(GAMES).map(([k, g]) => [k, { name: g.name, max: g.max }])),
         };
     }
@@ -537,10 +570,30 @@ export function gardenActions({ requireUser, publicUser, HttpError }) {
             return withGarden(db, event, async (client, user, m) => {
                 need(m, 'decor', 4);
                 if (m.decor.includes(body.key)) throw new HttpError(409, 'Tu l\'as déjà');
+                if (item.season && item.season !== seasonNow().key) throw new HttpError(409, `Revient au ${SEASONS[item.season].toLowerCase()}`);
                 if (m.honey < item.price) throw new HttpError(402, 'Pas assez de miel');
                 m.honey -= item.price;
                 m.decor = [...m.decor, body.key];
                 m.xp += item.beauty * 3;
+            });
+        },
+
+        // Honey shop: a cosmetic (avatar background, avatar effect, card frame) bought once, worn right away.
+        async honeyBuy(db, body, event) {
+            const slot = String(body.slot);
+            const item = COSMETIC[slot]?.[body.id];
+            if (!item) throw new HttpError(400, 'Objet inconnu');
+            return withGarden(db, event, async (client, user, m) => {
+                if (m.honey < item.price) throw new HttpError(402, 'Pas assez de miel');
+                const { rowCount } = await client.query(
+                    `INSERT INTO user_items (user_id, item, price) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+                    [user.id, cosmeticKey(slot, item.id), item.price]
+                );
+                if (!rowCount) throw new HttpError(409, 'Tu l\'as déjà');
+                m.honey -= item.price;
+                m.xp += Math.round(item.price / 20);
+                await wearCosmetic(client, user, slot, item.id);
+                return { bought: { slot, id: item.id, name: item.name } };
             });
         },
 

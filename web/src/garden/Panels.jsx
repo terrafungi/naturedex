@@ -1,9 +1,9 @@
 /** Bottom sheets of the garden: orders, barn, workshop, hive & decorations, arcade, quests, levels, a plot. */
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
-import { Bug, Check, Clock, Crown, Droplets, FlaskConical, Gamepad2, Gift, Lock, Sparkles, Sprout, Trophy, X } from 'lucide-react';
+import { Bug, Check, ChevronRight, Clock, Crown, Droplets, FlaskConical, Gamepad2, Gift, Lock, ShoppingBag, Sparkles, Sprout, Trophy, X } from 'lucide-react';
 import { Plant, Seed } from '../components/Currency.jsx';
-import { Compost, DECOR_EMOJI, Fertilizer, Honey, NPCS, PlantArt, ROADMAP, SEED_ORDER, growth, left, npcLine } from './art.jsx';
+import { Compost, DECOR_EMOJI, SEASON_EMOJI, Fertilizer, Honey, NPCS, PlantArt, ROADMAP, SEED_ORDER, growth, left, npcLine } from './art.jsx';
 
 export function Sheet({ title, icon, accent = '#8ee6a8', onClose, children, wide }) {
     return createPortal(
@@ -159,7 +159,64 @@ export function WorkshopPanel({ garden, busy, onCraft, onClose }) {
 
 // ---------------------------------------------------------------- hive & decorations
 
-export function HivePanel({ garden, busy, onBuy, onClose }) {
+function DecorTile({ id, d, garden, busy, onBuy, away }) {
+    const owned = garden.decor.includes(id);
+    return (
+        <li className={`p-3 rounded-2xl ring-1 flex flex-col ${owned ? 'bg-[#8ee6a8]/10 ring-[#8ee6a8]/40' : 'bg-white/[0.04] ring-white/10'} ${away && !owned ? 'opacity-55' : ''}`}>
+            <span className="text-4xl text-center">{DECOR_EMOJI[id]}</span>
+            <p className="mt-1 font-bold text-white text-sm text-center leading-tight">{d.name}</p>
+            <p className="text-[11px] text-white/50 text-center">+{d.beauty} beauté · +{d.beauty * 3} XP</p>
+            {away && !owned ? (
+                <span className="mt-2 flex items-center justify-center gap-1 py-2 rounded-full text-xs font-bold text-white/60 ring-1 ring-white/10"><Clock className="w-3.5 h-3.5" />{away}</span>
+            ) : (
+                <button type="button" disabled={busy || owned || garden.honey < d.price} onClick={() => onBuy(id)}
+                    className={`mt-2 flex items-center justify-center gap-1 py-2 rounded-full text-sm font-bold disabled:opacity-60 ${owned ? 'bg-transparent text-[#a8f0c6]' : 'bg-[#ffb627] text-[#3b2a05] disabled:grayscale'}`}>
+                    {owned ? <><Check className="w-4 h-4" />Sur l'île</> : <><Honey className="w-4 h-4" />{d.price}</>}
+                </button>
+            )}
+        </li>
+    );
+}
+
+const SEASON_OF = { printemps: 'de printemps', ete: "d'été", automne: "d'automne", hiver: "d'hiver" };
+const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+// Seasonal decorations: the current season's are on sale until it ends, the others come back next year
+// (and stay on the island once bought).
+function SeasonDecor({ garden, busy, onBuy }) {
+    const season = garden.season;
+    if (!season) return null;
+    const days = Math.max(1, Math.ceil((new Date(`${season.ends}T00:00:00`) - Date.now()) / 86_400_000));
+    const items = Object.entries(garden.decorShop).filter(([, d]) => d.season);
+    const order = garden.seasons.map((s) => s.key);
+    const start = order.indexOf(season.key);
+    const ring = [...order.slice(start), ...order.slice(0, start)];
+    return (
+        <div className="mt-6">
+            <div className="flex flex-wrap items-end gap-2">
+                <h3 className="font-display text-xl text-white">{SEASON_EMOJI[season.key]} Collection {SEASON_OF[season.key]}</h3>
+                <Chip className="ml-auto text-[#ffd98a]"><Clock className="w-3 h-3" />encore {days} jour{days > 1 ? 's' : ''}</Chip>
+            </div>
+            <p className="mt-1 text-sm text-ink-soft">En vente seulement cette saison. Une fois achetées, elles restent sur ton île pour toujours.</p>
+            {ring.map((key, i) => {
+                const list = items.filter(([, d]) => d.season === key);
+                const s = garden.seasons.find((x) => x.key === key);
+                // The next season as a teaser; the later ones only once something of theirs is on the island.
+                if (i > 1 && !list.some(([id]) => garden.decor.includes(id))) return null;
+                return (
+                    <div key={key} className={i ? 'mt-4' : 'mt-3'}>
+                        {i > 0 && <p className="mb-2 text-xs font-bold uppercase tracking-wider text-white/45">{SEASON_EMOJI[key]} {s.name} · revient en {MONTHS[s.month - 1]}</p>}
+                        <ul className="grid grid-cols-3 gap-2.5">
+                            {list.map(([id, d]) => <DecorTile key={id} id={id} d={d} garden={garden} busy={busy} onBuy={onBuy} away={i ? `En ${MONTHS[s.month - 1]}` : null} />)}
+                        </ul>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+export function HivePanel({ garden, busy, onBuy, onShop, onClose }) {
     const r = garden.rules;
     const pct = (x) => `${Math.round(x * 1000) / 10} %`;
     return (
@@ -171,6 +228,16 @@ export function HivePanel({ garden, busy, onBuy, onClose }) {
                     <p className="text-xs text-white/60 mt-1">Miel : fleurs récoltées, commandes, quêtes, mini-jeux et niveaux.</p>
                 </div>
             </div>
+            {onShop && (
+                <button type="button" onClick={onShop} className="mt-3 w-full flex items-center gap-3 p-4 rounded-2xl text-left bg-gradient-to-r from-[#ff9ec2]/20 to-[#c69bff]/15 ring-1 ring-[#ff9ec2]/40 hover:ring-[#ff9ec2]/70 transition">
+                    <span className="grid place-items-center w-10 h-10 rounded-xl bg-[#ff9ec2]/25 text-[#ffc4dc]"><ShoppingBag className="w-5 h-5" /></span>
+                    <span className="mr-auto">
+                        <span className="block font-bold text-white">Boutique du miel</span>
+                        <span className="block text-xs text-white/65">Fonds et effets d'avatar, cadres de cartes</span>
+                    </span>
+                    <ChevronRight className="w-5 h-5 text-white/60" />
+                </button>
+            )}
             <div className="mt-3 p-4 rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
                 <p className="flex items-center gap-2 font-bold text-white"><FlaskConical className="w-4 h-4 text-[#c69bff]" />Potion de croissance · <Honey className="w-4 h-4" />{r.potionPrice}</p>
                 <p className="mt-1 text-sm text-ink-soft">{garden.unlocks.includes('potion') ? 'Divise par deux le temps restant d\'une plante. Touche une plante qui pousse pour l\'utiliser.' : 'Se débloque au niveau 7.'}</p>
@@ -184,21 +251,11 @@ export function HivePanel({ garden, busy, onBuy, onClose }) {
                     <div className="mt-2"><Bar value={garden.goldenChance - 0.1} max={r.beautyMax} color="#e9c46a" /></div>
                     <p className="mt-1 text-[11px] text-white/45">Chaque point de beauté ajoute {pct(r.beautyStep)} de chance de récolte dorée, jusqu'à +{pct(r.beautyMax)}.</p>
                     <ul className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                        {Object.entries(garden.decorShop).map(([key, d]) => {
-                            const owned = garden.decor.includes(key);
-                            return (
-                                <li key={key} className={`p-3 rounded-2xl ring-1 flex flex-col ${owned ? 'bg-[#8ee6a8]/10 ring-[#8ee6a8]/40' : 'bg-white/[0.04] ring-white/10'}`}>
-                                    <span className="text-4xl text-center">{DECOR_EMOJI[key]}</span>
-                                    <p className="mt-1 font-bold text-white text-sm text-center leading-tight">{d.name}</p>
-                                    <p className="text-[11px] text-white/50 text-center">+{d.beauty} beauté · +{d.beauty * 3} XP</p>
-                                    <button type="button" disabled={busy || owned || garden.honey < d.price} onClick={() => onBuy(key)}
-                                        className={`mt-2 flex items-center justify-center gap-1 py-2 rounded-full text-sm font-bold disabled:opacity-60 ${owned ? 'bg-transparent text-[#a8f0c6]' : 'bg-[#ffb627] text-[#3b2a05] disabled:grayscale'}`}>
-                                        {owned ? <><Check className="w-4 h-4" />Sur l'île</> : <><Honey className="w-4 h-4" />{d.price}</>}
-                                    </button>
-                                </li>
-                            );
-                        })}
+                        {Object.entries(garden.decorShop).filter(([, d]) => !d.season).map(([key, d]) => (
+                            <DecorTile key={key} id={key} d={d} garden={garden} busy={busy} onBuy={onBuy} />
+                        ))}
                     </ul>
+                    <SeasonDecor garden={garden} busy={busy} onBuy={onBuy} />
                 </>
             )}
         </Sheet>

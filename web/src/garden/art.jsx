@@ -42,7 +42,10 @@ export const ROADMAP = [
     [30, 'Titre « Légende verte »'], [40, 'Titre « Âme du jardin »'],
 ];
 
-export const DECOR_EMOJI ={ lanterne: '🏮', champis: '🍄', nichoir: '🐦', banc: '🪑', epouvantail: '🧑‍🌾', fontaine: '⛲', arche: '🌸', moulin: '🌬️', cerisier: '🌸' };
+export const DECOR_EMOJI ={ lanterne: '🏮', champis: '🍄', nichoir: '🐦', banc: '🪑', epouvantail: '🧑‍🌾', fontaine: '⛲', arche: '🌸', moulin: '🌬️', cerisier: '🌸',
+    tulipes: '🌷', nid: '🪺', oeufs: '🥚', parasol: '⛱️', pasteques: '🍉', tournesols: '🌻',
+    feuilles: '🍂', chataignes: '🌰', citrouilles: '🎃', bonhomme: '⛄', cadeaux: '🎁', sapin: '🎄' };
+export const SEASON_EMOJI = { printemps: '🌷', ete: '☀️', automne: '🍁', hiver: '❄️' };
 
 export const duration = (minutes) => (minutes < 60 ? `${minutes} min` : `${minutes / 60} h`);
 export function left(ms) {
