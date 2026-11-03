@@ -2297,7 +2297,7 @@ const actions = {
         ]);
         const count = (kind) => awards.filter((a) => a.kind === kind).length;
         if (count('showcase')) badges['/vitrines'] = count('showcase');
-        if (count('quiz')) badges['/quiz'] = (badges['/quiz'] || 0) + count('quiz');
+        if (count('quiz')) badges['/quiz'] ||= count('quiz');
         return { user: pub, badges, gifts, awards };
     },
 

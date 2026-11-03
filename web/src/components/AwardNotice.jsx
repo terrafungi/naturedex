@@ -14,7 +14,7 @@ const PLACES = ['1re', '2e', '3e'];
 function weekLabel(week) {
     const start = new Date(`${week}T12:00:00Z`);
     const end = new Date(start.getTime() + 6 * 86400_000);
-    const day = (d, month) => d.toLocaleDateString('fr-FR', { day: 'numeric', ...(month ? { month: 'long' } : {}), timeZone: 'UTC' });
+    const day = (d, month) => `${d.getUTCDate() === 1 ? '1er' : d.getUTCDate()}${month ? ` ${d.toLocaleDateString('fr-FR', { month: 'long', timeZone: 'UTC' })}` : ''}`;
     return `du ${day(start, start.getUTCMonth() !== end.getUTCMonth())} au ${day(end, true)}`;
 }
 
