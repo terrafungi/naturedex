@@ -1681,6 +1681,21 @@ const actions = {
         return { card };
     },
 
+    // Full sheet of a card put up for auction, even one the player has not discovered yet:
+    // the sale already shows it, so nothing is spoiled.
+    async auctionCard(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows: [card] } = await db.query(
+            `SELECT ${CARD_FIELDS}, COALESCE(uc.count, 0) AS count FROM cards c
+             LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $2
+             WHERE c.id = $1 AND EXISTS (SELECT 1 FROM auctions a WHERE a.card_id = c.id)`,
+            [Number(body.id), user.id]
+        );
+        if (!card) throw new HttpError(404, 'Carte introuvable');
+        if (!card.extract) card.extract = await fillExtract(db, card);
+        return { card };
+    },
+
     async challenges(db, body, event) {
         const user = await requireUser(db, event);
         return dailyChallenges(db, user.id);

@@ -7,6 +7,7 @@ import { Card } from '../components/Card.jsx';
 import { Amount, Nugget } from '../components/Currency.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
 import LiveAuction, { timeLeft, useNow } from '../components/LiveAuction.jsx';
+import CardSheet from '../components/CardSheet.jsx';
 
 const TABS = [
     ['market', 'Le marché'],
@@ -37,7 +38,7 @@ function statusOf(a, now) {
     return null;
 }
 
-function AuctionTile({ a, now, total, busy, onBid, onBuy, onCancel, onOpen }) {
+function AuctionTile({ a, now, total, busy, onBid, onBuy, onCancel, onOpen, onCard }) {
     const [amount, setAmount] = useState(a.minBid);
     useEffect(() => setAmount(a.minBid), [a.minBid]);
     const status = statusOf(a, now);
@@ -46,7 +47,7 @@ function AuctionTile({ a, now, total, busy, onBid, onBuy, onCancel, onOpen }) {
     return (
         <motion.div layout className="@container rounded-3xl nd-glass p-2.5 sm:p-3 flex flex-col gap-3">
             <div className="relative">
-                <button type="button" onClick={() => onOpen(a)} className="block w-full text-left" aria-label={`Suivre l'enchère ${a.card.name}`}><Card card={a.card} number={a.card.num} total={total} /></button>
+                <button type="button" onClick={() => onCard(a.card)} className="block w-full text-left transition-transform hover:-translate-y-1" aria-label={`Voir la carte ${a.card.name}`}><Card card={a.card} number={a.card.num} total={total} /></button>
                 {!a.have && !a.mine && (
                     <span className="absolute top-2 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 rounded-full bg-[#4fd18b] text-[#05130d] text-[11px] font-bold shadow-lg flex items-center gap-1">
                         <Sparkles className="w-3 h-3" />Nouvelle pour toi
@@ -239,6 +240,7 @@ export default function Auctions() {
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState(null);
     const [live, setLive] = useState(null); // auction id shown in the live view
+    const [sheet, setSheet] = useState(null); // card opened big, over the page
     const now = useNow();
 
     const load = useCallback(() => {
@@ -325,7 +327,7 @@ export default function Auctions() {
                             <>
                                 {tab === 'market' && <p className="mt-4 text-sm text-white/50">{data.matches} carte{data.matches > 1 ? 's' : ''} en vente</p>}
                                 <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                                    {list.map((a) => <AuctionTile key={a.id} a={a} now={now} total={catalog?.total} busy={busy} onBid={onBid} onBuy={onBuy} onCancel={onCancel} onOpen={(x) => setLive(x.id)} />)}
+                                    {list.map((a) => <AuctionTile key={a.id} a={a} now={now} total={catalog?.total} busy={busy} onBid={onBid} onBuy={onBuy} onCancel={onCancel} onOpen={(x) => setLive(x.id)} onCard={setSheet} />)}
                                 </div>
                             </>
                         )}
@@ -333,7 +335,10 @@ export default function Auctions() {
                 )}
             </div>
             <AnimatePresence>
-                {live && <LiveAuction key={live} id={live} total={catalog?.total} onClose={() => { setLive(null); load(); }} onChange={load} />}
+                {live && <LiveAuction key={live} id={live} total={catalog?.total} onClose={() => { setLive(null); load(); }} onChange={load} onCard={setSheet} />}
+            </AnimatePresence>
+            <AnimatePresence>
+                {sheet && <CardSheet key={sheet.id} card={sheet} total={catalog?.total} onClose={() => setSheet(null)} />}
             </AnimatePresence>
         </div>
     );

@@ -53,7 +53,7 @@ function Outcome({ a }) {
 }
 
 // Live view of one auction: refreshed every 2 seconds with the full bid history.
-export default function LiveAuction({ id, total, onClose, onChange }) {
+export default function LiveAuction({ id, total, onClose, onChange, onCard }) {
     const { setUser, refreshCollection } = useGame();
     const [data, setData] = useState(null);
     const [amount, setAmount] = useState('');
@@ -129,7 +129,9 @@ export default function LiveAuction({ id, total, onClose, onChange }) {
                 ) : (
                     <div className="grid md:grid-cols-[240px_1fr] gap-5 sm:gap-7">
                         <div className="w-40 sm:w-52 md:w-full mx-auto">
-                            <Card card={a.card} number={a.card.num} total={total} />
+                            <button type="button" onClick={() => onCard?.(a.card)} className="block w-full text-left transition-transform hover:-translate-y-1" aria-label={`Voir la carte ${a.card.name}`}>
+                                <Card card={a.card} number={a.card.num} total={total} />
+                            </button>
                             <p className="mt-3 text-center text-xs text-white/55">Mise en vente par <b className="text-white/85">{a.mine ? 'toi' : a.seller}</b></p>
                         </div>
                         <div className="min-w-0">
