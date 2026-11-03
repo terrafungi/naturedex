@@ -381,7 +381,7 @@ function WeekShowcase() {
     const s = w.showcase;
     const from = new Date(`${w.week}T12:00:00`);
     const to = new Date(from.getTime() + 6 * 86400_000);
-    const day = (d, month) => d.toLocaleDateString('fr-FR', month ? { day: 'numeric', month: 'long' } : { day: 'numeric' });
+    const day = (d, month) => `${d.getDate() === 1 ? '1er' : d.getDate()}${month ? ` ${d.toLocaleDateString('fr-FR', { month: 'long' })}` : ''}`;
     const period = from.getMonth() === to.getMonth() ? `du ${day(from)} au ${day(to, true)}` : `du ${day(from, true)} au ${day(to, true)}`;
     const profile = user ? `/joueur/${encodeURIComponent(w.username)}` : SIGNUP;
 
@@ -403,7 +403,7 @@ function WeekShowcase() {
                             <Frame className="w-4 h-4" />{user ? 'Voter pour les vitrines' : 'Créer ma vitrine'}<ArrowRight className="w-4 h-4" />
                         </Link>
                     </Reveal>
-                    <Reveal delay={0.1} className={`mx-auto w-full ${s.format === 'carre' ? 'max-w-[360px]' : 'max-w-[280px]'}`}>
+                    <Reveal delay={0.1} className={`mx-auto w-full ${s.format === 'carre' ? 'max-w-[360px] md:w-[360px]' : 'max-w-[280px] md:w-[280px]'}`}>
                         <Link to={profile} className="block rounded-2xl overflow-hidden shadow-[0_30px_60px_-20px_rgba(0,0,0,0.85)] ring-[3px] ring-[#e9c46a] transition hover:-translate-y-1">
                             <ShowcaseThumb showcase={s} username={w.username} width={720} />
                         </Link>
