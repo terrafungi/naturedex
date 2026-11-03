@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, MessageCircle, MessageSquareHeart, Send, UserPlus } from 'lucide-react';
+import { ArrowLeft, BookOpen, Bug, CheckCircle2, Heart, Lightbulb, Mail, MessageCircle, MessageSquareHeart, Send, UserPlus } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import PlayerAvatar from '../components/PlayerAvatar.jsx';
 
@@ -158,11 +158,11 @@ function Thread({ username, onActivity }) {
 }
 
 const FEEDBACK_KINDS = [
-    { key: 'idea', emoji: '💡', label: 'À changer / idée', hint: 'Qu\'est-ce qui te manque, t\'agace ou pourrait être mieux ?' },
-    { key: 'bug', emoji: '🐞', label: 'Bug', hint: 'Où ça s\'est passé, ce que tu faisais, sur téléphone ou ordinateur…' },
-    { key: 'thanks', emoji: '💚', label: 'Merci', hint: 'Un petit mot qui fait plaisir.' },
-    { key: 'guestbook', emoji: '📖', label: 'Livre d\'or', hint: 'Laisse une trace de ton passage sur NatureDex.' },
-    { key: 'other', emoji: '✉️', label: 'Autre', hint: 'Tout ce qui ne rentre pas dans les autres cases.' },
+    { key: 'idea', Icon: Lightbulb, label: 'À changer / idée', hint: 'Qu\'est-ce qui te manque, t\'agace ou pourrait être mieux ?' },
+    { key: 'bug', Icon: Bug, label: 'Bug', hint: 'Où ça s\'est passé, ce que tu faisais, sur téléphone ou ordinateur…' },
+    { key: 'thanks', Icon: Heart, label: 'Merci', hint: 'Un petit mot qui fait plaisir.' },
+    { key: 'guestbook', Icon: BookOpen, label: 'Livre d\'or', hint: 'Laisse une trace de ton passage sur NatureDex.' },
+    { key: 'other', Icon: Mail, label: 'Autre', hint: 'Tout ce qui ne rentre pas dans les autres cases.' },
 ];
 const FEEDBACK_MAX = 900;
 
@@ -211,8 +211,8 @@ function Feedback() {
             <div className="mt-5 flex flex-wrap gap-2" role="radiogroup" aria-label="Type de message">
                 {FEEDBACK_KINDS.map((k) => (
                     <button key={k.key} type="button" role="radio" aria-checked={kind === k.key} onClick={() => setKind(k.key)}
-                        className={`px-3.5 py-2 rounded-full text-sm font-semibold transition-colors ${kind === k.key ? 'bg-[#4fd18b] text-[#05130d]' : 'bg-white/5 hover:bg-white/10 text-white'}`}>
-                        <span className="mr-1.5">{k.emoji}</span>{k.label}
+                        className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold transition-colors ${kind === k.key ? 'bg-[#4fd18b] text-[#05130d]' : 'bg-white/5 hover:bg-white/10 text-white'}`}>
+                        <k.Icon className="w-4 h-4" />{k.label}
                     </button>
                 ))}
             </div>
