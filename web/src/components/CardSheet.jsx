@@ -34,7 +34,7 @@ export default function CardSheet({ card: light, total, onClose }) {
                 initial={{ y: 30, scale: 0.96 }} animate={{ y: 0, scale: 1 }} exit={{ y: 30, scale: 0.96 }}>
                 <div className="w-full max-w-[360px] mx-auto pointer-events-auto">
                     <Card card={card} number={card.num} total={total} tilt />
-                    <p className="mt-3 text-center text-xs text-white/50">Touche la carte et fais-la pivoter pour faire briller le holo</p>
+                    <p className="mt-6 text-center text-xs text-white/50">Touche la carte et fais-la pivoter pour faire briller le holo</p>
                 </div>
                 <div className="pointer-events-auto rounded-3xl bg-[#081a11]/90 ring-1 ring-white/10 p-5 sm:p-6">
                     <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider">
