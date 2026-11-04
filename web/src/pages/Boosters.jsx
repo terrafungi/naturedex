@@ -45,6 +45,7 @@ function ChargeGauge({ user }) {
 export default function Boosters() {
     const { user, setUser, catalog, owned, ownedInfo, addCards } = useGame();
     const [opening, setOpening] = useState(() => pendingBooster(user.username)?.cards || null);
+    const [bonus, setBonus] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const countdown = useCountdown(user.nextDailyAt);
@@ -73,7 +74,7 @@ export default function Boosters() {
         }
     }
 
-    const open = () => run('openBooster', (res) => { addCards(res.cards); setOpening(res.cards); }, { pay: payWith === 'plants' ? 'plants' : payWith === 'coins' });
+    const open = () => run('openBooster', (res) => { addCards(res.cards); setBonus(res.bonus || null); setOpening(res.cards); }, { pay: payWith === 'plants' ? 'plants' : payWith === 'coins' });
     const daily = () => run('claimDaily');
 
     // Rewarded ad: the server hands out a token, the reward is claimable once the ad was watched.
@@ -244,7 +245,7 @@ export default function Boosters() {
 
             <AnimatePresence>
                 {opening && (
-                    <BoosterOpening
+                    <BoosterOpening bonus={bonus}
                         key={opening.map((c) => c.id).join('-')}
                         cards={opening}
                         owner={user.username}

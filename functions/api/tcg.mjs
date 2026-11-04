@@ -627,7 +627,7 @@ function aiSetup(state, side) {
     p.bench = creatures.slice(1, 1 + BENCH_SIZE).map(take);
 }
 
-const power = (c) => c.hp + c.attacks[1].damage * 2;
+export const power = (c) => c.hp + c.attacks[1].damage * 2;
 
 function aiPromote(state, events, side) {
     const p = state.players[side];
@@ -747,6 +747,29 @@ export function view(state, side = 0) {
 }
 
 // ---------- decks ----------
+
+export const DECK_MIN_CREATURES = 6;
+
+/**
+ * What is wrong with a deck (list of keys 'c:12', 'e:foret', 't:darwin'), as sentences for the player.
+ * `owned` counts the cards the player has, by the same keys. Énergies have no copy limit.
+ */
+export function deckProblems(keys, owned) {
+    const out = [];
+    const n = {};
+    for (const k of keys) n[k] = (n[k] || 0) + 1;
+    if (keys.length < DECK_MIN) out.push(`Il faut au moins ${DECK_MIN} cartes (${keys.length} pour l'instant).`);
+    if (keys.length > DECK_MAX) out.push(`${DECK_MAX} cartes au maximum.`);
+    const creatures = keys.filter((k) => k.startsWith('c:')).length;
+    if (creatures < DECK_MIN_CREATURES) out.push(`Il faut au moins ${DECK_MIN_CREATURES} créatures.`);
+    if (!keys.some((k) => k.startsWith('e:'))) out.push('Il faut au moins une Énergie.');
+    for (const [k, c] of Object.entries(n)) {
+        if (!k.startsWith('c:') && !itemCard(k)) { out.push('Carte inconnue.'); continue; }
+        if (!k.startsWith('e:') && c > MAX_COPIES) out.push(`${MAX_COPIES} exemplaires au maximum d'une même carte.`);
+        if (c > (owned[k] || 0)) out.push('Tu n\'as pas assez d\'exemplaires de certaines cartes.');
+    }
+    return [...new Set(out)];
+}
 
 export const STARTER_TRAINERS = ['t:appareil', 't:appareil', 't:gourde', 't:jumelles'];
 

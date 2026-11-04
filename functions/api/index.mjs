@@ -21,7 +21,7 @@ import {
     invoiceSubscription, passActive, periodEnd, setCancelAtPeriodEnd, stripeReady, stripeTestMode, verifyWebhook,
 } from './shop.mjs';
 import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLabel, seasonRollover } from './arena.mjs';
-import { duelActions } from './duel.mjs';
+import { boosterBonus, duelActions } from './duel.mjs';
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 import { blogRoute, blogTick, latestPosts } from './blog.mjs';
@@ -1436,6 +1436,7 @@ const actions = {
                 );
             }
             await client.query(`INSERT INTO openings (user_id, card_ids) VALUES ($1, $2)`, [user.id, ids]);
+            const bonus = await boosterBonus(client, user.id, ids); // an Énergie or Naturaliste for the card duel
             await client.query('COMMIT');
 
             const { rows: cards } = await db.query(`SELECT ${CARD_FIELDS} FROM cards c WHERE c.id = ANY($1)`, [ids]);
@@ -1451,7 +1452,7 @@ const actions = {
                 seen.add(id);
                 return { ...byId[id], isNew };
             });
-            return { cards: pack, paidWith, user: await publicUser(db, locked) };
+            return { cards: pack, bonus, paidWith, user: await publicUser(db, locked) };
         } catch (err) {
             await client.query('ROLLBACK').catch(() => {});
             throw err;

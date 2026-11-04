@@ -1,3 +1,4 @@
+import { GameCard } from './TcgCard.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -378,7 +379,7 @@ export function pendingBooster(owner) {
 }
 const sameCards = (a, b) => a.length === b.length && a.every((c, i) => c.id === b[i].id);
 
-export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, demo, owner }) {
+export default function BoosterOpening({ cards, bonus, onClose, onAgain, canOpenAgain, demo, owner }) {
     const frame = useMyFrame();
     const [resumeAt] = useState(() => {
         const p = !demo && owner != null && pendingBooster(owner);
@@ -569,6 +570,16 @@ export default function BoosterOpening({ cards, onClose, onAgain, canOpenAgain, 
                                     </motion.div>
                                 ))}
                             </div>
+                            {bonus && (
+                                <motion.div className="flex items-center gap-4 p-3 pr-5 rounded-2xl bg-white/[0.06] border border-[#f4d88f]/30" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: cards.length * 0.07 + 0.2 }}>
+                                    <GameCard card={bonus} size="hand" />
+                                    <div className="text-paper">
+                                        <p className="text-[11px] uppercase tracking-wider font-black text-[#f4d88f]">Bonus Duel de cartes</p>
+                                        <p className="font-display text-lg font-semibold">{bonus.name}</p>
+                                        <Link to="/duel/deck" className="text-sm text-paper/70 underline hover:text-paper">Ajouter à mon deck</Link>
+                                    </div>
+                                </motion.div>
+                            )}
                             <div className="flex flex-wrap justify-center gap-3">
                                 {canOpenAgain && (
                                     <button onClick={onAgain} className={`px-6 py-3 rounded-full font-bold ${demo ? 'border border-paper/30 text-paper hover:bg-white/10' : 'nd-btn'}`}>

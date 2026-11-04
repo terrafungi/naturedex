@@ -93,8 +93,12 @@ export default function Duel() {
                 <section className="space-y-3">
                     <div className="flex items-baseline justify-between">
                         <h2 className="font-display text-xl font-semibold">Ton deck ({data.deck.length} cartes)</h2>
-                        <span className="text-xs text-ink-soft">Composé automatiquement à partir de ta collection</span>
+                        <Link to="/duel/deck" className="px-3 py-1.5 rounded-full nd-cta-gold text-sm font-bold shrink-0">Modifier</Link>
                     </div>
+                    <p className="text-xs text-ink-soft -mt-1">
+                        {data.custom ? 'Ton deck personnalisé.' : data.broken ? 'Ton deck enregistré n\'est plus complet (cartes vendues ou échangées) : deck automatique en attendant.' : 'Composé automatiquement à partir de ta collection.'}
+                        {data.trimmed && ' Des cartes que tu ne possèdes plus ont été retirées.'}
+                    </p>
                     <p className="text-sm text-ink-soft flex flex-wrap gap-x-3 gap-y-1">
                         <span>{creatures.length} créatures</span>
                         {Object.entries(energyCount).map(([b, n]) => <span key={b} className="font-bold" style={{ color: biomeColor(b) }}>{n} {biomeName(b)}</span>)}
@@ -103,7 +107,7 @@ export default function Duel() {
                     <div className="flex flex-wrap gap-2 p-3 rounded-2xl bg-[#10241a]">
                         {data.deck.map((c, i) => <GameCard key={i} card={c} size="hand" onClick={() => setDetail(c)} />)}
                     </div>
-                    <p className="text-xs text-ink-soft">Gagne des duels pour obtenir plus d'Énergies et de Naturalistes : ton deck grandira jusqu'à 40 cartes.</p>
+                    <p className="text-xs text-ink-soft">Chaque booster ouvert et chaque duel gagné te donnent des Énergies et des Naturalistes : fais grandir ton deck jusqu'à 40 cartes.</p>
                 </section>
             )}
 

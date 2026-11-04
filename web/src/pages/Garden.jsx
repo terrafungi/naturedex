@@ -210,6 +210,7 @@ export default function Garden() {
     const [plotSheet, setPlotSheet] = useState(null);
     const [picker, setPicker] = useState(null); // slot being planted ('all' = every empty plot)
     const [opening, setOpening] = useState(() => pendingBooster(user.username)?.cards || null);
+    const [boosterBonus, setBoosterBonus] = useState(null);
     const [game, setGame] = useState(null);
     const [levelUps, setLevelUps] = useState(null);
     const [bursts, setBursts] = useState([]);
@@ -326,7 +327,7 @@ export default function Garden() {
         opening1.current = true;
         try {
             const res = await run('openBooster', { pay: 'plants' });
-            if (res) { addCards(res.cards); setOpening(res.cards); }
+            if (res) { addCards(res.cards); setBoosterBonus(res.bonus || null); setOpening(res.cards); }
         } finally { opening1.current = false; }
     }
     async function finishGame(score) {
@@ -559,7 +560,8 @@ export default function Garden() {
                 {panel === 'level' && <LevelPanel key="level" garden={garden} onClose={() => setPanel(null)} />}
                 {levelUps && <LevelUp key="lvl" ups={levelUps} onClose={() => setLevelUps(null)} />}
                 {opening && (
-                    <BoosterOpening key={opening.map((c) => c.id).join('-')} cards={opening} owner={user.username} onClose={() => setOpening(null)}
+                    <BoosterOpening bonus={boosterBonus}
+                        key={opening.map((c) => c.id).join('-')} cards={opening} owner={user.username} onClose={() => setOpening(null)}
                         canOpenAgain={user.plants >= user.boosterPlants} onAgain={openBooster} />
                 )}
             </AnimatePresence>

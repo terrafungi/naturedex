@@ -613,3 +613,10 @@ CREATE TABLE IF NOT EXISTS duels (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS duels_one_active ON duels (user_id) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS duels_user_ended ON duels (user_id, ended_at DESC);
+
+-- The deck a player saved in the deck editor (card keys, duplicates repeated).
+CREATE TABLE IF NOT EXISTS tcg_decks (
+    user_id    integer PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    keys       text[] NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);

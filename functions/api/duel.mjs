@@ -4,9 +4,9 @@
  * Énergies and Naturalistes are counted per player in tcg_cards (key 'e:foret', 't:darwin'…);
  * creatures are the species of the collection. Every player gets a small starter kit the first
  * time; winning duels earns more Énergie and Naturaliste cards.
- * The deck is built automatically from the collection until the deck builder exists.
+ * The player can save their own deck (tcg_decks); without one, it is built from the collection.
  */
-import { BIOMES, ITEM_KEYS, STARTER_TRAINERS, TRAINERS, UNIVERSAL, act, autoDeck, creatureCard, itemCard, newGame, view } from './tcg.mjs';
+import { BIOMES, DECK_MAX, DECK_MIN, DECK_MIN_CREATURES, ITEM_KEYS, MAX_COPIES, STARTER_TRAINERS, TRAINERS, UNIVERSAL, act, autoDeck, cardBiome, creatureCard, deckProblems, itemCard, newGame, view } from './tcg.mjs';
 
 const MIN_CREATURES = 6;
 const DAILY_REWARDED = 5; // won duels per Paris day that still pay out
@@ -21,10 +21,10 @@ const RANGERS = ['Camille', 'Sacha', 'Alex', 'Noa', 'Lou', 'Charlie', 'Eden', 'A
 const RARITY_WEIGHT = { common: 60, uncommon: 25, rare: 11, epic: 3.5, legendary: 0.5 };
 const RARITY_ORDER = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
 
-async function ownedCreatures(db, userId) {
+async function ownedRows(db, userId) {
     const { rows } = await db.query(
-        `SELECT ${CARD_FIELDS} FROM user_cards uc JOIN cards c ON c.id = uc.card_id WHERE uc.user_id = $1 AND uc.count > 0`, [userId]);
-    return rows.map(creatureCard);
+        `SELECT ${CARD_FIELDS}, uc.count FROM user_cards uc JOIN cards c ON c.id = uc.card_id WHERE uc.user_id = $1 AND uc.count > 0`, [userId]);
+    return rows;
 }
 
 async function ownedItems(db, userId) {
@@ -36,13 +36,48 @@ const addItems = (db, userId, keys) => db.query(
     `INSERT INTO tcg_cards (user_id, key, count) SELECT $1, k, count(*) FROM unnest($2::text[]) AS k GROUP BY k
      ON CONFLICT (user_id, key) DO UPDATE SET count = tcg_cards.count + EXCLUDED.count`, [userId, keys]);
 
-/** The first time: 10 Énergies of the player's two main biomes and 4 simple Naturalistes. */
+/**
+ * The first time: 10 Énergies of the player's two main biomes and 4 simple Naturalistes.
+ * A 'kit' row (count 0) remembers it was given: boosters also hand out cards before the first duel.
+ */
 async function ensureStarter(db, userId, creatures) {
-    const { rows: [has] } = await db.query(`SELECT 1 FROM tcg_cards WHERE user_id = $1 LIMIT 1`, [userId]);
-    if (has || creatures.length < MIN_CREATURES) return null;
+    if (creatures.length < MIN_CREATURES) return null;
+    const { rowCount } = await db.query(
+        `INSERT INTO tcg_cards (user_id, key, count) VALUES ($1, 'kit', 0) ON CONFLICT (user_id, key) DO NOTHING`, [userId]);
+    if (!rowCount) return null;
     const kit = autoDeck(creatures, { size: 24, nCreatures: 10, trainers: STARTER_TRAINERS }).filter((c) => c.kind !== 'creature').map((c) => c.key);
     await addItems(db, userId, kit);
     return kit;
+}
+
+/** Everything the player owns for the game, by key: 'c:12' (copies of the species), 'e:foret', 't:darwin'. */
+const ownedCounts = (rows, items) => ({ ...items, ...Object.fromEntries(rows.map((r) => [`c:${r.id}`, r.count])) });
+
+/**
+ * The deck the player plays: the one they saved, without the cards they no longer own
+ * (sold, traded); if that is no longer a valid deck, or there is none, the automatic one.
+ */
+async function playerDeck(db, userId, rows, items) {
+    const { rows: [saved] } = await db.query(`SELECT keys FROM tcg_decks WHERE user_id = $1`, [userId]);
+    const creatures = rows.map(creatureCard);
+    if (saved) {
+        const owned = ownedCounts(rows, items);
+        const used = {};
+        const keys = saved.keys.filter((k) => (used[k] = (used[k] || 0) + 1) <= (owned[k] || 0));
+        if (!deckProblems(keys, owned).length) {
+            const byKey = Object.fromEntries(creatures.map((c) => [c.key, c]));
+            return { deck: keys.map((k) => byKey[k] || itemCard(k)), custom: true, trimmed: keys.length < saved.keys.length };
+        }
+    }
+    return { deck: creatures.length >= MIN_CREATURES ? buildDeck(creatures, items) : [], custom: false, broken: !!saved };
+}
+
+/** One Énergie or Naturaliste card that comes with every booster; Énergies lean to the biomes just drawn. */
+export async function boosterBonus(client, userId, cardIds) {
+    const { rows } = await client.query(`SELECT type, stats FROM cards WHERE id = ANY($1)`, [cardIds]);
+    const [key] = rollRewards(1, [...new Set(rows.map(cardBiome))]);
+    await addItems(client, userId, [key]);
+    return itemCard(key);
 }
 
 /**
@@ -132,29 +167,61 @@ export function duelActions({ requireUser, inTransaction, HttpError, publicUser,
     return {
         async duelHome(db, body, event) {
             const user = await requireUser(db, event);
-            const creatures = await ownedCreatures(db, user.id);
+            const rows = await ownedRows(db, user.id);
+            const creatures = rows.map(creatureCard);
             const starter = await ensureStarter(db, user.id, creatures);
             const items = await ownedItems(db, user.id);
-            const deck = creatures.length >= MIN_CREATURES ? buildDeck(creatures, items) : [];
+            const { deck, custom, trimmed, broken } = await playerDeck(db, user.id, rows, items);
             const active = await loadDuel(db, user.id, null);
             const { rows: [st] } = await db.query(
                 `SELECT count(*) FILTER (WHERE status = 'won') AS won, count(*) FILTER (WHERE status = 'lost') AS lost FROM duels WHERE user_id = $1`, [user.id]);
             return {
                 levels: LEVELS.map(({ rarities, ...l }) => l), minCreatures: MIN_CREATURES, creatures: creatures.length,
-                starter: starter && starter.map(itemCard), deck, items: Object.entries(items).map(([key, count]) => ({ ...itemCard(key), count })),
+                starter: starter && starter.map(itemCard), deck, custom, trimmed: !!trimmed, broken: !!broken, items: Object.entries(items).map(([key, count]) => ({ ...itemCard(key), count })),
                 activeId: active ? Number(active.id) : null, won: Number(st.won), lost: Number(st.lost),
                 rewardsLeft: Math.max(0, DAILY_REWARDED - await rewardedToday(db, user.id)),
             };
+        },
+
+        // Everything the deck editor needs. Species go out raw and small: the site builds their game card itself.
+        async duelCollection(db, body, event) {
+            const user = await requireUser(db, event);
+            const rows = await ownedRows(db, user.id);
+            await ensureStarter(db, user.id, rows.map(creatureCard));
+            const items = await ownedItems(db, user.id);
+            const { deck, custom } = await playerDeck(db, user.id, rows, items);
+            return {
+                species: rows.map((r) => ({ id: r.id, name: r.name, type: r.type, rarity: r.rarity, iucn: r.iucn, thumb_url: r.thumb_url, count: r.count,
+                    stats: { hp: r.stats?.hp, atk: r.stats?.atk, def: r.stats?.def, spd: r.stats?.spd, biome: r.stats?.biome } })),
+                items: Object.entries(items).map(([key, count]) => ({ ...itemCard(key), count })).filter((c) => c.name),
+                deck: deck.map((c) => c.key), custom,
+                rules: { min: DECK_MIN, max: DECK_MAX, copies: MAX_COPIES, minCreatures: DECK_MIN_CREATURES },
+            };
+        },
+
+        async duelSaveDeck(db, body, event) {
+            const user = await requireUser(db, event);
+            if (body.reset) {
+                await db.query(`DELETE FROM tcg_decks WHERE user_id = $1`, [user.id]);
+                return { ok: true };
+            }
+            const keys = (Array.isArray(body.keys) ? body.keys : []).map(String).slice(0, DECK_MAX + 1);
+            const owned = ownedCounts(await ownedRows(db, user.id), await ownedItems(db, user.id));
+            const problems = deckProblems(keys, owned);
+            if (problems.length) throw new HttpError(400, problems[0]);
+            await db.query(`INSERT INTO tcg_decks (user_id, keys) VALUES ($1, $2)
+                ON CONFLICT (user_id) DO UPDATE SET keys = EXCLUDED.keys, updated_at = now()`, [user.id, keys]);
+            return { ok: true };
         },
 
         async duelStart(db, body, event) {
             const user = await requireUser(db, event);
             const level = LEVELS[Number(body.level) - 1];
             if (!level) throw new HttpError(400, 'Niveau inconnu');
-            const creatures = await ownedCreatures(db, user.id);
-            if (creatures.length < MIN_CREATURES) throw new HttpError(400, `Il te faut au moins ${MIN_CREATURES} cartes dans ta collection pour jouer.`);
-            await ensureStarter(db, user.id, creatures);
-            const deck = buildDeck(creatures, await ownedItems(db, user.id));
+            const rows = await ownedRows(db, user.id);
+            if (rows.length < MIN_CREATURES) throw new HttpError(400, `Il te faut au moins ${MIN_CREATURES} cartes dans ta collection pour jouer.`);
+            await ensureStarter(db, user.id, rows.map(creatureCard));
+            const { deck } = await playerDeck(db, user.id, rows, await ownedItems(db, user.id));
             const foe = await foeDeck(db, level);
             const name = `Ranger ${RANGERS[Math.floor(Math.random() * RANGERS.length)]}`;
             const state = newGame([deck, foe], { seed: Math.floor(Math.random() * 2 ** 31), names: [user.username, name], ai: level.ai });
