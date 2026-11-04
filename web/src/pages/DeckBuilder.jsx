@@ -87,16 +87,21 @@ export default function DeckBuilder() {
         };
         const limit = (c) => (c.kind === 'energy' ? c.owned : Math.min(c.owned, data.rules.copies));
         const free = (c) => count(c.key) < limit(c);
+        // Énergies owned per biome: creatures are picked among the biomes the player can power
+        const fuel = {};
+        for (const c of cards) if (c.kind === 'energy') fuel[c.biome] = (fuel[c.biome] || 0) + c.owned;
+        const powered = (b) => fuel[UNIVERSAL] || fuel[b];
         for (let guard = 0; next.length < data.rules.max && guard < 200; guard++) {
             const g = groups();
             const order = Object.keys(TARGET).sort((a, b) => g[a] / TARGET[a] - g[b] / TARGET[b]);
             let pick = null;
             for (const want of order) {
                 if (want === 'creature') {
-                    const main = Object.entries(biomesOf()).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([b]) => b);
-                    const pool = cards.filter((c) => c.kind === 'creature' && free(c));
-                    pick = pool.filter((c) => !main.length || main.includes(c.biome)).sort((a, b) => power(b) - power(a))[0]
-                        || pool.sort((a, b) => power(b) - power(a))[0];
+                    // the two biomes with the most Énergies owned
+                    const main = Object.entries(fuel).filter(([b]) => b !== UNIVERSAL).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([b]) => b);
+                    const pool = cards.filter((c) => c.kind === 'creature' && free(c)).sort((a, b) => power(b) - power(a));
+                    pick = pool.find((c) => main.includes(c.biome)) || pool.find((c) => powered(c.biome))
+                        || (g.creature < data.rules.minCreatures || !Object.keys(fuel).length ? pool[0] : null);
                 } else if (want === 'energy') {
                     const need = biomesOf();
                     const have = (b) => count(`e:${b}`);
