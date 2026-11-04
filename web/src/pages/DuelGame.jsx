@@ -379,7 +379,7 @@ export default function DuelGame() {
                                 {sheetCard.poisoned && <p className="mt-1 text-xs font-bold text-[#d6b3ff]">Empoisonnée : −10 PV à chaque fin de tour.</p>}
                             </div>
                         </div>
-                        <div className="mt-3"><CardText card={sheetCard} damageOf={damageOf} /></div>
+                        {!(sheet.where === 'mine' && sheetCard.uid === me.active?.uid && !isSetup && duel.status === 'active') && <div className="mt-3"><CardText card={sheetCard} damageOf={damageOf} /></div>}
                         <SheetActions />
                     </Sheet>
                 )}
@@ -416,12 +416,13 @@ export default function DuelGame() {
                             <button key={i} disabled={!ok} onClick={() => act({ t: 'attack', i })}
                                 className={`w-full p-3 rounded-2xl text-left flex items-center gap-3 font-bold transition disabled:opacity-40 ${ok ? 'bg-[#c2410c] hover:bg-[#d4511a]' : 'bg-white/10'}`}>
                                 <CostRow cost={a.cost} size={18} />
-                                <span className="flex-1">{a.name}{ko && ok && <span className="ml-2 px-1.5 rounded bg-[#f4d88f] text-[#2a1c00] text-[10px]">CAPTURE</span>}</span>
+                                <span className="flex-1">{a.name}{ko && ok && <span className="ml-2 px-1.5 rounded bg-[#f4d88f] text-[#2a1c00] text-[10px]">CAPTURE</span>}{a.text && <span className="block text-[11px] font-normal text-white/70">{a.text}</span>}</span>
                                 <span className="font-display text-xl">{dmg}</span>
                             </button>
                         );
                     })}
                     {!acts.some((x) => x.t === 'attack') && myTurn && <p className="text-xs text-white/60 text-center">{v.turn === 1 ? 'Pas d\'attaque au tout premier tour de la partie.' : 'Attache des Énergies du bon biome pour payer le coût d\'une attaque.'}</p>}
+                    <p className="text-xs text-white/60 text-center">Énergies attachées : {card.energies.length ? <CostRow cost={card.energies} size={13} /> : 'aucune'}</p>
                     {retreats.length > 0 && (
                         <button onClick={() => { setSheet(null); setTargeting({ label: 'Touche la créature du Banc qui prend sa place.', actions: retreats }); }}
                             className="w-full py-2.5 rounded-2xl bg-white/10 font-bold text-sm flex items-center justify-center gap-2">
