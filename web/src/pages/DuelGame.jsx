@@ -135,7 +135,7 @@ export default function DuelGame() {
         setTargeting(null);
         setError('');
         try {
-            const res = await api('duelAct', { id, action });
+            const res = await api('duelAct', { id, move: action });
             setDuel(res.duel);
             if (res.user) setUser(res.user);
             await replay(res.duel.frames || [], res.duel);

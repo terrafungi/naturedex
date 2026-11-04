@@ -185,7 +185,7 @@ export function duelActions({ requireUser, inTransaction, HttpError, publicUser,
                 if (!d) throw new HttpError(404, 'Duel introuvable');
                 if (d.status !== 'active') throw new HttpError(409, 'Ce duel est terminé');
                 const state = d.state;
-                const a = body.action || {};
+                const a = body.move || {};
                 const num = (v) => (v == null ? undefined : Number(v));
                 const action = { t: String(a.t), uid: num(a.uid), target: num(a.target), to: num(a.to), i: num(a.i) };
                 if (action.t === 'setup') Object.assign(action, { active: num(a.active), bench: (Array.isArray(a.bench) ? a.bench : []).slice(0, 3).map(Number) });
