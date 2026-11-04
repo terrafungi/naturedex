@@ -21,7 +21,7 @@ const BOARDS = [
     { key: 'prestige', label: 'Prestige', Icon: Crown, unit: 'points', text: 'Chaque espèce découverte rapporte des points selon sa rareté : Peu commune 1, Rare 3, Épique 8, Légendaire 25, Secrète 100.', extra: (v) => v ? plural(v, 'légendaire') : null },
     { key: 'arena', label: 'Arène', Icon: Swords, unit: 'points', text: 'Cote de l\'arène classée : +/− selon la force de l\'adversaire battu ou perdu (départ à 1000).', extra: (v) => plural(v, 'victoire') },
     { key: 'trophies', label: 'Trophées', Icon: Award, unit: 'trophées', text: 'Nombre de trophées récupérés.', extra: () => null },
-    { key: 'donors', label: 'Donateurs', Icon: HeartHandshake, unit: 'donnés', format: euros, text: '20 % de chaque achat en boutique est reversé à l\'association choisie (LPO, WWF, Humanité & Biodiversité). Classement par montant total reversé.', extra: (v, r) => [plural(v, 'achat'), r.assoc].filter(Boolean).join(' · ') },
+    { key: 'donors', label: 'Donateurs', Icon: HeartHandshake, unit: 'donnés', format: euros, text: '20 % de chaque achat en boutique est reversé à l\'association choisie (LPO ou Wikipédia). Classement par montant total reversé.', extra: (v, r) => [plural(v, 'achat'), r.assoc].filter(Boolean).join(' · ') },
 ];
 const PODIUM = ['#e9c46a', '#c3ccd8', '#cd8a4a'];
 

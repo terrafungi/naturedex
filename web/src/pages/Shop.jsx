@@ -7,7 +7,7 @@ import { api, useGame } from '../api.jsx';
 import { Amount, Nugget, Seed } from '../components/Currency.jsx';
 
 const euros = (cents) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-const ASSOC_COLOR = { lpo: '#4ea8ff', wwf: '#f3f7f1', hb: '#4fd18b' };
+const ASSOC_COLOR = { lpo: '#4ea8ff', wikipedia: '#f3f7f1' };
 const PICK_KEY = 'naturdex.association';
 
 function PackIcon({ pack }) {
@@ -89,7 +89,7 @@ function ReturnBanner({ state, associations, onClose }) {
 
 function Associations({ list, pick, setPick, share }) {
     return (
-        <div className="grid sm:grid-cols-3 gap-3">
+        <div className="grid sm:grid-cols-2 gap-3">
             {list.map((a) => {
                 const on = pick === a.id;
                 return (
@@ -112,7 +112,7 @@ function Associations({ list, pick, setPick, share }) {
                     </button>
                 );
             })}
-            <p className="sm:col-span-3 text-xs text-white/50">{Math.round(share * 100)} % de chaque paiement va à l'association cochée. Tu peux en changer à chaque achat.</p>
+            <p className="sm:col-span-2 text-xs text-white/50">{Math.round(share * 100)} % de chaque paiement va à l'association cochée. Tu peux en changer à chaque achat.</p>
         </div>
     );
 }
@@ -317,8 +317,8 @@ export default function Shop() {
                 <div className="flex items-center gap-4 flex-1">
                     <span className="font-display text-5xl sm:text-7xl font-bold text-[#4fd18b] leading-none whitespace-nowrap">{share} %</span>
                     <p className="text-white/90 leading-snug">
-                        <b className="text-white">du prix que tu paies est reversé</b> à l'association de protection de la nature que tu choisis :
-                        LPO, WWF France ou Humanité & Biodiversité.
+                        <b className="text-white">du prix que tu paies est reversé</b> à l'association que tu choisis :
+                        la LPO ou Wikipédia.
                     </p>
                 </div>
                 <div className="sm:text-right sm:border-l sm:border-white/10 sm:pl-5">

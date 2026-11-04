@@ -10,13 +10,9 @@ export const ASSOCIATIONS = {
         name: 'LPO', full: 'Ligue pour la Protection des Oiseaux', url: 'https://www.lpo.fr',
         text: 'Protège les oiseaux et la biodiversité en France depuis 1912 : refuges, soins à la faune sauvage, suivi des espèces.',
     },
-    wwf: {
-        name: 'WWF France', full: 'World Wide Fund for Nature', url: 'https://www.wwf.fr',
-        text: 'Agit pour les espèces menacées et leurs habitats : forêts, océans, eau douce, partout dans le monde.',
-    },
-    hb: {
-        name: 'Humanité & Biodiversité', full: 'Association fondée par Hubert Reeves', url: 'https://www.humanite-biodiversite.fr',
-        text: 'Défend la biodiversité et les liens entre l\'humain et le vivant, avec les Oasis Nature et un travail de plaidoyer.',
+    wikipedia: {
+        name: 'Wikipédia', full: 'Wikimedia Foundation', url: 'https://donate.wikimedia.org/?uselang=fr',
+        text: 'L\'encyclopédie libre d\'où vient chaque carte NatureDex : gratuite, sans publicité, écrite par des bénévoles.',
     },
 };
 

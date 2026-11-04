@@ -226,7 +226,7 @@ const PASS_PERKS = [
     [Clock, 'Booster gratuit toutes les 15 min', 'au lieu de toutes les 30 min'],
     [Shirt, '5 objets d\'avatar exclusifs', 'Mécène, Lauriers d\'or, Faon, garde forestier, Baskets ailées'],
     [Leaf, 'Badge Mécène', 'à côté de ton pseudo'],
-    [HeartHandshake, '0,80 € par mois pour la nature', 'reversés à la LPO, au WWF France ou à Humanité & Biodiversité'],
+    [HeartHandshake, '0,80 € par mois pour une bonne cause', 'reversés à la LPO ou à Wikipédia'],
 ];
 const PASS_LOOK = { shirt: 'mecene', hat: 'lauriers', pet: 'faon', pants: 'garde', shoes: 'ailees', face: 'aucun', neck: 'aucun' };
 

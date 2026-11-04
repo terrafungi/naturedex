@@ -100,7 +100,7 @@ function Intro({ catalog }) {
             <div className="mt-5 flex items-start gap-3 text-left rounded-2xl p-3.5 bg-[#e9c46a]/[0.08] ring-1 ring-[#e9c46a]/25 max-w-md mx-auto lg:mx-0">
                 <span className="grid place-items-center w-10 h-10 shrink-0 rounded-full bg-[#e9c46a] text-[#2a1c00]"><HeartHandshake className="w-5 h-5" /></span>
                 <p className="text-sm text-white/85 leading-snug">
-                    <strong className="text-[#f4d88f]">20 % de chaque achat</strong> en boutique est reversé à l'association nature de ton choix : LPO, WWF France ou Humanité & Biodiversité. Le jeu reste jouable gratuitement, et le <strong className="text-[#f4d88f]">Pass Naturaliste</strong> (3,99 € / mois) double tes bonus et soutient la nature chaque mois.
+                    <strong className="text-[#f4d88f]">20 % de chaque achat</strong> en boutique est reversé à l'association de ton choix : la LPO ou Wikipédia. Le jeu reste jouable gratuitement, et le <strong className="text-[#f4d88f]">Pass Naturaliste</strong> (3,99 € / mois) double tes bonus et soutient la nature chaque mois.
                 </p>
             </div>
 
