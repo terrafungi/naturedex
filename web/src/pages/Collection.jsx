@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigationType } from 'react-router-dom';
-import { Copy, FolderPlus, Frame, Pencil, Recycle, Search, Star, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, FolderPlus, Frame, Pencil, Recycle, Search, Star, Trash2 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { FavoriteStar } from '../components/Favorite.jsx';
-import { RARITIES, TYPES } from '../game.jsx';
+import { IUCN, RARITIES, TYPES } from '../game.jsx';
 
 const PAGE = 60;
 
@@ -23,6 +23,23 @@ function Chip({ active, onClick, children, color }) {
     );
 }
 
+// Most threatened first; « Non évaluée » = species never assessed by the IUCN.
+const IUCN_ORDER = ['CR', 'EN', 'VU', 'NT', 'LC', 'DD', 'EW', 'EX'];
+
+function Select({ value, onChange, label, children, color }) {
+    return (
+        <label className="relative flex-1 min-w-[10rem] sm:flex-none">
+            <span className="sr-only">{label}</span>
+            <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}
+                className={`w-full appearance-none pl-4 pr-9 py-2 rounded-full bg-white/5 border text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer [&>option]:bg-[#0b1f16] [&>option]:text-white ${value ? 'text-white' : 'text-ink'}`}
+                style={{ borderColor: value ? color || '#4fd18b' : 'rgba(255,255,255,0.1)' }}>
+                {children}
+            </select>
+            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-ink-soft" />
+        </label>
+    );
+}
+
 export default function Collection() {
     const { catalog, owned, ownedInfo, user, setUser, favs, setFavs, refreshCollection } = useGame();
     const restore = useRef(useNavigationType() === 'POP' ? saved : null).current;
@@ -30,6 +47,7 @@ export default function Collection() {
     const [dupes, setDupes] = useState(restore?.dupes ?? false); // only the cards owned more than once
     const [type, setType] = useState(restore?.type ?? null);
     const [rarity, setRarity] = useState(restore?.rarity ?? null);
+    const [iucn, setIucn] = useState(restore?.iucn ?? null);
     const [query, setQuery] = useState(restore?.query ?? '');
     const [debounced, setDebounced] = useState(restore?.query ?? '');
     const [page, setPage] = useState(restore?.page ?? null); // { cards, matches } for the current filters
@@ -44,7 +62,7 @@ export default function Collection() {
 
     // The catalogue is far too big for the browser: the server sorts and filters, we fetch pages.
     // Only the player's own cards are listed; undiscovered ones stay hidden.
-    const filters = useMemo(() => ({ binder, type, rarity, onlyOwned: true, duplicates: dupes, query: debounced }), [binder, dupes, type, rarity, debounced]);
+    const filters = useMemo(() => ({ binder, type, rarity, iucn, onlyOwned: true, duplicates: dupes, query: debounced }), [binder, dupes, type, rarity, iucn, debounced]);
     // inside a binder, starring or unstarring a card changes the list
     const favKey = binder ? favs.cards : null;
     useEffect(() => {
@@ -57,7 +75,7 @@ export default function Collection() {
         return () => { alive = false; };
     }, [filters, owned, favKey]);
 
-    useEffect(() => { saved = { ...saved, binder, dupes, type, rarity, query, page }; }, [binder, dupes, type, rarity, query, page]);
+    useEffect(() => { saved = { ...saved, binder, dupes, type, rarity, iucn, query, page }; }, [binder, dupes, type, rarity, iucn, query, page]);
     // back from a card: return to the same spot, retrying for a moment while the grid grows tall enough
     // (and after the layout's scroll-to-top)
     useEffect(() => {
@@ -180,26 +198,28 @@ export default function Collection() {
                         </span>
                     )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    <Chip active={!type} onClick={() => setType(null)}>Tous les types</Chip>
-                    {Object.entries(TYPES).map(([key, t]) => (
-                        <Chip key={key} active={type === key} color={t.color} onClick={() => setType(type === key ? null : key)}>
-                            <t.Icon className="w-3.5 h-3.5" />{t.label}
-                        </Chip>
-                    ))}
-                </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <Chip active={!rarity} onClick={() => setRarity(null)}>Toutes raretés</Chip>
-                    {Object.entries(RARITIES).map(([key, r]) => (
-                        <Chip key={key} active={rarity === key} color={r.color} onClick={() => setRarity(rarity === key ? null : key)}>
-                            {r.symbol} {r.label}
-                        </Chip>
-                    ))}
-                    <div className="relative ml-auto">
+                    <div className="relative w-full lg:w-auto lg:flex-1 lg:max-w-sm">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-                        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Chercher une carte…"
-                            className="pl-9 pr-3 py-2 rounded-full bg-white/5 border border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nom, ou mot de la description…" type="search"
+                            className="w-full pl-9 pr-3 py-2 rounded-full bg-white/5 border border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
                     </div>
+                    <Select label="Type" value={type} onChange={setType} color={TYPES[type]?.color}>
+                        <option value="">Tous les types</option>
+                        {Object.entries(TYPES).map(([key, t]) => <option key={key} value={key}>{t.label}</option>)}
+                    </Select>
+                    <Select label="Rareté" value={rarity} onChange={setRarity} color={RARITIES[rarity]?.color}>
+                        <option value="">Toutes les raretés</option>
+                        {Object.entries(RARITIES).map(([key, r]) => <option key={key} value={key}>{r.symbol} {r.label}</option>)}
+                    </Select>
+                    <Select label="Statut de conservation" value={iucn} onChange={setIucn} color={IUCN[iucn]?.color}>
+                        <option value="">Tous les statuts (UICN)</option>
+                        {IUCN_ORDER.map((key) => <option key={key} value={key}>{IUCN[key].label}</option>)}
+                        <option value="NE">Non évaluée</option>
+                    </Select>
+                    {(type || rarity || iucn || query) && (
+                        <button onClick={() => { setType(null); setRarity(null); setIucn(null); setQuery(''); }} className="px-3 py-2 text-xs font-semibold text-ink-soft hover:text-white underline">Effacer les filtres</button>
+                    )}
                 </div>
             </div>
 
@@ -220,9 +240,9 @@ export default function Collection() {
             {page?.matches === 0 && (binder ? (
                 <p className="py-20 text-center text-ink-soft">{binder === 'all' && !favs.binders.length
                     ? <>Aucun favori pour l'instant. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour la ranger dans un classeur.</>
-                    : <>Aucune carte ici{type || rarity || debounced ? ' avec ces filtres' : ''}. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour l'ajouter.</>}</p>
+                    : <>Aucune carte ici{type || rarity || iucn || debounced ? ' avec ces filtres' : ''}. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour l'ajouter.</>}</p>
             ) : dupes ? (
-                <p className="py-20 text-center text-ink-soft">Aucun doublon{type || rarity || debounced ? ' avec ces filtres' : ''}.</p>
+                <p className="py-20 text-center text-ink-soft">Aucun doublon{type || rarity || iucn || debounced ? ' avec ces filtres' : ''}.</p>
             ) : Object.keys(owned).length ? (
                 <p className="py-20 text-center text-ink-soft">Aucune de tes cartes ne correspond à ces filtres.</p>
             ) : (

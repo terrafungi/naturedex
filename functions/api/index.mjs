@@ -908,6 +908,14 @@ const quizProgress = (q) => ({
     endsAt: q.ends_at, answered: q.answers.length, results: q.answers.map((a) => (a.skip ? null : a.correct)),
 });
 
+const IUCN_CODES = ['CR', 'EN', 'VU', 'NT', 'LC', 'DD', 'EW', 'EX', 'NE'];
+
+// Lower case, no accents, every run of punctuation or spaces becomes one space.
+function searchText(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/œ/g, 'oe').replace(/æ/g, 'ae')
+        .replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 80);
+}
+
 // ---- Friends & trades ----
 const MAX_TRADE_ITEMS = 10;
 const MAX_PENDING_TRADES = 20;
@@ -1432,21 +1440,29 @@ const actions = {
         const user = await requireUser(db, event);
         const limit = Math.min(Number(body.limit) || 60, 120);
         const offset = Math.max(Number(body.offset) || 0, 0);
-        const q = String(body.query || '').trim();
+        // « Martin pêcheur » finds « Martin-pêcheur d'Europe »: accents, case and punctuation are ignored.
+        const q = searchText(body.query);
         // binder: a binder id, 'all' = any of the player's binders, null = no binder filter
         const binder = body.binder === 'all' ? 0 : body.binder ? Number(body.binder) : null;
+        // IUCN status, or 'NE' for the species never assessed
+        const iucn = IUCN_CODES.includes(body.iucn) ? body.iucn : null;
+        const norm = (sql) => `regexp_replace(unaccent(lower(${sql})), '[^a-z0-9]+', ' ', 'g')`;
         const { rows } = await db.query(
             `SELECT ${LIGHT_FIELDS}, uc.count, COUNT(*) OVER()::int AS matches
              FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1
+             CROSS JOIN LATERAL (SELECT CASE WHEN $5 = '' THEN false
+                    ELSE ${norm(`c.name || ' ' || coalesce(c.sci_name, '')`)} LIKE '%' || $5 || '%' END AS by_name) n
              WHERE ($2::text IS NULL OR c.type = $2) AND ($3::text IS NULL OR c.rarity = $3)
                AND (NOT $4 OR uc.count IS NOT NULL)
-               AND ($5 = '' OR (uc.count IS NOT NULL AND (c.name ILIKE '%' || $5 || '%' OR c.sci_name ILIKE '%' || $5 || '%')))
+               AND ($5 = '' OR (uc.count IS NOT NULL AND (n.by_name
+                    OR ${norm(`coalesce(c.extract, '') || ' ' || coalesce((SELECT st.body->>'intro' FROM species_texts st WHERE st.card_id = c.id), '')`)} LIKE '%' || $5 || '%')))
                AND ($8::int IS NULL OR EXISTS (SELECT 1 FROM binder_cards bc JOIN binders b ON b.id = bc.binder_id
                     WHERE bc.card_id = c.id AND b.user_id = $1 AND ($8 = 0 OR b.id = $8)))
                AND (NOT $9 OR uc.count > 1)
-             ORDER BY uc.count IS NULL, ${RARITY_ORDER} DESC, c.num
+               AND ($10::text IS NULL OR c.iucn = $10 OR ($10 = 'NE' AND c.iucn IS NULL))
+             ORDER BY uc.count IS NULL, n.by_name DESC, ${RARITY_ORDER} DESC, c.num
              LIMIT $6 OFFSET $7`,
-            [user.id, body.type || null, body.rarity || null, Boolean(body.onlyOwned || q || binder != null), q, limit, offset, binder, Boolean(body.duplicates)]
+            [user.id, body.type || null, body.rarity || null, Boolean(body.onlyOwned || q || binder != null), q, limit, offset, binder, Boolean(body.duplicates), iucn]
         );
         return {
             matches: rows[0]?.matches || 0,
