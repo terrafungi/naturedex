@@ -260,6 +260,7 @@ export default function Garden() {
         const craft = garden.unlocks.includes('atelier') ? Math.floor(garden.compost / garden.rules.compostPerFertilizer) : 0;
         return { orders: deliverable, quests, workshop: craft };
     }, [garden]);
+    const opening1 = useRef(false); // a fast double tap must not open two boosters
 
     if (!garden) return <div className="py-32 text-center font-display text-xl text-ink-soft">{error || 'Le jardin se réveille…'}</div>;
 
@@ -320,7 +321,6 @@ export default function Garden() {
         const res = await run('shoo', { slot }, sfx.correct);
         if (res) toast(`Nuisible chassé ! +${res.xp} XP${res.compost ? ' · +1 compost' : ''}`, 'bug');
     }
-    const opening1 = useRef(false); // a fast double tap must not open two boosters
     async function openBooster() {
         if (opening1.current) return;
         opening1.current = true;
