@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeftRight, Check, Clock, Gift, MessageCircle, Minus, Plus, Search, Send, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react';
 import InviteBanner from '../components/InviteBanner.jsx';
@@ -406,7 +406,10 @@ function TradeRow({ t, busy, onRespond, onCancel }) {
 
 export default function Friends() {
     const { user, setUser, catalog, refreshCollection } = useGame();
-    const [tab, setTab] = useState('friends');
+    const [params] = useSearchParams();
+    const linkedTab = { demandes: 'requests', echanges: 'trades' }[params.get('onglet')];
+    const [tab, setTab] = useState(linkedTab || 'friends');
+    useEffect(() => { if (linkedTab) setTab(linkedTab); }, [linkedTab]); // from the « Pendant ton absence » pop-up
     const [friends, setFriends] = useState(null);
     const [trades, setTrades] = useState(null);
     const [trading, setTrading] = useState(null); // friend username in the trade builder

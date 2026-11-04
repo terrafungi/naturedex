@@ -585,3 +585,8 @@ CREATE TABLE IF NOT EXISTS garden_meta (
 ALTER TABLE garden_plots ADD COLUMN IF NOT EXISTS pest_at TIMESTAMPTZ;
 ALTER TABLE garden_plots ADD COLUMN IF NOT EXISTS pest_gone BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE garden_plots ADD COLUMN IF NOT EXISTS fertilized BOOLEAN NOT NULL DEFAULT false;
+
+-- « Pendant ton absence » pop-up: events after notices_seen_at are shown once (NULL = the last 7 days);
+-- invite_ready_seen = referral rewards already announced, so an unclaimed one is not shown again.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notices_seen_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_ready_seen INTEGER NOT NULL DEFAULT 0;

@@ -643,6 +643,27 @@ async function giftAllowance(db, meId, friendId) {
     return allowance;
 }
 
+// « Pendant ton absence »: what happened since the last visit and has no pop-up of its own
+// (gifts and contest prizes have theirs). Each event is shown once; see seenNotices.
+async function userNotices(db, user, invitesReady) {
+    const since = user.notices_seen_at || new Date(Date.now() - 7 * 86400_000);
+    const [{ rows: invitees }, { rows: friends }, { rows: trades }] = await Promise.all([
+        db.query(`SELECT username FROM users WHERE invited_by = $1 AND created_at > $2 ORDER BY created_at LIMIT 10`, [user.id, since]),
+        db.query(`SELECT u.username FROM friendships f JOIN users u ON u.id = f.requester_id
+                  WHERE f.addressee_id = $1 AND f.status = 'pending' AND f.created_at > $2 ORDER BY f.created_at LIMIT 10`, [user.id, since]),
+        db.query(`SELECT u.username, t.message FROM trades t JOIN users u ON u.id = t.from_id
+                  WHERE t.to_id = $1 AND t.status = 'pending' AND t.created_at > $2 ORDER BY t.created_at LIMIT 10`, [user.id, since]),
+    ]);
+    const ready = invitesReady > user.invite_ready_seen ? invitesReady : 0;
+    if (!invitees.length && !friends.length && !trades.length && !ready) return null;
+    return {
+        invitees: invitees.map((r) => r.username),
+        invitesReady: ready, inviteReward: INVITE_REWARD,
+        friendRequests: friends.map((r) => r.username),
+        trades: trades.map((r) => ({ from: r.username, message: r.message })),
+    };
+}
+
 // Gifts received and not yet shown, oldest first, for the pop-up at the next visit.
 async function unseenGifts(db, userId) {
     const { rows } = await db.query(
@@ -1883,7 +1904,7 @@ const actions = {
                             UNION SELECT day FROM quizzes WHERE user_id = u.id AND status = 'done') x) >= $2
                     ORDER BY u.created_at LIMIT $3)`, [u.id, INVITE_DAYS, room]);
             if (rowCount) {
-                await client.query(`UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1`,
+                await client.query(`UPDATE users SET coins = coins + $2, nuggets = nuggets + $3, invite_ready_seen = 0 WHERE id = $1`,
                     [u.id, rowCount * INVITE_REWARD.coins, rowCount * INVITE_REWARD.nuggets]);
             }
             return rowCount;
@@ -2199,7 +2220,16 @@ const actions = {
         const count = (kind) => awards.filter((a) => a.kind === kind).length;
         if (count('showcase')) badges['/vitrines'] = count('showcase');
         if (count('quiz')) badges['/quiz'] ||= count('quiz');
-        return { user: pub, badges, gifts, awards };
+        const notices = await userNotices(db, user, badges['/inviter'] || 0);
+        return { user: pub, badges, gifts, awards, notices };
+    },
+
+    // Closes the « Pendant ton absence » pop-up: those events (and the referral rewards ready now) are not shown again.
+    async seenNotices(db, body, event) {
+        const user = await requireUser(db, event);
+        const ready = Math.max(0, Math.min(INVITE_CAP, Number(body.invitesReady) || 0));
+        await db.query(`UPDATE users SET notices_seen_at = now(), invite_ready_seen = GREATEST(invite_ready_seen, $2) WHERE id = $1`, [user.id, ready]);
+        return { ok: true };
     },
 
     // Closes the « Nouveautés » pop-up for good on this account.

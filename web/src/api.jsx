@@ -53,9 +53,11 @@ export function GameProvider({ children }) {
     const [badges, setBadges] = useState({});
     const [gifts, setGifts] = useState([]); // gifts received and not yet shown (pop-up)
     const [awards, setAwards] = useState([]); // weekly showcase prizes won and not yet collected (pop-up)
+    const [awardsLater, setAwardsLater] = useState([]); // prizes put off with « Plus tard » during this visit
+    const [notices, setNotices] = useState(null); // « Pendant ton absence » (referrals, friend requests, trades)
     const refreshBadges = useCallback(() => {
         if (!localStorage.getItem(TOKEN_KEY)) return;
-        api('badges').then(({ user, badges, gifts, awards }) => { setUserRaw(user); setBadges(badges); setGifts(gifts || []); setAwards(awards || []); }).catch(() => {});
+        api('badges').then(({ user, badges, gifts, awards, notices }) => { setUserRaw(user); setBadges(badges); setGifts(gifts || []); setAwards(awards || []); setNotices(notices || null); }).catch(() => {});
     }, []);
     const loggedIn = !!user;
     useEffect(() => {
@@ -88,6 +90,7 @@ export function GameProvider({ children }) {
         setBadges({});
         setGifts([]);
         setAwards([]);
+        setNotices(null);
         setOwned({});
         setOwnedInfo({});
         setFavs(NO_FAVS);
@@ -108,7 +111,7 @@ export function GameProvider({ children }) {
     }, []);
 
     return (
-        <GameContext.Provider value={{ user, setUser, ready, badges, refreshBadges, gifts, setGifts, awards, setAwards, catalog, owned, ownedInfo, setOwned, favs, setFavs, refreshCollection, authenticate, logout, addCards }}>
+        <GameContext.Provider value={{ user, setUser, ready, badges, refreshBadges, gifts, setGifts, awards, setAwards, awardsLater, setAwardsLater, notices, setNotices, catalog, owned, ownedInfo, setOwned, favs, setFavs, refreshCollection, authenticate, logout, addCards }}>
             {children}
         </GameContext.Provider>
     );

@@ -22,10 +22,9 @@ function weekLabel(week) {
 // Shown after the gift pop-up; « Plus tard » keeps the prize (and the Vitrines / Quiz badge) until the
 // next visit of that page.
 export default function AwardNotice() {
-    const { user, awards, setAwards, gifts, setUser } = useGame();
-    const [later, setLater] = useState([]);
+    const { user, awards, setAwards, gifts, setUser, awardsLater: later, setAwardsLater: setLater } = useGame();
     const { pathname } = useLocation();
-    useEffect(() => { if (pathname === '/vitrines' || pathname === '/quiz') setLater([]); }, [pathname]);
+    useEffect(() => { if (pathname === '/vitrines' || pathname === '/quiz') setLater([]); }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
     const [done, setDone] = useState(null); // prize just collected
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');

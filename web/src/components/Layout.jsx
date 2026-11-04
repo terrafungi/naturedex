@@ -8,6 +8,7 @@ import { canVibrate, music, setPref, sfx, usePrefs } from '../sfx.js';
 import AwardNotice from './AwardNotice.jsx';
 import GiftNotice from './GiftNotice.jsx';
 import NewsNotice from './NewsNotice.jsx';
+import NoticeCenter from './NoticeCenter.jsx';
 import InstallPrompt, { InstallLink } from './InstallPrompt.jsx';
 
 export const NAV = [
@@ -268,6 +269,7 @@ export default function Layout() {
             {user && <NewsNotice />}
             {user && <GiftNotice />}
             {user && <AwardNotice />}
+            {user && <NoticeCenter />}
             <InstallPrompt raised={!!user} />
         </div>
     );
