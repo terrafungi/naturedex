@@ -357,7 +357,7 @@ export default function DuelGame() {
             </div>
 
             {error && <button onClick={() => setError('')} className="absolute top-14 inset-x-4 z-[80] p-2.5 rounded-xl bg-rust text-sm font-bold">{error}</button>}
-            {replaying && <button onClick={() => { skip.current = true; }} className="absolute top-14 right-3 z-[75] px-3 py-1 rounded-full bg-black/50 text-xs font-bold">Passer ⏩</button>}
+            {replaying && <button onClick={() => { skip.current = true; }} className="absolute top-14 right-3 z-[75] px-3 py-1 rounded-full bg-black/50 text-xs font-bold">Passer »</button>}
 
             <AnimatePresence>
                 {sheet?.discard && (
