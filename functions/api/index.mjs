@@ -26,6 +26,7 @@ import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 import { blogRoute, blogTick, latestPosts } from './blog.mjs';
 import { speciesRoute } from './species.mjs';
 import { massCheckTick } from './mass-check.mjs';
+import { biomeCheckTick } from './biome-check.mjs';
 import { speciesEnrichTick } from './species-enrich.mjs';
 import { fieldActions } from './field.mjs';
 import { exploreActions } from './explore.mjs';
@@ -2955,6 +2956,7 @@ export const handler = async (event) => {
             blogTick(getPool()).catch((err) => console.error('blogTick', err)),
             speciesEnrichTick(getPool()).catch((err) => console.error('speciesEnrich', err)),
             massCheckTick(getPool()).catch((err) => console.error('massCheck', err)),
+            biomeCheckTick(getPool()).catch((err) => console.error('biomeCheck', err)),
         ]);
         return { ok: true };
     }
