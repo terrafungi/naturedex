@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Award, Brain, Crown, EyeOff, Gem, HeartHandshake, Layers, Medal, Users, Globe2, Swords } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.jsx';
 import PlayerAvatar from '../components/PlayerAvatar.jsx';
 import SeasonBadge from '../components/SeasonBadge.jsx';
@@ -21,7 +21,7 @@ const BOARDS = [
     { key: 'prestige', label: 'Prestige', Icon: Crown, unit: 'points', text: 'Chaque espèce découverte rapporte des points selon sa rareté : Peu commune 1, Rare 3, Épique 8, Légendaire 25, Secrète 100.', extra: (v) => v ? plural(v, 'légendaire') : null },
     { key: 'arena', label: 'Arène', Icon: Swords, unit: 'points', text: 'Cote de l\'arène classée : +/− selon la force de l\'adversaire battu ou perdu (départ à 1000).', extra: (v) => plural(v, 'victoire') },
     { key: 'trophies', label: 'Trophées', Icon: Award, unit: 'trophées', text: 'Nombre de trophées récupérés.', extra: () => null },
-    { key: 'donors', label: 'Donateurs', Icon: HeartHandshake, unit: 'donnés', format: euros, text: '20 % de chaque achat en boutique est reversé à l\'association choisie (LPO ou Wikipédia). Classement par montant total reversé.', extra: (v, r) => [plural(v, 'achat'), r.assoc].filter(Boolean).join(' · ') },
+    { key: 'donors', label: 'Donateurs', Icon: HeartHandshake, unit: 'donnés', format: euros, text: '20 % de chaque achat en boutique est reversé à l\'association choisie (LPO ou Wikipédia). Classement du mois par montant reversé, remis à zéro le 1er de chaque mois.', extra: (v, r) => [plural(v, 'achat'), r.assoc].filter(Boolean).join(' · ') },
 ];
 const PODIUM = ['#e9c46a', '#c3ccd8', '#cd8a4a'];
 
@@ -104,25 +104,35 @@ function DonorPrivacy({ hidden, onChange, reload }) {
     );
 }
 
+// « Novembre 2026 »
+const monthName = () => {
+    const m = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+    return m[0].toUpperCase() + m.slice(1);
+};
+
 export default function Leaderboard() {
-    const [boardKey, setBoardKey] = useState('quiz');
+    const [params] = useSearchParams();
+    // /classement?tableau=donors opens a board directly (the home page links to the donors)
+    const [boardKey, setBoardKey] = useState(() => (BOARDS.some((b) => b.key === params.get('tableau')) ? params.get('tableau') : 'quiz'));
     const [period, setPeriod] = useState('all');
+    const [donorPeriod, setDonorPeriod] = useState('month');
     const [scope, setScope] = useState('all');
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
     const [reload, setReload] = useState(0);
     const board = BOARDS.find((b) => b.key === boardKey);
+    const asked = boardKey === 'quiz' ? period : boardKey === 'donors' ? donorPeriod : 'all';
 
     useEffect(() => {
         let live = true;
         setError('');
-        api('leaderboard', { board: boardKey, period, scope })
+        api('leaderboard', { board: boardKey, period: asked, scope })
             .then((res) => live && setData(res))
             .catch((e) => live && setError(e.message));
         return () => { live = false; };
-    }, [boardKey, period, scope, reload]);
+    }, [boardKey, asked, scope, reload]);
 
-    const fresh = data && data.board === boardKey && data.scope === scope && (boardKey !== 'quiz' || data.period === period);
+    const fresh = data && data.board === boardKey && data.scope === scope && data.period === asked;
     const top = fresh ? data.top : [];
     const me = fresh ? data.me : null;
     const meShown = me && top.some((r) => r.me);
@@ -145,6 +155,12 @@ export default function Leaderboard() {
                 <div className="mt-2 flex flex-wrap gap-2">
                     <Pill active={period === 'all'} onClick={() => setPeriod('all')}>Depuis toujours</Pill>
                     <Pill active={period === 'week'} onClick={() => setPeriod('week')}>7 derniers jours</Pill>
+                </div>
+            )}
+            {boardKey === 'donors' && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                    <Pill active={donorPeriod === 'month'} onClick={() => setDonorPeriod('month')}>{monthName()}</Pill>
+                    <Pill active={donorPeriod === 'all'} onClick={() => setDonorPeriod('all')}>Depuis toujours</Pill>
                 </div>
             )}
             <p className="mt-4 text-sm text-ink-soft">{board.text}</p>

@@ -136,13 +136,57 @@ function SectionTitle({ kicker, children, sub, center }) {
 
 /* ---------- hero (mockup) ---------- */
 
+const euros = (cents) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: cents % 100 ? 2 : 0 });
+const MEDALS = ['#f4c25b', '#d9e2ec', '#e0a074'];
+
+/** Top donors of the month, at the very top of the home page. Starts again on the 1st of each month. */
+function TopDonors() {
+    const { user } = useGame();
+    const [data, setData] = useState(null);
+    useEffect(() => { api('topDonors').then(setData).catch(() => {}); }, []);
+    if (!data) return <div className="h-[92px]" />;
+    const month = new Date(`${data.month}-15T12:00:00`).toLocaleDateString('fr-FR', { month: 'long' });
+    const board = user ? '/classement?tableau=donors' : SIGNUP;
+    return (
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: EASE }}
+            className="rounded-3xl p-4 sm:p-5 bg-black/45 backdrop-blur-md ring-1 ring-[#f4c25b]/40 shadow-[0_20px_60px_-25px_rgba(244,194,91,0.5)]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="grid place-items-center w-9 h-9 rounded-full bg-[#f4c25b] text-[#2a1c00]"><HeartHandshake className="w-5 h-5" /></span>
+                <p className="font-display text-xl sm:text-2xl font-semibold text-white">Top donateurs de {month}</p>
+                <Link to={board} className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-[#f4d88f] hover:underline">Classement<ChevronRight className="w-4 h-4" /></Link>
+            </div>
+            {data.donors.length ? (
+                <ol className="mt-3 flex flex-wrap gap-2">
+                    {data.donors.map((d, i) => (
+                        <li key={d.username}>
+                            <Link to={user ? `/joueur/${encodeURIComponent(d.username)}` : board}
+                                className={`flex items-center gap-2 pl-1.5 pr-3.5 py-1.5 rounded-full ${i === 0 ? 'bg-[#f4c25b]/20 ring-1 ring-[#f4c25b]/60' : 'bg-white/[0.07] ring-1 ring-white/10'} hover:bg-white/15`}>
+                                <span className="grid place-items-center w-7 h-7 rounded-full text-xs font-black text-[#2a1c00]" style={{ background: MEDALS[i] || 'rgba(255,255,255,0.2)' }}>{i + 1}</span>
+                                <span className="font-bold text-white">{d.username}</span>
+                                <span className="text-sm font-semibold text-[#a8f0c6] tabular-nums">{euros(d.donated)}</span>
+                            </Link>
+                        </li>
+                    ))}
+                </ol>
+            ) : (
+                <p className="mt-2 text-white/80">Personne n'a encore donné en {month}. Le premier achat du mois prend la tête du classement.</p>
+            )}
+            <p className="mt-3 text-xs sm:text-sm text-white/65">
+                20 % de chaque achat en boutique va à la LPO ou à Wikipédia. Le classement repart à zéro le 1er de chaque mois.{' '}
+                <Link to={user ? '/boutique' : SIGNUP} className="font-semibold text-[#f4d88f] hover:underline">Soutenir</Link>
+            </p>
+        </motion.div>
+    );
+}
+
 function Hero() {
     const { user } = useGame();
     const fade = (delay) => ({ initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.9, delay, ease: EASE } });
     return (
         <section className="relative isolate overflow-hidden">
             <motion.div className="nd-hero-bg" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 2.4, ease: EASE }} />
-            <div className="max-w-6xl mx-auto px-5 sm:px-6 pt-36 sm:pt-44 pb-14 sm:pb-24 min-h-[640px] sm:min-h-[760px] md:min-h-[min(88vh,860px)] flex flex-col justify-end">
+            <div className="max-w-6xl mx-auto px-5 sm:px-6 pt-24 sm:pt-28 pb-14 sm:pb-24 min-h-[640px] sm:min-h-[760px] md:min-h-[min(88vh,860px)] flex flex-col justify-end">
+                <div className="mb-auto pb-8 max-w-2xl"><TopDonors /></div>
                 <motion.div {...fade(0)}>
                     <Link to={user ? '/exploration' : '#fonctionnalites'} onClick={user ? undefined : jump('fonctionnalites')} className="inline-flex items-center gap-2 rounded-full nd-glass pl-1.5 pr-3.5 py-1.5 text-xs font-semibold text-white/90 hover:bg-white/10 transition-colors">
                         <span className="rounded-full bg-[#4fd18b] text-[#05130d] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">Nouveau</span>

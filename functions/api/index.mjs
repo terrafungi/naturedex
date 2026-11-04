@@ -368,11 +368,12 @@ const TROPHIES = [
 ];
 
 // Leaderboards: one (user_id, score, extra) query per board; `extra` breaks ties.
+const MONTH_START = `(date_trunc('month', now() AT TIME ZONE 'Europe/Paris') AT TIME ZONE 'Europe/Paris')`;
 const RARITY_POINTS = `CASE c.rarity WHEN 'secret' THEN 100 WHEN 'legendary' THEN 25 WHEN 'epic' THEN 8 WHEN 'rare' THEN 3 WHEN 'uncommon' THEN 1 ELSE 0 END`;
 const BOARDS = {
-    quiz: (week) => `SELECT user_id, SUM(score)::int AS score,
+    quiz: (period) => `SELECT user_id, SUM(score)::int AS score,
                             COUNT(*) FILTER (WHERE mode IN ('classic', 'daily') AND score = jsonb_array_length(questions))::int AS extra
-                     FROM quizzes WHERE status = 'done' ${week ? `AND day >= current_date - 6` : ''} GROUP BY 1`,
+                     FROM quizzes WHERE status = 'done' ${period === 'week' ? `AND day >= current_date - 6` : ''} GROUP BY 1`,
     species: () => `SELECT user_id, COUNT(*)::int AS score, SUM(count)::int AS extra FROM user_cards GROUP BY 1`,
     cards: () => `SELECT user_id, SUM(count)::int AS score, COUNT(*)::int AS extra FROM user_cards GROUP BY 1`,
     prestige: () => `SELECT uc.user_id, SUM(${RARITY_POINTS})::int AS score,
@@ -381,9 +382,11 @@ const BOARDS = {
     trophies: () => `SELECT user_id, COUNT(*)::int AS score, 0 AS extra FROM trophy_claims GROUP BY 1`,
     arena: () => `SELECT user_id, rating AS score, wins AS extra FROM arena WHERE wins + losses > 0`,
     // Real (live) payments only; 20% of each goes to the chosen association. Players can opt out.
-    donors: () => `SELECT p.user_id, SUM(p.donation_cents)::int AS score, COUNT(*)::int AS extra
+    // 'month' (the default) starts again on the 1st of every month, Paris time.
+    donors: (period) => `SELECT p.user_id, SUM(p.donation_cents)::int AS score, COUNT(*)::int AS extra
                    FROM purchases p JOIN users u ON u.id = p.user_id
-                   WHERE p.status = 'paid' AND p.livemode AND NOT u.hide_donations GROUP BY 1`,
+                   WHERE p.status = 'paid' AND p.livemode AND NOT u.hide_donations
+                     ${period === 'month' ? `AND p.paid_at >= ${MONTH_START}` : ''} GROUP BY 1`,
 };
 
 // Best final arena rank of a player (top 10, rated seasons only), shown as a badge next to the name.
@@ -1593,10 +1596,11 @@ const actions = {
     async leaderboard(db, body, event) {
         const user = await requireUser(db, event);
         const board = BOARDS[body.board] ? body.board : 'quiz';
-        const week = board === 'quiz' && body.period === 'week';
+        const period = board === 'quiz' && body.period === 'week' ? 'week'
+            : board === 'donors' && body.period !== 'all' ? 'month' : 'all';
         const friends = body.scope === 'friends';
         const { rows } = await db.query(
-            `WITH s AS (${BOARDS[board](week)}),
+            `WITH s AS (${BOARDS[board](period)}),
              r AS (
                 SELECT u.username, s.score, s.extra, u.id = $1 AS me, ${SEASON_BADGE('u.id')},${board === 'donors' ? `
                        (SELECT mode() WITHIN GROUP (ORDER BY association) FROM purchases
@@ -1624,7 +1628,7 @@ const actions = {
         }
         return {
             donor, share: DONATION_SHARE,
-            board, period: week ? 'week' : 'all', scope: friends ? 'friends' : 'all',
+            board, period, scope: friends ? 'friends' : 'all',
             players: rows[0]?.players || 0,
             top: rows.filter((r) => r.rank <= 50).slice(0, 50).map(({ players, ...r }) => withBadge(r)),
             me: me && (({ players, ...r }) => withBadge(r))(me),
@@ -1832,6 +1836,15 @@ const actions = {
     // Public: the showcase that won last week's contest, shown on the home page.
     async showcaseOfWeek(db) {
         return { winner: await showcaseOfWeek(db) };
+    },
+
+    // Top donors of the current month, for the home page (visitors too).
+    async topDonors(db) {
+        const { rows } = await db.query(
+            `SELECT u.username, s.score AS donated, s.extra AS purchases FROM (${BOARDS.donors('month')}) s JOIN users u ON u.id = s.user_id
+             WHERE u.username NOT LIKE 'zz\\_test\\_%' ORDER BY s.score DESC, s.extra DESC, u.username LIMIT 5`);
+        const { rows: [{ month }] } = await db.query(`SELECT to_char(now() AT TIME ZONE 'Europe/Paris', 'YYYY-MM') AS month`);
+        return { month, donors: rows };
     },
 
     async blogLatest(db) {
@@ -2878,7 +2891,7 @@ Object.assign(actions, exploreActions({ requireUser, inTransaction, HttpError, p
 Object.assign(actions, gardenActions({ requireUser, publicUser, HttpError }));
 Object.assign(actions, avatarActions({ requireUser, inTransaction, HttpError, publicUser }));
 
-const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest', 'showcaseOfWeek']);
+const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest', 'showcaseOfWeek', 'topDonors']);
 
 export const handler = async (event) => {
     if (event.source === 'schedule') {
