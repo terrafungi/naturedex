@@ -1440,7 +1440,8 @@ const actions = {
         const user = await requireUser(db, event);
         const limit = Math.min(Number(body.limit) || 60, 120);
         const offset = Math.max(Number(body.offset) || 0, 0);
-        // « Martin pêcheur » finds « Martin-pêcheur d'Europe »: accents, case and punctuation are ignored.
+        // « Martin pêcheur » finds « Martin-pêcheur d'Europe », then the cards whose description (Wikipedia
+        // extract, or the long text of the card page) mentions it. Accents, case and punctuation are ignored.
         const q = searchText(body.query);
         // binder: a binder id, 'all' = any of the player's binders, null = no binder filter
         const binder = body.binder === 'all' ? 0 : body.binder ? Number(body.binder) : null;
@@ -1455,7 +1456,10 @@ const actions = {
              WHERE ($2::text IS NULL OR c.type = $2) AND ($3::text IS NULL OR c.rarity = $3)
                AND (NOT $4 OR uc.count IS NOT NULL)
                AND ($5 = '' OR (uc.count IS NOT NULL AND (n.by_name
-                    OR ${norm(`coalesce(c.extract, '') || ' ' || coalesce((SELECT st.body->>'intro' FROM species_texts st WHERE st.card_id = c.id), '')`)} LIKE '%' || $5 || '%')))
+                    OR EXISTS (SELECT 1 FROM (SELECT NULL) x LEFT JOIN species_texts st ON st.card_id = c.id
+                        WHERE ${norm(`coalesce(c.extract, '') || ' ' || coalesce(st.body->>'intro', '') || ' '
+                            || coalesce(jsonb_path_query_array(st.body, '$.facts[*]')::text, '') || ' '
+                            || coalesce(jsonb_path_query_array(st.body, '$.sections[*].paragraphs[*]')::text, '')`)} LIKE '%' || $5 || '%'))))
                AND ($8::int IS NULL OR EXISTS (SELECT 1 FROM binder_cards bc JOIN binders b ON b.id = bc.binder_id
                     WHERE bc.card_id = c.id AND b.user_id = $1 AND ($8 = 0 OR b.id = $8)))
                AND (NOT $9 OR uc.count > 1)
