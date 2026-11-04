@@ -426,6 +426,13 @@ function Home({ state, onStart, busy, error }) {
 
 // ---------- game ----------
 
+// Waits for the question's photos (at most a few seconds) so the timer only runs once they are visible.
+function preloadImages(q) {
+    const urls = [q?.media?.image, ...(q?.options || []).map((o) => o.image)].filter(Boolean);
+    const one = (src) => new Promise((done) => { const img = new Image(); img.onload = img.onerror = done; img.src = src; });
+    return Promise.race([Promise.all(urls.map(one)), new Promise((done) => setTimeout(done, 6000))]);
+}
+
 function useCountdown(deadline, offset, paused) {
     const [left, setLeft] = useState(1);
     useEffect(() => {
@@ -662,6 +669,8 @@ function QuizRun({ id, fresh, mode: startMode, onExit, onReplay }) {
         try {
             const res = await api('quizNext', { id });
             if (res.done) { onExit(); return; }
+            await preloadImages(res.question);
+            if (res.quiz.mode !== 'blitz') Object.assign(res, await api('quizShown', { id, index: res.question.index }));
             document.querySelector('[data-quiz-stage]')?.scrollTo?.({ top: 0, behavior: 'smooth' });
             setOffset(new Date(res.serverNow).getTime() - Date.now());
             setChosen(null);

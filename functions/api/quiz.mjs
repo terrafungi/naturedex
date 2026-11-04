@@ -9,7 +9,8 @@ export const LEVEL_COINS = [2, 3, 5]; // graines per right answer
 export const PERFECT_COINS = 20;
 export const PERFECT_NUGGETS = 10;
 export const CARD_SCORE = 8; // right answers needed to win a card
-const GRACE_MS = 3000; // network latency allowance on the timer
+const GRACE_MS = 4000; // network latency allowance on the timer
+export const LOAD_MAX_MS = 8000; // the timer waits at most this long for the photos to load
 
 // Game modes. Classic and daily keep the 10 rising questions; survival goes on until three
 // mistakes; blitz is one minute against the clock (right answers add time, wrong ones cost some).
@@ -91,7 +92,8 @@ async function getPool(db) {
     if (!pool || Date.now() - poolAt > 1_800_000) {
         const { rows } = await db.query(
             `SELECT id, name, sci_name, type, rarity, views::int AS views, thumb_url, iucn,
-                    (stats->>'mass_kg')::float AS mass, extract IS NOT NULL AND length(extract) > 80 AS has_extract
+                    CASE WHEN stats->>'mass_checked' = 'ok' THEN (stats->>'mass_kg')::float END AS mass, -- see mass-check.mjs
+                    extract IS NOT NULL AND length(extract) > 80 AS has_extract
              FROM cards WHERE views >= 800 AND art IS DISTINCT FROM 'illus'`
         );
         for (const c of rows) {
@@ -425,9 +427,10 @@ export async function buildQuiz(db, theme, seen, { levels = LEVELS, kinds: allow
 }
 
 // Time allowed on a question: its own timer (+ the time joker), or the end of the blitz.
+// The timer starts once the question is on screen (loadMs = time spent loading its photos).
 export function deadlineOf(q, askedAt, cur = {}, endsAt = null) {
     if (endsAt) return new Date(endsAt).getTime();
-    return new Date(askedAt).getTime() + q.seconds * 1000 + (cur.extraMs || 0);
+    return new Date(askedAt).getTime() + (cur.loadMs || 0) + q.seconds * 1000 + (cur.extraMs || 0);
 }
 
 // What the browser may see before answering: no answer, no card ids.

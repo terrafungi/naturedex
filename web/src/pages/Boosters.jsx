@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Clapperboard, Gift, Sprout, Zap } from 'lucide-react';
@@ -54,7 +54,11 @@ export default function Boosters() {
     const payWith = user.charges > 0 ? 'charge' : user.boosters > 0 ? 'booster' : user.plants >= user.boosterPlants ? 'plants' : 'coins';
     const canOpen = payWith !== 'coins' || user.coins >= user.boosterPrice;
 
+    // A ref, not the busy state: a fast double tap fires twice before React re-renders.
+    const inFlight = useRef(false);
     async function run(action, after, params) {
+        if (inFlight.current) return;
+        inFlight.current = true;
         setBusy(true);
         setError('');
         try {
@@ -64,6 +68,7 @@ export default function Boosters() {
         } catch (err) {
             setError(err.message);
         } finally {
+            inFlight.current = false;
             setBusy(false);
         }
     }

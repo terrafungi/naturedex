@@ -320,9 +320,14 @@ export default function Garden() {
         const res = await run('shoo', { slot }, sfx.correct);
         if (res) toast(`Nuisible chassé ! +${res.xp} XP${res.compost ? ' · +1 compost' : ''}`, 'bug');
     }
+    const opening1 = useRef(false); // a fast double tap must not open two boosters
     async function openBooster() {
-        const res = await run('openBooster', { pay: 'plants' });
-        if (res) { addCards(res.cards); setOpening(res.cards); }
+        if (opening1.current) return;
+        opening1.current = true;
+        try {
+            const res = await run('openBooster', { pay: 'plants' });
+            if (res) { addCards(res.cards); setOpening(res.cards); }
+        } finally { opening1.current = false; }
     }
     async function finishGame(score) {
         try {

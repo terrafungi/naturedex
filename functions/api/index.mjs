@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import pg from 'pg';
 import {
-    BLITZ, CARD_SCORE, COMBO_STEPS, IUCN_LABELS, KIND_LABELS, LEVEL_COINS, LEVELS, MODES, PERFECT_COINS, PERFECT_NUGGETS, QUIZ_PER_DAY,
+    BLITZ, CARD_SCORE, COMBO_STEPS, IUCN_LABELS, KIND_LABELS, LEVEL_COINS, LEVELS, LOAD_MAX_MS, MODES, PERFECT_COINS, PERFECT_NUGGETS, QUIZ_PER_DAY,
     RUN_REWARDS, THEMES, TIME_JOKER_MS, buildQuiz, intro, isLate, kindsFor, levelAt, multiplier, publicQuestion, questionPoints, quizLevel,
 } from './quiz.mjs';
 import {
@@ -25,6 +25,7 @@ import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s
 import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 import { blogRoute, blogTick, latestPosts } from './blog.mjs';
 import { speciesRoute } from './species.mjs';
+import { massCheckTick } from './mass-check.mjs';
 import { speciesEnrichTick } from './species-enrich.mjs';
 import { fieldActions } from './field.mjs';
 import { exploreActions } from './explore.mjs';
@@ -1376,6 +1377,9 @@ const actions = {
         try {
             await client.query('BEGIN');
             const { rows: [current] } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
+            // A double tap sends two requests: the second one waits on the lock above, then stops here.
+            const { rows: [recent] } = await client.query(`SELECT 1 FROM openings WHERE user_id = $1 AND at > now() - interval '2 seconds' LIMIT 1`, [user.id]);
+            if (recent) throw new HttpError(429, 'Booster déjà en cours d\'ouverture');
             const now = Date.now();
             const charge = chargeState(current, now);
             let update, params, paidWith;
@@ -2544,6 +2548,20 @@ const actions = {
         });
     },
 
+    // The browser has loaded the photos and shows the question: its timer starts now (once, capped).
+    async quizShown(db, body, event) {
+        const user = await requireUser(db, event);
+        return inTransaction(db, async (client) => {
+            let q = await lockQuiz(client, user.id, body.id);
+            if (q.status === 'done' || !q.asked_at || Number(body.index) !== q.current) throw new HttpError(409, 'Cette question a déjà reçu une réponse');
+            if (!q.ends_at && q.cur?.loadMs === undefined) {
+                const loadMs = Math.min(LOAD_MAX_MS, Math.max(0, Date.now() - new Date(q.asked_at).getTime()));
+                ({ rows: [q] } = await client.query(`UPDATE quizzes SET cur = $2 WHERE id = $1 RETURNING *`, [q.id, JSON.stringify({ ...q.cur, loadMs })]));
+            }
+            return { question: publicQuestion(q.questions[q.current], q.current, q.asked_at, q.cur, q.ends_at), serverNow: new Date().toISOString() };
+        });
+    },
+
     // Jokers, once per game each: 50/50 (half the points), +10 s, or skip the question.
     async quizJoker(db, body, event) {
         const user = await requireUser(db, event);
@@ -2611,7 +2629,7 @@ const actions = {
             const late = isLate(question, q.asked_at, cur, q.ends_at, now);
             const choice = Number.isInteger(body.choice) ? body.choice : -1;
             const correct = !late && choice === question.answer && !(cur.removed || []).includes(choice);
-            const ms = now - new Date(q.asked_at).getTime();
+            const ms = Math.max(0, now - new Date(q.asked_at).getTime() - (cur.loadMs || 0));
             const combo = correct ? q.combo + 1 : 0;
             const score = q.score + (correct ? 1 : 0);
             let points = 0, gained = 0;
@@ -2906,6 +2924,7 @@ export const handler = async (event) => {
         await Promise.all([
             blogTick(getPool()).catch((err) => console.error('blogTick', err)),
             speciesEnrichTick(getPool()).catch((err) => console.error('speciesEnrich', err)),
+            massCheckTick(getPool()).catch((err) => console.error('massCheck', err)),
         ]);
         return { ok: true };
     }
