@@ -21,6 +21,7 @@ import {
     invoiceSubscription, passActive, periodEnd, setCancelAtPeriodEnd, stripeReady, stripeTestMode, verifyWebhook,
 } from './shop.mjs';
 import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLabel, seasonRollover } from './arena.mjs';
+import { duelActions } from './duel.mjs';
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 import { blogRoute, blogTick, latestPosts } from './blog.mjs';
@@ -2935,6 +2936,7 @@ const actions = {
 };
 
 Object.assign(actions, arenaActions({ requireUser, inTransaction, HttpError, publicUser, parisDay }));
+Object.assign(actions, duelActions({ requireUser, inTransaction, HttpError, publicUser, parisDay }));
 Object.assign(actions, fieldActions({ requireUser, inTransaction, HttpError, publicUser }));
 Object.assign(actions, exploreActions({ requireUser, inTransaction, HttpError, publicUser }));
 Object.assign(actions, gardenActions({ requireUser, publicUser, HttpError }));

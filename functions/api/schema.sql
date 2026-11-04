@@ -590,3 +590,26 @@ ALTER TABLE garden_plots ADD COLUMN IF NOT EXISTS fertilized BOOLEAN NOT NULL DE
 -- invite_ready_seen = referral rewards already announced, so an unclaimed one is not shown again.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notices_seen_at TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_ready_seen INTEGER NOT NULL DEFAULT 0;
+
+-- Card game (« Duel »): Énergie and Naturaliste cards owned (key 'e:foret', 't:darwin'…),
+-- and each duel against the AI with its full state (hidden deck order included).
+CREATE TABLE IF NOT EXISTS tcg_cards (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key        TEXT NOT NULL,
+    count      INTEGER NOT NULL DEFAULT 0,
+    first_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, key)
+);
+CREATE TABLE IF NOT EXISTS duels (
+    id            BIGSERIAL PRIMARY KEY,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    level         INTEGER NOT NULL,
+    opponent_name TEXT NOT NULL,
+    state         JSONB NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'active',
+    reward        JSONB,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ended_at      TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS duels_one_active ON duels (user_id) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS duels_user_ended ON duels (user_id, ended_at DESC);

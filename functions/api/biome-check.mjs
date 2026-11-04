@@ -35,7 +35,8 @@ async function batch(db) {
         WHERE id IN (
             SELECT id FROM cards
             WHERE stats->>'biome' IS NULL AND coalesce((stats->>'biome_claim')::int, 0) < extract(epoch FROM now()) - 300
-            ORDER BY views DESC LIMIT ${PER_BATCH} FOR UPDATE SKIP LOCKED)
+            ORDER BY EXISTS (SELECT 1 FROM user_cards uc WHERE uc.card_id = cards.id) DESC, views DESC -- players' cards first: their decks need them
+            LIMIT ${PER_BATCH} FOR UPDATE SKIP LOCKED)
         RETURNING id, name, sci_name, type`);
     if (!cards.length) return 0;
     const answers = await llm(prompt(cards));

@@ -30,6 +30,8 @@ import Shop from './pages/Shop.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Combat from './pages/Combat.jsx';
 import Battle from './pages/Battle.jsx';
+const Duel = lazy(() => import('./pages/Duel.jsx'));
+const DuelGame = lazy(() => import('./pages/DuelGame.jsx'));
 
 // Every page but the home needs an account; visitors are sent to the sign-up form
 // (Auth switches to log-in for returning players).
@@ -74,6 +76,8 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/encheres" element={<Private><Auctions /></Private>} />
                         <Route path="/combat" element={<Private><Combat /></Private>} />
                         <Route path="/combat/:id" element={<Private><Battle /></Private>} />
+                        <Route path="/duel" element={<Private><Suspense fallback={null}><Duel /></Suspense></Private>} />
+                        <Route path="/duel/:id" element={<Private><Suspense fallback={null}><DuelGame /></Suspense></Private>} />
                         <Route path="/quiz" element={<Private><Quiz /></Private>} />
                         <Route path="/boutique" element={<Private><Shop /></Private>} />
                         <Route path="/amis" element={<Private><Friends /></Private>} />

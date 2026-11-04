@@ -462,6 +462,15 @@ export default function Combat() {
                 </div>
             </div>
 
+            <Link to="/duel" className="block p-4 rounded-3xl nd-glass ring-1 ring-[#f4d88f]/40 hover:ring-[#f4d88f] transition">
+                <span className="flex items-center gap-3">
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#f4d88f] text-[#2a1c00]">NOUVEAU</span>
+                    <span className="flex-1"><span className="font-bold text-white">Duel de cartes (bêta)</span>
+                        <span className="block text-sm text-ink-soft">Énergies, naturalistes, chaîne alimentaire et captures : le nouveau mode de jeu à la Pokémon.</span></span>
+                    <ChevronRight className="w-5 h-5 text-[#f4d88f]" />
+                </span>
+            </Link>
+
             {data.active && (
                 <motion.button initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} onClick={() => navigate(`/combat/${data.active.id}`)}
                     className="w-full p-4 rounded-3xl nd-cta-gold flex items-center gap-3 text-left font-bold">
