@@ -916,6 +916,20 @@ function searchText(s) {
         .replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 80);
 }
 
+// The same normalisation in SQL, so a searchText() query matches with a plain LIKE.
+const normSql = (sql) => `regexp_replace(unaccent(lower(${sql})), '[^a-z0-9]+', ' ', 'g')`;
+
+// Card search on the searchText() query in parameter p (card alias c). byName: name or scientific name;
+// any: that, or the description (Wikipedia extract, or the long text of the card page).
+function cardSearchSql(p) {
+    const byName = `${normSql(`c.name || ' ' || coalesce(c.sci_name, '')`)} LIKE '%' || ${p} || '%'`;
+    const inText = `EXISTS (SELECT 1 FROM (SELECT NULL) x LEFT JOIN species_texts st ON st.card_id = c.id
+        WHERE ${normSql(`coalesce(c.extract, '') || ' ' || coalesce(st.body->>'intro', '') || ' '
+            || coalesce(jsonb_path_query_array(st.body, '$.facts[*]')::text, '') || ' '
+            || coalesce(jsonb_path_query_array(st.body, '$.sections[*].paragraphs[*]')::text, '')`)} LIKE '%' || ${p} || '%')`;
+    return { byName, any: `(${byName} OR ${inText})` };
+}
+
 // ---- Friends & trades ----
 const MAX_TRADE_ITEMS = 10;
 const MAX_PENDING_TRADES = 20;
@@ -1447,19 +1461,14 @@ const actions = {
         const binder = body.binder === 'all' ? 0 : body.binder ? Number(body.binder) : null;
         // IUCN status, or 'NE' for the species never assessed
         const iucn = IUCN_CODES.includes(body.iucn) ? body.iucn : null;
-        const norm = (sql) => `regexp_replace(unaccent(lower(${sql})), '[^a-z0-9]+', ' ', 'g')`;
+        const search = cardSearchSql('$5');
         const { rows } = await db.query(
             `SELECT ${LIGHT_FIELDS}, uc.count, COUNT(*) OVER()::int AS matches
              FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1
-             CROSS JOIN LATERAL (SELECT CASE WHEN $5 = '' THEN false
-                    ELSE ${norm(`c.name || ' ' || coalesce(c.sci_name, '')`)} LIKE '%' || $5 || '%' END AS by_name) n
+             CROSS JOIN LATERAL (SELECT CASE WHEN $5 = '' THEN false ELSE ${search.byName} END AS by_name) n
              WHERE ($2::text IS NULL OR c.type = $2) AND ($3::text IS NULL OR c.rarity = $3)
                AND (NOT $4 OR uc.count IS NOT NULL)
-               AND ($5 = '' OR (uc.count IS NOT NULL AND (n.by_name
-                    OR EXISTS (SELECT 1 FROM (SELECT NULL) x LEFT JOIN species_texts st ON st.card_id = c.id
-                        WHERE ${norm(`coalesce(c.extract, '') || ' ' || coalesce(st.body->>'intro', '') || ' '
-                            || coalesce(jsonb_path_query_array(st.body, '$.facts[*]')::text, '') || ' '
-                            || coalesce(jsonb_path_query_array(st.body, '$.sections[*].paragraphs[*]')::text, '')`)} LIKE '%' || $5 || '%'))))
+               AND ($5 = '' OR (uc.count IS NOT NULL AND ${search.any}))
                AND ($8::int IS NULL OR EXISTS (SELECT 1 FROM binder_cards bc JOIN binders b ON b.id = bc.binder_id
                     WHERE bc.card_id = c.id AND b.user_id = $1 AND ($8 = 0 OR b.id = $8)))
                AND (NOT $9 OR uc.count > 1)
@@ -1943,7 +1952,8 @@ const actions = {
     async auctions(db, body, event) {
         const user = await requireUser(db, event);
         const view = ['selling', 'bidding'].includes(body.view) ? body.view : 'market';
-        const q = String(body.query || '').trim();
+        const q = searchText(body.query);
+        const search = cardSearchSql('$4');
         const where = {
             market: `a.status = 'open'`,
             selling: `a.seller_id = $1`,
@@ -1955,8 +1965,8 @@ const actions = {
              FROM auctions a JOIN cards c ON c.id = a.card_id JOIN users s ON s.id = a.seller_id
              LEFT JOIN user_cards uc ON uc.card_id = a.card_id AND uc.user_id = $1
              WHERE ${where} AND ($2::text IS NULL OR c.type = $2) AND ($3::text IS NULL OR c.rarity = $3)
-               AND ($4 = '' OR c.name ILIKE '%' || $4 || '%' OR c.sci_name ILIKE '%' || $4 || '%')
-             ORDER BY ${order} LIMIT 60 OFFSET $5`,
+               AND ($4 = '' OR ${search.any})
+             ORDER BY ${q ? `(${search.byName}) DESC, ` : ''}${order} LIMIT 60 OFFSET $5`,
             [user.id, body.type || null, body.rarity || null, q, Math.max(Number(body.offset) || 0, 0)]
         );
         return {
@@ -2343,14 +2353,15 @@ const actions = {
     async tradeCards(db, body, event) {
         const user = await requireUser(db, event);
         const owner = body.username ? await requireFriend(db, user.id, body.username) : user;
-        const q = String(body.query || '').trim();
+        const q = searchText(body.query);
+        const search = cardSearchSql('$5');
         const { rows } = await db.query(
             `SELECT ${LIGHT_FIELDS}, uc.count, COALESCE(mine.count, 0) AS have, COUNT(*) OVER()::int AS matches
              FROM user_cards uc JOIN cards c ON c.id = uc.card_id
              LEFT JOIN user_cards mine ON mine.user_id = $2 AND mine.card_id = uc.card_id
              WHERE uc.user_id = $1 AND ($3::text IS NULL OR c.type = $3) AND ($4::text IS NULL OR c.rarity = $4)
-               AND ($5 = '' OR c.name ILIKE '%' || $5 || '%' OR c.sci_name ILIKE '%' || $5 || '%')
-             ORDER BY ${body.missing && owner.id !== user.id ? '(mine.count IS NULL) DESC, ' : ''}${RARITY_ORDER} DESC, c.views DESC
+               AND ($5 = '' OR ${search.any})
+             ORDER BY ${q ? `(${search.byName}) DESC, ` : ''}${body.missing && owner.id !== user.id ? '(mine.count IS NULL) DESC, ' : ''}${RARITY_ORDER} DESC, c.views DESC
              LIMIT 60 OFFSET $6`,
             [owner.id, user.id, body.type || null, body.rarity || null, q, Math.max(Number(body.offset) || 0, 0)]
         );

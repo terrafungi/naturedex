@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Crown, Download, EyeOff, LayoutGrid, Lock, Save, Share2, Square, Star, Smartphone, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Crown, Download, EyeOff, LayoutGrid, Lock, Save, Search, Share2, Square, Star, Smartphone, X } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import ShowcaseCanvas, { shareShowcase } from '../components/Showcase.jsx';
 import { BACKGROUNDS, FORMATS, LAYOUTS, SHOWCASE_MAX } from '../showcase.js';
@@ -69,6 +69,8 @@ export default function ShowcaseEditor() {
     const fromParam = params.get('classeur');
     const [source, setSource] = useState(fromParam === 'all' || !fromParam ? 'all' : Number(fromParam));
     const [pool, setPool] = useState(null);
+    const [query, setQuery] = useState('');
+    const [debounced, setDebounced] = useState('');
     const [draft, setDraft] = useState(null);
     const [saved, setSaved] = useState(undefined); // undefined = loading, null = none
     const [busy, setBusy] = useState('');
@@ -76,20 +78,26 @@ export default function ShowcaseEditor() {
     const [owned, setOwned] = useState([]);
     const [premium, setPremium] = useState({});
 
-    const binderName = (id) => (id === 'all' ? 'Mes favoris' : favs.binders.find((b) => b.id === id)?.name || 'Ma vitrine');
+    const binderName = (id) => (id === 'all' ? 'Mes favoris' : id === 'collection' ? 'Ma collection' : favs.binders.find((b) => b.id === id)?.name || 'Ma vitrine');
 
     useEffect(() => {
         api('showcase').then((r) => { setSaved(r.showcase); setOwned(r.owned || []); setPremium(r.premium || {}); }).catch(() => setSaved(null));
     }, []);
 
     useEffect(() => {
+        const t = setTimeout(() => setDebounced(query.trim()), 250);
+        return () => clearTimeout(t);
+    }, [query]);
+
+    // source: 'all' = every favourite binder, 'collection' = every card I own, or one binder id
+    useEffect(() => {
         let live = true;
         setPool(null);
-        api('browse', { binder: source, onlyOwned: true, offset: 0, limit: 120 })
+        api('browse', { binder: source === 'collection' ? null : source, onlyOwned: true, query: debounced, offset: 0, limit: 120 })
             .then((r) => live && setPool(r.cards))
             .catch(() => live && setPool([]));
         return () => { live = false; };
-    }, [source]);
+    }, [source, debounced]);
 
     // First draft: the saved showcase, or the first 10 cards of the chosen binder.
     useEffect(() => {
@@ -256,15 +264,21 @@ export default function ShowcaseEditor() {
                     </Section>
                     <Section title="Choisir dans">
                         <div className="flex flex-wrap gap-2">
-                            {[['all', `Tous les favoris`], ...favs.binders.filter((b) => b.count).map((b) => [b.id, b.name])].map(([id, name]) => (
+                            {[['all', `Tous les favoris`], ...favs.binders.filter((b) => b.count).map((b) => [b.id, b.name]), ['collection', 'Toute ma collection']].map(([id, name]) => (
                                 <button key={id} onClick={() => setSource(id)}
                                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${source === id ? 'bg-[#c9a227] border-transparent text-paper' : 'border-white/10 text-ink hover:bg-white/10'}`}>
                                     {id === 'all' && <Star className="w-3.5 h-3.5 fill-current" />}{name}
                                 </button>
                             ))}
                         </div>
+                        <label className="mt-3 flex items-center gap-2 px-3.5 rounded-full bg-white/5 ring-1 ring-white/10 focus-within:ring-[#e9c46a]/50">
+                            <Search className="w-4 h-4 text-white/50" />
+                            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nom, ou mot de la description…"
+                                className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-white/40" />
+                        </label>
                         {!pool && <p className="mt-4 text-sm text-white/50">Chargement…</p>}
-                        {pool?.length === 0 && <p className="mt-4 text-sm text-white/50">Aucune carte ici. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte dans ta collection pour l'ajouter à tes favoris.</p>}
+                        {pool?.length === 0 && debounced && <p className="mt-4 text-sm text-white/50">Aucune carte trouvée.</p>}
+                        {pool?.length === 0 && !debounced && <p className="mt-4 text-sm text-white/50">Aucune carte ici. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte dans ta collection pour l'ajouter à tes favoris.</p>}
                         {pool?.length > 0 && (
                             <div className="mt-4 grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
                                 {pool.map((c) => {

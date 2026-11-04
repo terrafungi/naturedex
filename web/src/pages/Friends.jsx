@@ -122,7 +122,7 @@ function Picker({ username, selected, onToggle, onQty, total }) {
         <div>
             <label className="flex items-center gap-2 px-3.5 rounded-full bg-white/5 ring-1 ring-white/10 focus-within:ring-[#4fd18b]/50">
                 <Search className="w-4 h-4 text-white/50" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Chercher une carte…" className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-white/40" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nom, ou mot de la description…" className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-white/40" />
             </label>
             {!page ? <div className="py-12 text-center text-ink-soft">Chargement…</div> : page.cards.length === 0 ? (
                 <p className="py-12 text-center text-ink-soft">{debounced ? 'Aucune carte trouvée.' : 'Aucune carte dans cette collection.'}</p>

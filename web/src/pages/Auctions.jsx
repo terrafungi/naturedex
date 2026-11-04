@@ -111,7 +111,7 @@ function Filters({ filters, setFilters }) {
         <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2">
             <label className="col-span-3 flex items-center gap-2 px-3.5 rounded-full bg-white/5 ring-1 ring-white/10 focus-within:ring-[#4fd18b]/50 flex-1 min-w-[180px]">
                 <Search className="w-4 h-4 text-white/50" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Chercher une espèce…" className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-white/40" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nom, ou mot de la description…" className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-white/40" />
             </label>
             <select value={filters.rarity || ''} onChange={(e) => setFilters({ ...filters, rarity: e.target.value || null })} className={select} aria-label="Rareté">
                 <option value="">Rareté : toutes</option>
