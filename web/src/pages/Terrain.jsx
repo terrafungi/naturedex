@@ -11,6 +11,11 @@ import { RARITIES } from '../game.jsx';
 const PHOTO_SIZE = 1600;
 const THUMB_SIZE = 560;
 const GEO_KEY = 'naturdex.terrainGeo';
+// When the phone does not zoom itself, the photo is cropped in the middle of the frame.
+const DIGITAL_ZOOM_MAX = 4;
+const HARDWARE_ZOOM_MAX = 10;
+const ZOOM_STOPS = [0.5, 1, 2, 3, 5, 10];
+const zoomLabel = (z) => `${z.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}×`;
 
 /** Resized JPEG (base64, no prefix) of a bitmap, longest side ≤ max. */
 function jpeg(bitmap, max, quality) {
@@ -269,20 +274,38 @@ function LiveCamera({ onCapture, onClose }) {
     const [ready, setReady] = useState(false);
     const [flash, setFlash] = useState(false);
     const [error, setError] = useState('');
+    const track = useRef(null);
+    // hw: the camera zooms itself (sharper, may switch to the telephoto lens); otherwise digital crop
+    const [zoomRange, setZoomRange] = useState(null);
+    const [zoom, setZoom] = useState(1);
+    const pinch = useRef(null);
+    const pendingZoom = useRef(null);
 
     useEffect(() => { api('fieldCamera').then((r) => setToken(r.token)).catch((e) => setError(e.message)); }, []);
 
     useEffect(() => {
         let stream, cancelled = false;
         setReady(false);
+        setZoomRange(null);
+        setZoom(1);
+        track.current = null;
         if (!navigator.mediaDevices?.getUserMedia) {
             setError("Ton navigateur ne donne pas accès à l'appareil photo. Ouvre NatureDex sur ton téléphone, dans Chrome ou Safari.");
             return undefined;
         }
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false })
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 2560 }, height: { ideal: 1920 } }, audio: false })
             .then((s) => {
                 if (cancelled) { s.getTracks().forEach((t) => t.stop()); return; }
                 stream = s;
+                const t = s.getVideoTracks()[0];
+                track.current = t;
+                const caps = t.getCapabilities?.() || {};
+                if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+                    setZoomRange({ min: caps.zoom.min, max: Math.min(caps.zoom.max, HARDWARE_ZOOM_MAX), hw: true });
+                    setZoom(t.getSettings?.().zoom || Math.max(1, caps.zoom.min));
+                } else {
+                    setZoomRange({ min: 1, max: DIGITAL_ZOOM_MAX, hw: false });
+                }
                 video.current.srcObject = s;
                 video.current.play().catch(() => {});
             })
@@ -302,20 +325,50 @@ function LiveCamera({ onCapture, onClose }) {
         return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = overflow; };
     }, [onClose]);
 
+    function applyZoom(value) {
+        if (!zoomRange) return;
+        const z = Math.min(zoomRange.max, Math.max(zoomRange.min, value));
+        setZoom(z);
+        if (!zoomRange.hw) return;
+        // one camera update per frame while pinching
+        if (pendingZoom.current == null) requestAnimationFrame(() => {
+            const next = pendingZoom.current;
+            pendingZoom.current = null;
+            track.current?.applyConstraints({ advanced: [{ zoom: next }] }).catch(() => {});
+        });
+        pendingZoom.current = z;
+    }
+
+    const distance = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    function onTouchStart(e) {
+        if (e.touches.length === 2) pinch.current = { d: distance(e.touches), zoom };
+    }
+    function onTouchMove(e) {
+        if (e.touches.length === 2 && pinch.current) applyZoom(pinch.current.zoom * (distance(e.touches) / pinch.current.d));
+    }
+
     function capture() {
         const v = video.current;
         if (!ready || !token || !v.videoWidth) return;
+        // digital zoom: keep the middle of the frame, as shown on screen
+        const crop = zoomRange && !zoomRange.hw ? zoom : 1;
+        const w = Math.round(v.videoWidth / crop), h = Math.round(v.videoHeight / crop);
         const frame = document.createElement('canvas');
-        frame.width = v.videoWidth; frame.height = v.videoHeight;
-        frame.getContext('2d').drawImage(v, 0, 0);
+        frame.width = w; frame.height = h;
+        frame.getContext('2d').drawImage(v, (v.videoWidth - w) / 2, (v.videoHeight - h) / 2, w, h, 0, 0, w, h);
         setFlash(true);
         setTimeout(() => onCapture(frame, token), 120);
     }
 
+    const digital = zoomRange && !zoomRange.hw ? zoom : 1;
+    const stops = zoomRange ? ZOOM_STOPS.filter((z) => z >= zoomRange.min - 0.01 && z <= zoomRange.max + 0.01) : [];
+
     return createPortal(
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col overflow-hidden touch-none"
+            onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={() => { pinch.current = null; }}>
             <video ref={video} playsInline muted autoPlay onLoadedData={() => setReady(true)}
-                className={`flex-1 min-h-0 w-full object-cover ${facing === 'user' ? '-scale-x-100' : ''}`} />
+                style={{ transform: `scale(${(facing === 'user' ? -1 : 1) * digital}, ${digital})` }}
+                className="flex-1 min-h-0 w-full object-cover" />
             {flash && <div className="absolute inset-0 bg-white animate-pulse" />}
             <button onClick={onClose} aria-label="Fermer l'appareil photo"
                 className="absolute top-4 right-4 w-11 h-11 grid place-items-center rounded-full bg-black/50 text-white" style={{ marginTop: 'env(safe-area-inset-top)' }}>
@@ -330,16 +383,38 @@ function LiveCamera({ onCapture, onClose }) {
                     </div>
                 </div>
             ) : (
-                <div className="absolute inset-x-0 bottom-0 pt-6 pb-8 flex items-center justify-center gap-10 bg-gradient-to-t from-black/70 to-transparent" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
-                    <span className="w-12" />
-                    <button onClick={capture} disabled={!ready || !token} aria-label="Prendre la photo"
-                        className="w-20 h-20 rounded-full border-4 border-white grid place-items-center disabled:opacity-40">
-                        <span className="w-16 h-16 rounded-full bg-white active:scale-90 transition-transform" />
-                    </button>
-                    <button onClick={() => setFacing((f) => (f === 'environment' ? 'user' : 'environment'))} aria-label="Changer de caméra"
-                        className="w-12 h-12 grid place-items-center rounded-full bg-black/50 text-white">
-                        <RefreshCw className="w-5 h-5" />
-                    </button>
+                <div className="absolute inset-x-0 bottom-0 pt-10 bg-gradient-to-t from-black/75 to-transparent" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+                    {zoomRange && (
+                        <div className="mx-auto mb-5 w-full max-w-xs px-6">
+                            <div className="flex justify-center gap-2">
+                                {stops.map((z) => {
+                                    const on = Math.abs(zoom - z) < 0.05;
+                                    return (
+                                        <button key={z} onClick={() => applyZoom(z)} aria-label={`Zoom ${zoomLabel(z)}`} aria-pressed={on}
+                                            className={`min-w-10 h-10 px-2 rounded-full text-sm font-bold transition-colors ${on ? 'bg-[#f4c25b] text-[#2a1c00]' : 'bg-black/55 text-white'}`}>
+                                            {on ? zoomLabel(zoom) : zoomLabel(z)}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div className="mt-3 flex items-center gap-3">
+                                <span className="w-10 text-right text-sm font-bold text-white tabular-nums">{zoomLabel(zoom)}</span>
+                                <input type="range" min={zoomRange.min} max={zoomRange.max} step={0.1} value={zoom} onChange={(e) => applyZoom(Number(e.target.value))}
+                                    aria-label="Zoom" className="flex-1 accent-[#f4c25b]" />
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex items-center justify-center gap-10">
+                        <span className="w-12" />
+                        <button onClick={capture} disabled={!ready || !token} aria-label="Prendre la photo"
+                            className="w-20 h-20 rounded-full border-4 border-white grid place-items-center disabled:opacity-40">
+                            <span className="w-16 h-16 rounded-full bg-white active:scale-90 transition-transform" />
+                        </button>
+                        <button onClick={() => setFacing((f) => (f === 'environment' ? 'user' : 'environment'))} aria-label="Changer de caméra"
+                            className="w-12 h-12 grid place-items-center rounded-full bg-black/50 text-white">
+                            <RefreshCw className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             )}
         </div>,
