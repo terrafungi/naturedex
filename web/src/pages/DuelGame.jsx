@@ -52,7 +52,7 @@ function Pile({ Icon, n, label, onClick }) {
 }
 
 // An empty slot of the bench, so the board keeps its shape.
-const Slot = ({ w = 62 }) => <span className="shrink-0 rounded-xl border-2 border-dashed border-white/10" style={{ width: w, height: Math.round(w * 1.38) }} />;
+const Slot = ({ w = 62 }) => <span className="block shrink-0 rounded-xl border-2 border-dashed border-white/15" style={{ width: w, height: Math.round(w * 1.38) }} />;
 
 // Floating damage / heal number over a card.
 function Flash({ f }) {
@@ -314,14 +314,17 @@ export default function DuelGame() {
                 <div className="flex gap-2">{[0, 1, 2].map((i) => <div key={i}>{fieldCard(myBench[i], 'mine', 'bench')}</div>)}</div>
             </div>
 
+            {hint() && (
+                <p className="mx-3 mb-1 px-3 py-1.5 rounded-xl bg-black/30 text-xs leading-snug text-white/85 flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4 shrink-0 text-[#f4d88f]" />{hint()}
+                </p>
+            )}
             {/* my bar */}
             <div className="flex items-center gap-2 px-3 py-1">
                 <Captures n={me.captures} side={0} />
                 <Pile Icon={Layers} n={me.deck} label="Cartes dans ton deck" />
                 <Pile Icon={Trash2} n={me.discard.length} label="Ta défausse" onClick={() => setSheet({ discard: true })} />
-                <span className="flex-1 min-w-0 text-[11px] leading-tight text-white/75 flex items-center gap-1">
-                    {hint() && <><Lightbulb className="w-3.5 h-3.5 shrink-0 text-[#f4d88f]" /><span className="line-clamp-2">{hint()}</span></>}
-                </span>
+                <span className="flex-1" />
                 {targeting && <button onClick={() => setTargeting(null)} className="px-3 py-2 rounded-full bg-white/10 text-xs font-bold">Annuler</button>}
                 {isSetup && (
                     <button disabled={setup.active == null || busy} onClick={() => act({ t: 'setup', active: setup.active, bench: setup.bench })}
@@ -334,8 +337,8 @@ export default function DuelGame() {
 
             {/* hand */}
             <div className="px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-1 bg-black/25">
-                <div className="flex justify-center overflow-x-auto no-scrollbar py-1.5">
-                    <div className="flex" style={{ gap: hand.length > 6 ? 0 : 6 }}>
+                <div className="overflow-x-auto no-scrollbar py-1.5">
+                    <div className="flex w-max mx-auto px-1" style={{ gap: hand.length > 6 ? 0 : 6 }}>
                         <AnimatePresence initial={false}>
                             {hand.map((c, i) => {
                                 const playable = isSetup ? c.kind === 'creature' : handActs(c).length > 0;
