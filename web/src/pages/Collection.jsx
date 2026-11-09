@@ -142,6 +142,8 @@ export default function Collection() {
     }
 
     async function recycleAll() {
+        const n = duplicates.count;
+        if (!window.confirm(`Recycler ${n} doublon${n > 1 ? 's' : ''} (${duplicates.cards} carte${duplicates.cards > 1 ? 's' : ''}) contre ${duplicates.coins} pépites ? Tu gardes un exemplaire de chaque carte. Cette action est irréversible.`)) return;
         const res = await api('recycle');
         setUser(res.user);
         await refreshCollection();
