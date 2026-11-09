@@ -51,6 +51,8 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     const ink = bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
     const trainer = trainerOf(card);
     const fact = bleed || trainer ? null : card.fact;
+    // where the subject sits in the photo (computed once per card): the 4:3 window crops around it
+    const focus = card.focus || card.stats?.focus;
 
     // Tilt mode (card sheet, booster): the card follows the finger / mouse in 3D on a spring, like a
     // real foil card turned in the light, then wobbles back flat when let go.
@@ -130,7 +132,8 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                     </div>
                 </div>
                 <div className="nd-window">
-                    <img src={bleed ? sharper(card.thumb_url) : card.thumb_url} alt={card.name} loading="lazy" draggable="false" onError={fallbackToOriginal} />
+                    <img src={bleed ? sharper(card.thumb_url) : card.thumb_url} alt={card.name} loading="lazy" draggable="false" onError={fallbackToOriginal}
+                        style={focus && !bleed ? { objectPosition: `${focus[0]}% ${focus[1]}%` } : undefined} />
                 </div>
                 <div className="nd-strip">
                     <span className="nd-sci">{card.sci_name || t.label}</span>

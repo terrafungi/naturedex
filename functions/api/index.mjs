@@ -792,7 +792,7 @@ const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c
                      c.extract, c.wiki_url, c.iucn, c.stats`;
 
 const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp,
-    (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd`;
+    (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd, c.stats->'focus' AS focus`;
 let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
 // The catalogue builder skips article intros (too many pages to fetch in bulk):
