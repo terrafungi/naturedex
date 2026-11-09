@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Heart } from 'lucide-react';
 import { api } from '../api.jsx';
-import { drawShowcase, loadCardImage, loadFonts } from '../showcase.js';
+import { cardImageUrl, drawShowcase, loadCardImage, loadFonts } from '../showcase.js';
 
 // The showcase picture, drawn at full export size and scaled down by CSS.
 // Draws at once (cards without photos), then again as fonts and photos arrive.
@@ -19,7 +19,7 @@ const ShowcaseCanvas = forwardRef(function ShowcaseCanvas({ showcase, username, 
         let timer = 0;
         for (const c of showcase.cards) {
             if (images.has(c.id)) continue;
-            loadCardImage(c.thumb_url).then((img) => {
+            loadCardImage(cardImageUrl(c)).then((img) => {
                 if (!live || !img) return;
                 images.set(c.id, img);
                 clearTimeout(timer);
@@ -38,7 +38,7 @@ export async function exportShowcase(showcase, username) {
     await loadFonts();
     const images = new Map();
     await Promise.all(showcase.cards.map(async (c) => {
-        const img = await loadCardImage(c.thumb_url);
+        const img = await loadCardImage(cardImageUrl(c));
         if (img) images.set(c.id, img);
     }));
     const canvas = document.createElement('canvas');
@@ -86,7 +86,7 @@ export function ShowcaseThumb({ showcase, username, width = 480, className = '' 
             io.disconnect();
             const images = new Map();
             await Promise.all([loadFonts(), ...showcase.cards.map(async (c) => {
-                const img = await loadCardImage(c.thumb_url);
+                const img = await loadCardImage(cardImageUrl(c));
                 if (img) images.set(c.id, img);
             })]);
             drawQueue = drawQueue.then(async () => {

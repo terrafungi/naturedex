@@ -639,12 +639,94 @@ function fitFont(ctx, text, weight, family, size, maxWidth, minSize) {
     return `${t.trimEnd()}…`;
 }
 
+// Full arts and Illustrations: the picture covers the whole card (like the .nd-card[data-art] cards).
+const BLEED_ARTS = ['full', 'illus'];
+// The picture to load for a card: a sharper one when it fills the whole card.
+export const cardImageUrl = (card) => (BLEED_ARTS.includes(card.art) ? card.thumb_url?.replace(/\/\d+px-([^/]+)$/, '/960px-$1') : card.thumb_url);
+
+// Draw `img` to cover the box; fx/fy (0-100) = the point of the picture kept in view (cards.stats.focus).
+function cover(ctx, img, x, y, w, h, [fx, fy] = [50, 50]) {
+    const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+    const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
+    ctx.drawImage(img, x - (dw - w) * fx / 100, y - (dh - h) * fy / 100, dw, dh);
+}
+
+// Holographic rainbow bands across a box (the foil of the holo and full art cards).
+function rainbow(ctx, x, y, w, h, alpha) {
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    const colors = ['#ff7eb3', '#ffd36e', '#7dffb0', '#6ec8ff', '#c18bff'];
+    for (let band = 0; band < 3; band++) {
+        const start = band / 3 + 0.06;
+        g.addColorStop(start, 'rgba(255,255,255,0)');
+        colors.forEach((c, i) => g.addColorStop(start + 0.03 + i * 0.03, c));
+        g.addColorStop(start + 0.2, 'rgba(255,255,255,0)');
+    }
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = 'color-dodge';
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+}
+
+// Full art / Illustration: picture edge to edge, name on top and labels at the bottom over dark gradients.
+function drawBleedCard(ctx, card, img, w, h, type, rarity, frame) {
+    const p = w * 0.025, r = w * 0.045;
+    const ix = p, iy = p, iw = w - 2 * p, ih = h - 2 * p;
+    ctx.save();
+    rrect(ctx, ix, iy, iw, ih, r);
+    ctx.clip();
+    ctx.fillStyle = '#1b211e';
+    ctx.fillRect(ix, iy, iw, ih);
+    if (img) cover(ctx, img, ix, iy, iw, ih);
+    const shade = ctx.createLinearGradient(0, iy, 0, iy + ih);
+    shade.addColorStop(0, 'rgba(0,0,0,0.62)'); shade.addColorStop(0.24, 'rgba(0,0,0,0.12)'); shade.addColorStop(0.42, 'rgba(0,0,0,0)');
+    shade.addColorStop(0.55, 'rgba(0,0,0,0)'); shade.addColorStop(0.75, 'rgba(0,0,0,0.6)'); shade.addColorStop(1, 'rgba(0,0,0,0.88)');
+    ctx.fillStyle = shade;
+    ctx.fillRect(ix, iy, iw, ih);
+    rainbow(ctx, ix, iy, iw, ih, 0.3);
+    ctx.restore();
+
+    const inner = w - 4 * p;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = w * 0.03;
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 ${w * 0.075}px ${SANS}`;
+    const symbolWidth = ctx.measureText(rarity.symbol).width;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(fitFont(ctx, card.name || '', 700, DISPLAY, w * 0.085, inner - symbolWidth - p, w * 0.06), 2 * p, p + w * 0.085);
+    ctx.font = `700 ${w * 0.06}px ${SANS}`;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = card.rarity === 'common' ? '#e5e7eb' : rarity.color;
+    ctx.fillText(rarity.symbol, w - 2 * p, p + w * 0.085);
+
+    const pillH = w * 0.1, pillY = h - 2 * p - pillH;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(fitFont(ctx, card.sci_name || type.label, 'italic 500', DISPLAY, w * 0.056, inner, w * 0.04), 2 * p, pillY - w * 0.06);
+    ctx.font = `700 ${w * 0.05}px ${SANS}`;
+    const label = fitFont(ctx, type.label, 700, SANS, w * 0.05, inner * 0.55, w * 0.035);
+    const pillW = ctx.measureText(label).width + w * 0.07;
+    ctx.fillStyle = type.color;
+    rrect(ctx, 2 * p, pillY, pillW, pillH, pillH / 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(label, 2 * p + w * 0.035, pillY + pillH / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = card.rarity === 'common' ? '#e5e7eb' : frame[0];
+    ctx.fillText(fitFont(ctx, card.art === 'illus' ? 'Illustration' : 'Full art', 700, SANS, w * 0.05, inner - pillW - p, w * 0.035), w - 2 * p, pillY + pillH / 2);
+    ctx.restore();
+}
+
 // One card, centred on (cx, cy), `w` wide, rotated by `rot` radians.
 function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     const h = w * 1.4;
     const type = TYPES[card.type] || TYPES.plant;
     const rarity = RARITIES[card.rarity] || RARITIES.common;
     const frame = RARITY_FRAMES[card.rarity] || ['#ffffff', type.color, '#10261a'];
+    const bleed = BLEED_ARTS.includes(card.art), holo = card.art === 'holo';
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(rot);
@@ -660,6 +742,20 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     rrect(ctx, 0, 0, w, h, w * 0.06);
     ctx.fill();
     ctx.restore();
+    // holo: the frame shines with rainbow foil
+    if (holo || bleed) {
+        ctx.save();
+        rrect(ctx, 0, 0, w, h, w * 0.06);
+        ctx.clip();
+        rainbow(ctx, 0, 0, w, h, 0.75);
+        ctx.restore();
+    }
+
+    if (bleed) {
+        drawBleedCard(ctx, card, img, w, h, type, rarity, frame);
+        ctx.restore();
+        return;
+    }
 
     const p = w * 0.04;
     ctx.fillStyle = '#f8f1df';
@@ -687,10 +783,12 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     ctx.clip();
     ctx.fillStyle = type.color;
     ctx.fillRect(ix, iy, iw, ih);
-    if (img) {
-        const scale = Math.max(iw / img.naturalWidth, ih / img.naturalHeight);
-        const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
-        ctx.drawImage(img, ix + (iw - dw) / 2, iy + (ih - dh) / 2, dw, dh);
+    if (img) cover(ctx, img, ix, iy, iw, ih, card.focus || undefined);
+    // holo: a light glitter on the picture
+    if (holo) {
+        rainbow(ctx, ix, iy, iw, ih, 0.22);
+        const rand = (i) => ((Math.sin((card.id || 1) * 97 + i * 13.7) + 1) / 2);
+        for (let i = 0; i < 14; i++) sparkle(ctx, ix + rand(i) * iw, iy + rand(i + 50) * ih, w * (0.012 + rand(i + 99) * 0.02), 'rgba(255,255,255,0.75)');
     }
     ctx.restore();
     ctx.strokeStyle = type.color;
