@@ -2938,7 +2938,9 @@ const actions = {
             const { rows } = await client.query(
                 `WITH old AS (
                     SELECT card_id, count FROM user_cards
-                    WHERE user_id = $1 AND count > 1 AND ($2::int IS NULL OR card_id = $2) FOR UPDATE
+                    WHERE user_id = $1 AND count > 1 AND ($2::int IS NOT NULL AND card_id = $2
+                        -- "every duplicate" keeps the Naturalistes: the Duel deck plays up to 4 copies
+                        OR $2::int IS NULL AND card_id NOT IN (SELECT id FROM cards WHERE type = 'naturalist')) FOR UPDATE
                  )
                  UPDATE user_cards uc SET count = 1 FROM old JOIN cards c ON c.id = old.card_id
                  WHERE uc.user_id = $1 AND uc.card_id = old.card_id

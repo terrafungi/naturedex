@@ -51,14 +51,15 @@ export default function CardPage() {
             <div className="max-w-md mx-auto px-4 py-12 text-center">
                 <BackLink className="inline-flex items-center gap-2 text-sm font-semibold text-white mb-8"><ArrowLeft className="w-4 h-4" />Collection</BackLink>
                 <div className="w-64 mx-auto"><MysteryCard card={card} number={number} /></div>
-                <h1 className="mt-8 font-display text-3xl font-bold">Espèce inconnue</h1>
+                <h1 className="mt-8 font-display text-3xl font-bold">{card.type === 'naturalist' ? 'Carte inconnue' : 'Espèce inconnue'}</h1>
                 <p className="mt-2 text-ink-soft">Une carte <b style={{ color: r.color }}>{r.label}</b> de type <b style={{ color: t.color }}>{t.label}</b>. Ouvre des boosters pour la découvrir !</p>
             </div>
         );
     }
 
     const stats = card.stats || {};
-    const facts = [
+    const naturalist = card.type === 'naturalist';
+    const facts = naturalist ? [] : [
         { Icon: Eye, label: 'Lectures Wikipédia par an (estimation)', value: Number(card.views).toLocaleString('fr-FR') },
         stats.mass_kg && { Icon: Weight, label: 'Masse', value: formatMeasure(stats.mass_kg, 'kg') },
         stats.length_m && { Icon: Ruler, label: 'Longueur', value: formatMeasure(stats.length_m, 'm') },
@@ -99,9 +100,13 @@ export default function CardPage() {
                             </div>
                         ))}
                     </dl>
-                    <p className="mt-4 text-sm text-ink-soft">
+                    {naturalist ? (
+                        <p className="text-sm text-ink-soft">
+                            Une carte Naturaliste du <Link to="/duel/deck" className="underline text-white">Duel de cartes</Link> : ajoute-la à ton deck pour utiliser son effet (jusqu'à 4 exemplaires).
+                        </p>
+                    ) : <p className="mt-4 text-sm text-ink-soft">
                         Sa rareté vient de sa popularité : {formatViews(Number(card.views))} lectures par an (moyenne des 3 derniers mois), comparées aux autres espèces de type {t.label.toLowerCase()}.
-                    </p>
+                    </p>}
 
                     <div className="mt-8 flex flex-wrap items-center gap-3">
                         <span className="font-display text-lg">Tu possèdes <b>{card.count}</b> exemplaire{card.count > 1 ? 's' : ''}</span>
@@ -117,7 +122,7 @@ export default function CardPage() {
                     </div>
                 </div>
             </div>
-            {card.type !== 'mineral' && <FieldSection cardId={card.id} />}
+            {card.type !== 'mineral' && !naturalist && <FieldSection cardId={card.id} />}
         </div>
     );
 }

@@ -109,8 +109,9 @@ export default function Collection() {
         let count = 0, coins = 0, cards = 0;
         for (const [id, n] of Object.entries(owned)) {
             const extra = n - 1;
-            const rarity = ownedInfo[id]?.[1];
-            if (extra > 0) { count += extra; cards += 1; coins += extra * (user.recycleValue?.[rarity] || 0); }
+            const [type, rarity] = ownedInfo[id] || [];
+            // Naturalistes are kept for the Duel deck (up to 4 copies): recycled one by one only
+            if (extra > 0 && type !== 'naturalist') { count += extra; cards += 1; coins += extra * (user.recycleValue?.[rarity] || 0); }
         }
         return { count, coins, cards };
     }, [owned, ownedInfo, user.recycleValue]);
