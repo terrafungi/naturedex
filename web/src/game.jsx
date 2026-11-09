@@ -1,5 +1,5 @@
 import {
-    Bird, Biohazard, Bone, Bug, Fish, Flower2, Gem, PawPrint, Shell, Shrimp, Snail, TreeDeciduous, Turtle, Waves,
+    Bird, Biohazard, Bone, Bug, Fish, Flower2, Gem, GraduationCap, PawPrint, Shell, Shrimp, Snail, TreeDeciduous, Turtle, Waves,
 } from 'lucide-react';
 
 const svgProps = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -50,6 +50,8 @@ export const TYPES = {
     virus:     { label: 'Virus', color: '#e11d74', Icon: Biohazard, attacks: ['Réplication', 'Mutation', 'Contagion', 'Capside'] },
     fossil:    { label: 'Fossile', color: '#a8763e', Icon: Bone, attacks: ['Rugissement ancestral', 'Pétrification', 'Âge de pierre', 'Extinction'] },
     mineral:   { label: 'Minéral & roche', color: '#6d7fa3', Icon: Gem, attacks: ['Éclat cristallin', 'Érosion', 'Éboulement', 'Coulée de magma'] },
+    // the Naturaliste cards of the Duel (scientists, objects, stades): no battle stats
+    naturalist: { label: 'Naturaliste', color: '#ff8a65', Icon: GraduationCap, attacks: [] },
 };
 
 export const RARITIES = {

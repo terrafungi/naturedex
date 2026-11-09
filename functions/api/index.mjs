@@ -22,6 +22,7 @@ import {
 } from './shop.mjs';
 import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLabel, seasonRollover } from './arena.mjs';
 import { boosterBonus, duelActions } from './duel.mjs';
+import { NATURALIST, syncNaturalistCards } from './naturalists.mjs';
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 import { blogRoute, blogTick, latestPosts } from './blog.mjs';
@@ -71,6 +72,12 @@ const BOOSTER_SLOTS = [
     { uncommon: 80, rare: 17, epic: 3 },
     { rare: 698, epic: 220, legendary: 80, secret: 2 },
 ];
+// Naturaliste cards (scientists, objects, stades) have their own pool: in about 45 % of boosters
+// one of them takes the place of a common slot.
+const NATURALIST_SHARE = 45;
+const NATURALIST_SLOT = { common: 520, uncommon: 300, rare: 130, epic: 40, legendary: 9, secret: 1 };
+// God pack, 1 booster in 3,500: legendaries only, with a Full art, an Illustration and a secret.
+const GOD_PACK_ODDS = 3500;
 
 class HttpError extends Error {
     constructor(status, message) { super(message); this.status = status; }
@@ -192,12 +199,24 @@ async function socialCounts(db, userId) {
 
 // ---------- booster draw ----------
 
-let rarityPools, poolsAt = 0; // { rarity: [cardId, ...] } — cached per Lambda container for 10 min
+// { rarity: [cardId, ...], naturalist: { rarity: [...] }, god: { legendary, full, illus, secret } }
+// — cached per Lambda container for 10 min
+let rarityPools, poolsAt = 0;
 async function getRarityPools(db) {
     if (!rarityPools || Date.now() - poolsAt > 600_000) {
-        const { rows } = await db.query(`SELECT rarity, array_agg(id) AS ids FROM cards GROUP BY rarity`);
+        await syncNaturalistCards(db);
+        const { rows } = await db.query(
+            `SELECT rarity, type = $1 AS nat, art, array_agg(id) AS ids FROM cards GROUP BY 1, 2, 3`, [NATURALIST]);
         if (!rows.length) throw new HttpError(503, 'Le catalogue de cartes est en cours de préparation');
-        rarityPools = Object.fromEntries(rows.map((r) => [r.rarity, r.ids]));
+        const pools = { naturalist: {}, god: { legendary: [], full: [], illus: [], secret: [] } };
+        const push = (o, k, ids) => { o[k] = (o[k] || []).concat(ids); };
+        for (const r of rows) {
+            if (r.nat) { push(pools.naturalist, r.rarity, r.ids); continue; }
+            push(pools, r.rarity, r.ids);
+            if (r.rarity === 'secret') push(pools.god, 'secret', r.ids);
+            else if (r.rarity === 'legendary') push(pools.god, r.art === 'full' ? 'full' : r.art === 'illus' ? 'illus' : 'legendary', r.ids);
+        }
+        rarityPools = pools;
         poolsAt = Date.now();
     }
     return rarityPools;
@@ -213,15 +232,21 @@ function rollRarity(table, pools) {
     return entries[0][0];
 }
 
-function drawBooster(pools) {
+const isGodPack = (pools) => Object.values(pools.god).every((ids) => ids.length) && crypto.randomInt(GOD_PACK_ODDS) === 0;
+
+function drawBooster(pools, god = false) {
     const picked = new Set();
-    return BOOSTER_SLOTS.map((table) => {
-        const ids = pools[rollRarity(table, pools)];
+    const pick = (ids) => {
         let id;
         do { id = ids[crypto.randomInt(ids.length)]; } while (picked.has(id) && picked.size < ids.length);
         picked.add(id);
         return id;
-    });
+    };
+    if (god) return ['legendary', 'legendary', 'legendary', 'full', 'illus', 'secret'].map((k) => pick(pools.god[k]));
+    const naturalist = crypto.randomInt(100) < NATURALIST_SHARE;
+    return BOOSTER_SLOTS.map((table, i) => (naturalist && i === 3
+        ? pick(pools.naturalist[rollRarity(NATURALIST_SLOT, pools.naturalist)])
+        : pick(pools[rollRarity(table, pools)])));
 }
 
 // ---------- daily challenges ----------
@@ -1422,7 +1447,8 @@ const actions = {
             }
             const { rows: [locked] } = await client.query(`UPDATE users SET ${update} WHERE id = $1 RETURNING *`, [user.id, ...params]);
 
-            const ids = drawBooster(pools);
+            const godPack = isGodPack(pools);
+            const ids = drawBooster(pools, godPack);
             const { rows: before } = await client.query(
                 `SELECT card_id FROM user_cards WHERE user_id = $1 AND card_id = ANY($2)`,
                 [user.id, ids]
@@ -1436,7 +1462,7 @@ const actions = {
                 );
             }
             await client.query(`INSERT INTO openings (user_id, card_ids) VALUES ($1, $2)`, [user.id, ids]);
-            const bonus = await boosterBonus(client, user.id, ids); // an Énergie or Naturaliste for the card duel
+            const bonus = await boosterBonus(client, user.id, ids); // an Énergie for the card duel
             await client.query('COMMIT');
 
             const { rows: cards } = await db.query(`SELECT ${CARD_FIELDS} FROM cards c WHERE c.id = ANY($1)`, [ids]);
@@ -1452,7 +1478,7 @@ const actions = {
                 seen.add(id);
                 return { ...byId[id], isNew };
             });
-            return { cards: pack, bonus, paidWith, user: await publicUser(db, locked) };
+            return { cards: pack, bonus, paidWith, ...(godPack ? { godPack: true } : {}), user: await publicUser(db, locked) };
         } catch (err) {
             await client.query('ROLLBACK').catch(() => {});
             throw err;
@@ -1470,7 +1496,7 @@ const actions = {
                 `(SELECT * FROM (SELECT ${LIGHT_FIELDS}, row_number() OVER (PARTITION BY c.type, c.rarity ORDER BY c.views DESC) AS k
                     FROM cards c WHERE c.rarity IN ('legendary', 'epic')) t WHERE k <= 4)
                  UNION ALL
-                 (SELECT ${LIGHT_FIELDS}, 0 FROM cards c WHERE c.rarity IN ('rare', 'uncommon', 'common') ORDER BY random() LIMIT 300)`
+                 (SELECT ${LIGHT_FIELDS}, 0 FROM cards c WHERE c.rarity IN ('rare', 'uncommon', 'common') AND c.type <> 'naturalist' ORDER BY random() LIMIT 300)`
             );
             const types = {};
             for (const { type, rarity, n } of counts) (types[type] ||= {})[rarity] = n;
@@ -2705,7 +2731,7 @@ const actions = {
                          WHERE c.id = ANY($2::int[]) AND c.rarity IN ('common', 'uncommon', 'rare')
                          ORDER BY (uc.card_id IS NULL) DESC, random() LIMIT 1`, [user.id, known]);
                     const fallback = c || (await client.query(
-                        `SELECT id FROM cards WHERE rarity = 'uncommon' AND views >= 800 ORDER BY random() LIMIT 1`)).rows[0];
+                        `SELECT id FROM cards WHERE rarity = 'uncommon' AND views >= 800 AND type <> 'naturalist' ORDER BY random() LIMIT 1`)).rows[0];
                     rewardCard = fallback?.id || null;
                     if (rewardCard) await giveCard(client, user.id, rewardCard);
                 }

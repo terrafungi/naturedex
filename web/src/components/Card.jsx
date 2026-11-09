@@ -3,6 +3,8 @@ import { Camera, Eye, HelpCircle, MapPin, Sparkles, Zap } from 'lucide-react';
 import { RARITIES, TYPES, formatViews } from '../game.jsx';
 import { useGame } from '../api.jsx';
 import { ABILITIES, battleStats } from '../battle.js';
+import { TRAINERS } from '../tcg.js';
+import { KIND_LABEL } from './TcgCard.jsx';
 
 export function TypeBadge({ type, className = '' }) {
     const t = TYPES[type];
@@ -28,6 +30,10 @@ const sharper = (url) => url?.replace(/\/\d+px-([^/]+)$/, '/960px-$1');
 export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo' };
 
 /** The signed-in player's card frame (honey shop), for their own cards. */
+/** The Duel effect of a Naturaliste card (type 'naturalist'), by its trainer key or its name. */
+export const trainerOf = (card) => (card.type === 'naturalist'
+    ? TRAINERS[card.stats?.trainer] || Object.values(TRAINERS).find((t) => t.name === card.name) : null);
+
 export const useMyFrame = () => useGame()?.user?.avatar?.frame;
 
 /** Full card. `card` comes from the catalog (light) or the API (full). `frame`: the owner's
@@ -43,7 +49,8 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     const bleed = art && card.art !== 'holo';
     const foil = art || ['epic', 'legendary', 'secret'].includes(card.rarity);
     const ink = bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
-    const fact = bleed ? null : card.fact;
+    const trainer = trainerOf(card);
+    const fact = bleed || trainer ? null : card.fact;
 
     // Tilt mode (card sheet, booster): the card follows the finger / mouse in 3D on a spring, like a
     // real foil card turned in the light, then wobbles back flat when let go.
@@ -129,11 +136,18 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                     <span className="nd-sci">{card.sci_name || t.label}</span>
                     <span className="shrink-0 font-semibold" style={{ color: ink }}>{t.label}</span>
                 </div>
-                <div className="nd-stats">
-                    <span title="Attaque"><small>ATQ</small>{st.atk}</span>
-                    <span title="Défense"><small>DÉF</small>{st.def}</span>
-                    <span title="Vitesse : la plus rapide agit en premier"><small>VIT</small>{st.spd}</span>
-                </div>
+                {trainer ? (
+                    <div className="nd-effect">
+                        <b>{KIND_LABEL[trainer.kind]}</b>
+                        <p>{trainer.text}</p>
+                    </div>
+                ) : (
+                    <div className="nd-stats">
+                        <span title="Attaque"><small>ATQ</small>{st.atk}</span>
+                        <span title="Défense"><small>DÉF</small>{st.def}</span>
+                        <span title="Vitesse : la plus rapide agit en premier"><small>VIT</small>{st.spd}</span>
+                    </div>
+                )}
                 {ab && (
                     <div className="nd-attack" title={ab.text}>
                         <span className="nd-type-icon !w-[5cqi] !h-[5cqi]" style={{ '--type': t.color }} />
@@ -144,7 +158,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                 {fact && <p className="nd-fact">{fact}</p>}
                 <div className="nd-foot">
                     <span className="flex items-center gap-[1cqi]" title="Lectures Wikipédia par an (estimation)">
-                        {card.views != null && <><Eye className="w-[3.6cqi] h-[3.6cqi]" />{formatViews(Number(card.views))}</>}
+                        {card.views != null && !trainer && <><Eye className="w-[3.6cqi] h-[3.6cqi]" />{formatViews(Number(card.views))}</>}
                     </span>
                     <span className="font-bold tracking-wide" style={{ color: ink }} title={r.label}>
                         {r.symbol} {r.label}

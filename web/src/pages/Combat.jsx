@@ -313,7 +313,7 @@ function TeamBuilder({ data, onSaved }) {
             </div>
             <div className="flex flex-wrap gap-1.5">
                 <button onClick={() => setType('')} className={`px-2.5 py-1 rounded-full text-xs font-semibold ${!type ? 'bg-white text-black' : 'bg-white/[0.06]'}`}>Tous</button>
-                {Object.entries(TYPES).map(([k, t]) => (
+                {Object.entries(TYPES).filter(([k]) => PROFILES[k]).map(([k, t]) => (
                     <button key={k} onClick={() => setType(type === k ? '' : k)} className="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1"
                         style={type === k ? { background: t.color, color: 'white' } : { background: 'rgb(255 255 255 / 0.06)' }}>
                         <t.Icon className="w-3.5 h-3.5" />{t.label}
@@ -377,7 +377,7 @@ function Rules() {
                 <h3 className="font-display text-lg font-semibold">Les types</h3>
                 <p className="text-ink-soft">Un type fort inflige <b className="text-[#8ee6a8]">×1,5</b> ; dans l'autre sens, il ne subit que <b className="text-[#ffb4a2]">×0,75</b>. Change de carte pour exploiter ces avantages.</p>
                 <div className="mt-3 grid sm:grid-cols-2 gap-x-6 gap-y-2.5">
-                    {Object.entries(TYPES).map(([k, t]) => (
+                    {Object.entries(TYPES).filter(([k]) => PROFILES[k]).map(([k, t]) => (
                         <div key={k} className="flex flex-col gap-1">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <TypeChip type={k} />

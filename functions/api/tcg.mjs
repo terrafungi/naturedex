@@ -51,34 +51,39 @@ export const cardBiome = (card) => {
 // target: what the player must pick — 'mine' (one of their creatures), 'myBench', 'foeBench', 'mineDamaged'.
 export const TRAINERS = {
     // Objets
-    jumelles: { kind: 'item', name: 'Jumelles', rarity: 'common', text: 'Regarde les 5 premières cartes de ton deck et prends une créature au hasard parmi elles.' },
-    appareil: { kind: 'item', name: 'Appareil photo', rarity: 'common', text: 'Pioche 1 carte.' },
-    gourde: { kind: 'item', name: 'Gourde', rarity: 'common', target: 'mine', text: 'Soigne 30 PV à une de tes créatures.' },
-    boussole: { kind: 'item', name: 'Boussole', rarity: 'uncommon', target: 'myBench', text: 'Échange ta créature active avec une créature de ton Banc.' },
-    filet: { kind: 'item', name: 'Filet', rarity: 'rare', target: 'foeBench', text: "Échange la créature active adverse avec une créature de son Banc que tu choisis." },
-    trousse: { kind: 'item', name: 'Trousse de soin', rarity: 'rare', target: 'mine', text: 'Soigne 60 PV et retire le poison d\'une de tes créatures.' },
+    jumelles: { kind: 'item', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/Navy_binoculars.jpg/330px-Navy_binoculars.jpg', name: 'Jumelles', rarity: 'common', text: 'Regarde les 5 premières cartes de ton deck et prends une créature au hasard parmi elles.' },
+    appareil: { kind: 'item', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/9/99/Many_cameras.jpg/330px-Many_cameras.jpg', name: 'Appareil photo', rarity: 'common', text: 'Pioche 1 carte.' },
+    gourde: { kind: 'item', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4c/Military_Canteen_7984.jpg/330px-Military_Canteen_7984.jpg', name: 'Gourde', rarity: 'common', target: 'mine', text: 'Soigne 30 PV à une de tes créatures.' },
+    boussole: { kind: 'item', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/59/Plastic-compass.jpg/330px-Plastic-compass.jpg', name: 'Boussole', rarity: 'uncommon', target: 'myBench', text: 'Échange ta créature active avec une créature de ton Banc.' },
+    filet: { kind: 'item', img: 'https://upload.wikimedia.org/wikipedia/commons/a/ad/Net.gsfc.jpg', name: 'Filet', rarity: 'rare', target: 'foeBench', text: "Échange la créature active adverse avec une créature de son Banc que tu choisis." },
+    trousse: { kind: 'item', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Kit_pronto_soccorso_moto_%28aperto%29.JPG/330px-Kit_pronto_soccorso_moto_%28aperto%29.JPG', name: 'Trousse de soin', rarity: 'rare', target: 'mine', text: 'Soigne 60 PV et retire le poison d\'une de tes créatures.' },
     // Outils
-    loupe: { kind: 'tool', name: 'Loupe', rarity: 'uncommon', target: 'mine', text: 'La créature équipée inflige +20 dégâts.' },
-    gilet: { kind: 'tool', name: 'Gilet de terrain', rarity: 'uncommon', target: 'mine', text: 'La créature équipée subit −20 dégâts.' },
-    bottes: { kind: 'tool', name: 'Bottes de marche', rarity: 'common', target: 'mine', text: 'La créature équipée bat en retraite gratuitement.' },
+    loupe: { kind: 'tool', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/80/Magnifying_glass.jpg/330px-Magnifying_glass.jpg', name: 'Loupe', rarity: 'uncommon', target: 'mine', text: 'La créature équipée inflige +20 dégâts.' },
+    gilet: { kind: 'tool', img: 'https://naturedex.fr/media/art/naturalist/gilet-thumb.jpg', big: 'https://naturedex.fr/media/art/naturalist/gilet.jpg', name: 'Gilet de terrain', rarity: 'uncommon', target: 'mine', text: 'La créature équipée subit −20 dégâts.' },
+    bottes: { kind: 'tool', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/29/Hiking_shoes_Lowa.jpg/330px-Hiking_shoes_Lowa.jpg', name: 'Bottes de marche', rarity: 'common', target: 'mine', text: 'La créature équipée bat en retraite gratuitement.' },
     // Stades (météo et milieux)
-    pluie: { kind: 'stadium', name: 'Pluie', rarity: 'uncommon', boost: ['ocean', 'humide'], text: 'Les créatures Océan et Zone humide infligent +20 dégâts.' },
-    secheresse: { kind: 'stadium', name: 'Sécheresse', rarity: 'uncommon', boost: ['desert', 'prairie'], text: 'Les créatures Désert et Prairie infligent +20 dégâts.' },
-    canopee: { kind: 'stadium', name: 'Canopée', rarity: 'uncommon', boost: ['foret', 'ciel'], text: 'Les créatures Forêt et Ciel infligent +20 dégâts.' },
-    blizzard: { kind: 'stadium', name: 'Blizzard', rarity: 'uncommon', boost: ['montagne'], text: 'Les créatures Montagne infligent +20 dégâts.' },
+    pluie: { kind: 'stadium', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2d/08152_Bukowsko_%28powiat_sanocki%29.jpg/330px-08152_Bukowsko_%28powiat_sanocki%29.jpg', name: 'Pluie', rarity: 'uncommon', boost: ['ocean', 'humide'], text: 'Les créatures Océan et Zone humide infligent +20 dégâts.' },
+    secheresse: { kind: 'stadium', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f0/Terre_seche.JPG/330px-Terre_seche.JPG', name: 'Sécheresse', rarity: 'uncommon', boost: ['desert', 'prairie'], text: 'Les créatures Désert et Prairie infligent +20 dégâts.' },
+    canopee: { kind: 'stadium', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Canopy_Walk.jpg/330px-Canopy_Walk.jpg', name: 'Canopée', rarity: 'uncommon', boost: ['foret', 'ciel'], text: 'Les créatures Forêt et Ciel infligent +20 dégâts.' },
+    blizzard: { kind: 'stadium', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/Blizzard3_-_NOAA.jpg/330px-Blizzard3_-_NOAA.jpg', name: 'Blizzard', rarity: 'uncommon', boost: ['montagne'], text: 'Les créatures Montagne infligent +20 dégâts.' },
     // Supporters : de vrais naturalistes
-    darwin: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f1/Charles_Darwin_portrait.jpg/330px-Charles_Darwin_portrait.jpg', name: 'Charles Darwin', rarity: 'legendary', years: '1809–1882', text: 'Pioche 3 cartes.' },
-    linne: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/6/68/Carl_von_Linn%C3%A9.jpg/330px-Carl_von_Linn%C3%A9.jpg', name: 'Carl von Linné', rarity: 'rare', years: '1707–1778', text: 'Prends une créature au hasard dans ton deck et ajoute-la à ta main.' },
-    goodall: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Deputy_Secretary_Higginbottom_Poses_for_a_Photo_With_Dr._Jane_Goodall_and_the_State_Department%27s_Global_Health_Diplomacy_Director_Jordan_in_Washington_%2822365513310%29_%282%29_%28cropped_2%29.jpg/330px-thumbnail.jpg', name: 'Jane Goodall', rarity: 'epic', years: '1934–2025', target: 'mine', text: 'Soigne 80 PV à une de tes créatures (120 si c\'est un mammifère).' },
-    cousteau: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/10/Cousteau1972_%28cropped%29.jpg/330px-Cousteau1972_%28cropped%29.jpg', name: 'Jacques-Yves Cousteau', rarity: 'epic', years: '1910–1997', text: 'Prends 2 Énergies au hasard dans ton deck et ajoute-les à ta main.' },
-    fabre: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Jean-henri_fabre.jpg/330px-Jean-henri_fabre.jpg', name: 'Jean-Henri Fabre', rarity: 'rare', years: '1823–1915', text: 'Ce tour-ci, tes créatures infligent +30 dégâts (+50 pour un arthropode).' },
-    carson: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f4/Rachel-Carson.jpg/330px-Rachel-Carson.jpg', name: 'Rachel Carson', rarity: 'rare', years: '1907–1964', text: 'Soigne 30 PV à toutes tes créatures et retire leur poison.' },
-    humboldt: { kind: 'supporter', img: 'https://upload.wikimedia.org/wikipedia/commons/f/f3/AvHumboldt.jpg', name: 'Alexander von Humboldt', rarity: 'rare', years: '1769–1859', text: 'Pioche 2 cartes, puis prends un Stade au hasard dans ton deck.' },
-    audubon: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8e/John_James_Audubon_1826.jpg/330px-John_James_Audubon_1826.jpg', name: 'John James Audubon', rarity: 'uncommon', years: '1785–1851', target: 'myBench', text: 'Échange ta créature active avec une de ton Banc, puis pioche 1 carte.' },
-    buffon: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a3/Fran%C3%A7ois_Hubert_Drouais_-_Portrait_of_Buffon.jpg/330px-Fran%C3%A7ois_Hubert_Drouais_-_Portrait_of_Buffon.jpg', name: 'Buffon', rarity: 'uncommon', years: '1707–1788', text: 'Mélange ta main dans ton deck, puis pioche 5 cartes.' },
-    fossey: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Dian_Fossey_October_1968.jpg/330px-Dian_Fossey_October_1968.jpg', name: 'Dian Fossey', rarity: 'rare', years: '1932–1985', target: 'foeBench', text: 'Échange la créature active adverse avec une de son Banc, au choix.' },
-    monod: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/Theodore_Monod_-_Adrar_de_Mauritanie_-_Oued_Akerdil_-_D%C3%A9cembre_1998.jpg/330px-Theodore_Monod_-_Adrar_de_Mauritanie_-_Oued_Akerdil_-_D%C3%A9cembre_1998.jpg', name: 'Théodore Monod', rarity: 'uncommon', years: '1902–2000', text: 'Prends 1 Énergie au hasard dans ta défausse et attache-la à ta créature active. Pioche 1 carte.' },
-    maathai: { kind: 'supporter', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/Wangari_Matthai_2001_%28cropped%29.jpg/330px-Wangari_Matthai_2001_%28cropped%29.jpg', name: 'Wangari Maathai', rarity: 'epic', years: '1940–2011', text: 'Pioche 2 cartes et soigne 40 PV à ta créature active.' },
+    darwin: { kind: 'supporter', role: 'Naturaliste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f1/Charles_Darwin_portrait.jpg/330px-Charles_Darwin_portrait.jpg', name: 'Charles Darwin', rarity: 'legendary', years: '1809–1882', text: 'Pioche 3 cartes.' },
+    linne: { kind: 'supporter', role: 'Botaniste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/6/68/Carl_von_Linn%C3%A9.jpg/330px-Carl_von_Linn%C3%A9.jpg', name: 'Carl von Linné', rarity: 'rare', years: '1707–1778', text: 'Prends une créature au hasard dans ton deck et ajoute-la à ta main.' },
+    goodall: { kind: 'supporter', role: 'Primatologue', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Deputy_Secretary_Higginbottom_Poses_for_a_Photo_With_Dr._Jane_Goodall_and_the_State_Department%27s_Global_Health_Diplomacy_Director_Jordan_in_Washington_%2822365513310%29_%282%29_%28cropped_2%29.jpg/330px-thumbnail.jpg', name: 'Jane Goodall', rarity: 'epic', years: '1934–2025', target: 'mine', text: 'Soigne 80 PV à une de tes créatures (120 si c\'est un mammifère).' },
+    cousteau: { kind: 'supporter', role: 'Océanographe', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/10/Cousteau1972_%28cropped%29.jpg/330px-Cousteau1972_%28cropped%29.jpg', name: 'Jacques-Yves Cousteau', rarity: 'epic', years: '1910–1997', text: 'Prends 2 Énergies au hasard dans ton deck et ajoute-les à ta main.' },
+    fabre: { kind: 'supporter', role: 'Entomologiste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Jean-henri_fabre.jpg/330px-Jean-henri_fabre.jpg', name: 'Jean-Henri Fabre', rarity: 'rare', years: '1823–1915', text: 'Ce tour-ci, tes créatures infligent +30 dégâts (+50 pour un arthropode).' },
+    carson: { kind: 'supporter', role: 'Biologiste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f4/Rachel-Carson.jpg/330px-Rachel-Carson.jpg', name: 'Rachel Carson', rarity: 'rare', years: '1907–1964', text: 'Soigne 30 PV à toutes tes créatures et retire leur poison.' },
+    humboldt: { kind: 'supporter', role: 'Explorateur', img: 'https://upload.wikimedia.org/wikipedia/commons/f/f3/AvHumboldt.jpg', name: 'Alexander von Humboldt', rarity: 'rare', years: '1769–1859', text: 'Pioche 2 cartes, puis prends un Stade au hasard dans ton deck.' },
+    audubon: { kind: 'supporter', role: 'Ornithologue', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8e/John_James_Audubon_1826.jpg/330px-John_James_Audubon_1826.jpg', name: 'John James Audubon', rarity: 'uncommon', years: '1785–1851', target: 'myBench', text: 'Échange ta créature active avec une de ton Banc, puis pioche 1 carte.' },
+    buffon: { kind: 'supporter', role: 'Naturaliste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a3/Fran%C3%A7ois_Hubert_Drouais_-_Portrait_of_Buffon.jpg/330px-Fran%C3%A7ois_Hubert_Drouais_-_Portrait_of_Buffon.jpg', name: 'Buffon', rarity: 'uncommon', years: '1707–1788', text: 'Mélange ta main dans ton deck, puis pioche 5 cartes.' },
+    fossey: { kind: 'supporter', role: 'Primatologue', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Dian_Fossey_October_1968.jpg/330px-Dian_Fossey_October_1968.jpg', name: 'Dian Fossey', rarity: 'rare', years: '1932–1985', target: 'foeBench', text: 'Échange la créature active adverse avec une de son Banc, au choix.' },
+    monod: { kind: 'supporter', role: 'Explorateur', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/Theodore_Monod_-_Adrar_de_Mauritanie_-_Oued_Akerdil_-_D%C3%A9cembre_1998.jpg/330px-Theodore_Monod_-_Adrar_de_Mauritanie_-_Oued_Akerdil_-_D%C3%A9cembre_1998.jpg', name: 'Théodore Monod', rarity: 'uncommon', years: '1902–2000', text: 'Prends 1 Énergie au hasard dans ta défausse et attache-la à ta créature active. Pioche 1 carte.' },
+    maathai: { kind: 'supporter', role: 'Écologiste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/Wangari_Matthai_2001_%28cropped%29.jpg/330px-Wangari_Matthai_2001_%28cropped%29.jpg', name: 'Wangari Maathai', rarity: 'epic', years: '1940–2011', text: 'Pioche 2 cartes et soigne 40 PV à ta créature active.' },
+    anning: { kind: 'supporter', role: 'Paléontologue', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Mary_Anning_painting.jpg/330px-Mary_Anning_painting.jpg', name: 'Mary Anning', rarity: 'epic', years: '1799–1847', text: 'Prends 2 créatures Fossile ou Minéral au hasard dans ton deck et ajoute-les à ta main.' },
+    cuvier: { kind: 'supporter', role: 'Paléontologue', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/Georges_Cuvier_3.jpg/330px-Georges_Cuvier_3.jpg', name: 'Georges Cuvier', rarity: 'rare', years: '1769–1832', text: 'Ce tour-ci, tes créatures infligent +30 dégâts (+50 pour un fossile).' },
+    lamarck: { kind: 'supporter', role: 'Botaniste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a5/Jean-Baptiste_de_Lamarck.jpg/330px-Jean-Baptiste_de_Lamarck.jpg', name: 'Jean-Baptiste de Lamarck', rarity: 'uncommon', years: '1744–1829', target: 'mine', text: 'Soigne 40 PV à une de tes créatures (70 si c\'est une plante ou un arbre).' },
+    mendel: { kind: 'supporter', role: 'Botaniste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/b/ba/Gregor_Mendel_2.jpg/330px-Gregor_Mendel_2.jpg', name: 'Gregor Mendel', rarity: 'rare', years: '1822–1884', text: 'Pioche 2 cartes, puis prends une Plante ou un Arbre au hasard dans ton deck.' },
+    pasteur: { kind: 'supporter', role: 'Chercheur', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Louis_Pasteur_%281822_-_1895%29%2C_microbiologist_and_chemist_Wellcome_V0026980.jpg/330px-Louis_Pasteur_%281822_-_1895%29%2C_microbiologist_and_chemist_Wellcome_V0026980.jpg', name: 'Louis Pasteur', rarity: 'epic', years: '1822–1895', text: 'Retire le poison de tes créatures et soigne 50 PV à ta créature active. La créature active adverse est empoisonnée.' },
 };
 
 /** Every card that is not a species, by key: 'e:foret', 't:darwin'. */
@@ -269,7 +274,7 @@ export function attackDamage(state, side, att, attack, def) {
     if (attack.swarm) dmg += attack.swarm * me.bench.filter((c) => c.type === 'arthropod').length;
     if (att.tool === 'loupe') dmg += 20;
     if (state.stadium && TRAINERS[state.stadium.key].boost.includes(att.biome)) dmg += 20;
-    if (me.boost) dmg += me.boost + (me.boostArthropod && att.type === 'arthropod' ? 20 : 0);
+    if (me.boost) dmg += me.boost + ((me.boostType || (me.boostArthropod && 'arthropod')) === att.type ? 20 : 0);
     if (att.weak) dmg -= att.weak;
     const chain = chainMult(att.type, def.type);
     if (chain === 'prey') dmg *= 2;
@@ -318,7 +323,9 @@ export function legalActions(state, side) {
 // a card with nothing to do is not offered (an empty deck to search, a full hand to heal…)
 function blockedPlay(state, side, tr) {
     const p = state.players[side];
-    if (['darwin', 'appareil', 'humboldt', 'maathai'].includes(trKey(tr)) && !p.deck.length) return true;
+    if (['darwin', 'appareil', 'humboldt', 'maathai', 'mendel'].includes(trKey(tr)) && !p.deck.length) return true;
+    if (trKey(tr) === 'anning' && !p.deck.some((c) => c.kind === 'creature' && ['fossil', 'mineral'].includes(c.type))) return true;
+    if (trKey(tr) === 'pasteur' && !p.active) return true;
     if (trKey(tr) === 'linne' && !p.deck.some((c) => c.kind === 'creature')) return true;
     if (trKey(tr) === 'jumelles' && !p.deck.slice(0, 5).some((c) => c.kind === 'creature')) return true;
     if (trKey(tr) === 'cousteau' && !p.deck.some((c) => c.kind === 'energy')) return true;
@@ -386,7 +393,7 @@ function beginTurn(state, events) {
     state.turn += 1;
     const side = state.current;
     const p = state.players[side];
-    Object.assign(p, { energyPlayed: false, supporterPlayed: false, retreated: false, boost: 0, boostArthropod: false });
+    Object.assign(p, { energyPlayed: false, supporterPlayed: false, retreated: false, boost: 0, boostArthropod: false, boostType: null });
     event(state, events, { k: 'turn', side, turn: state.turn });
     if (state.turn > MAX_TURNS) return endGame(state, events, p.captures >= state.players[opp(side)].captures ? side : opp(side), 'Limite de tours atteinte.');
     if (!p.deck.length) return endGame(state, events, opp(side), `${state.names[side]} n'a plus de cartes à piocher.`);
@@ -573,7 +580,16 @@ function playTrainer(state, side, action, events) {
         case 'humboldt': draw(state, events, side, 2); searchDeck((c) => c.kind === 'stadium', 1); break;
         case 'goodall': event(state, events, { k: 'heal', side, uid: target.uid, amount: heal(target, target.type === 'mammal' ? 120 : 80) }); break;
         case 'carson': for (const c of inPlay(p)) { c.poisoned = false; const h = heal(c, 30); if (h) event(state, events, { k: 'heal', side, uid: c.uid, amount: h }); } break;
-        case 'fabre': p.boost = 30; p.boostArthropod = true; break;
+        case 'fabre': p.boost = 30; p.boostType = 'arthropod'; break;
+        case 'cuvier': p.boost = 30; p.boostType = 'fossil'; break;
+        case 'anning': searchDeck((c) => c.kind === 'creature' && ['fossil', 'mineral'].includes(c.type), 2); break;
+        case 'lamarck': event(state, events, { k: 'heal', side, uid: target.uid, amount: heal(target, ['plant', 'tree'].includes(target.type) ? 70 : 40) }); break;
+        case 'mendel': draw(state, events, side, 2); searchDeck((c) => c.kind === 'creature' && ['plant', 'tree'].includes(c.type), 1); break;
+        case 'pasteur':
+            for (const c of inPlay(p)) c.poisoned = false;
+            event(state, events, { k: 'heal', side, uid: p.active.uid, amount: heal(p.active, 50) });
+            if (foe.active) { foe.active.poisoned = true; event(state, events, { k: 'poisoned', side: opp(side), uid: foe.active.uid, text: `${foe.active.name} est empoisonné.` }); }
+            break;
         case 'audubon': switchActive(p, target.uid); p.active.poisoned = false; event(state, events, { k: 'switch', side, uid: p.active.uid }); draw(state, events, side, 1); break;
         case 'buffon': p.deck.push(...p.hand.splice(0)); shuffle(state, p.deck); draw(state, events, side, 5); break;
         case 'monod': {
@@ -707,14 +723,17 @@ function aiWantsTrainer(state, side, key, action) {
     const foe = state.players[opp(side)];
     const target = action.target != null ? findInPlay(p, action.target) || findInPlay(foe, action.target) : null;
     switch (key) {
-        case 'appareil': case 'jumelles': case 'linne': case 'cousteau': case 'monod': return true;
+        case 'appareil': case 'jumelles': case 'linne': case 'cousteau': case 'monod': case 'anning': return true;
+        case 'mendel': return p.hand.length <= 5;
+        case 'lamarck': return target.damage >= 40;
+        case 'pasteur': return (!!foe.active && !foe.active.poisoned) || p.active.damage >= 50;
         case 'darwin': case 'humboldt': return p.hand.length <= 5;
         case 'buffon': return p.hand.length <= 2;
         case 'maathai': return p.hand.length <= 5 || (p.active && p.active.damage >= 40);
         case 'gourde': return target.damage >= 30 && hpLeft(target) > 0;
         case 'trousse': case 'goodall': return target.damage >= 60 || target.poisoned;
         case 'carson': return inPlay(p).reduce((s, c) => s + Math.min(30, c.damage), 0) >= 50 || inPlay(p).some((c) => c.poisoned);
-        case 'fabre': return !!p.active && p.active.attacks.some((a) => canPay(p.active.energies, a.cost)) && state.turn > 1;
+        case 'fabre': case 'cuvier': return !!p.active && p.active.attacks.some((a) => canPay(p.active.energies, a.cost)) && state.turn > 1;
         case 'boussole': case 'audubon': return !!p.active && aiScore(state, side, target, foe.active) > aiScore(state, side, p.active, foe.active) + 50;
         case 'filet': case 'fossey': return !!p.active && attackDamageMax(state, side, p.active, target) >= hpLeft(target); // pull a weak one in to capture it
         default:
@@ -740,7 +759,7 @@ export function view(state, side = 0) {
             active: publicCard(p.active), bench: p.bench.map(publicCard), captures: p.captures,
             deck: p.deck.length, discard: p.discard.map(({ uid, ...c }) => c), handCount: p.hand.length,
             hand: i === side ? p.hand : undefined, mulligans: p.mulligans,
-            energyPlayed: p.energyPlayed, supporterPlayed: p.supporterPlayed, retreated: p.retreated, boost: p.boost, boostArthropod: p.boostArthropod,
+            energyPlayed: p.energyPlayed, supporterPlayed: p.supporterPlayed, retreated: p.retreated, boost: p.boost, boostArthropod: p.boostArthropod, boostType: p.boostType,
         })),
         actions: legalActions(state, side),
     };

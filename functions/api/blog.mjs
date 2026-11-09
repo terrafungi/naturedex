@@ -105,12 +105,12 @@ async function pickCards(db, cat) {
     if (cat.iucn) { params.push(cat.iucn); where.push(`c.iucn = ANY($${params.length})`); }
     if (cat.living) where.push(`c.iucn IS DISTINCT FROM 'EX' AND c.iucn IS DISTINCT FROM 'EW'`);
     if (cat.sameType) {
-        const { rows: [t] } = await db.query(`SELECT type FROM cards WHERE type NOT IN ('virus','mold','bacteria','alga','mineral') GROUP BY type ORDER BY random() LIMIT 1`);
+        const { rows: [t] } = await db.query(`SELECT type FROM cards WHERE type NOT IN ('virus','mold','bacteria','alga','mineral','naturalist') GROUP BY type ORDER BY random() LIMIT 1`);
         params.push(t.type); where.push(`c.type = $${params.length}`);
     }
     const { rows } = await db.query(
         `SELECT * FROM (SELECT c.id, c.qid, c.name, c.sci_name, c.type, c.rarity, c.iucn, c.image_url, c.thumb_url, c.wiki_url
-           FROM cards c WHERE c.art IS DISTINCT FROM 'illus' AND ${where.join(' AND ')} ORDER BY c.views DESC LIMIT 600) s ORDER BY random() LIMIT ${cat.count * (cat.seasonal || cat.mustContain ? 12 : 4)}`, params);
+           FROM cards c WHERE c.art IS DISTINCT FROM 'illus' AND c.type <> 'naturalist' AND ${where.join(' AND ')} ORDER BY c.views DESC LIMIT 600) s ORDER BY random() LIMIT ${cat.count * (cat.seasonal || cat.mustContain ? 12 : 4)}`, params);
     const picked = [];
     const month = new Date().toLocaleString('fr-FR', { month: 'long', timeZone: 'Europe/Paris' });
     const seasonal = new RegExp(`(^|[^\\p{L}])(${month}|${SEASONS[MONTHS.indexOf(month)]})([^\\p{L}]|$)`, 'iu');
@@ -148,7 +148,7 @@ async function pickNews(db) {
         if (text.length < 1200) continue;
         const { rows: cards } = await db.query(
             `SELECT id, qid, name, sci_name, type, rarity, iucn, image_url, thumb_url, wiki_url FROM cards
-             WHERE art IS DISTINCT FROM 'illus' AND length(name) > 4 AND (position(lower(name) in lower($1)) > 0 OR (sci_name IS NOT NULL AND length(sci_name) > 6 AND position(lower(sci_name) in lower($1)) > 0))
+             WHERE art IS DISTINCT FROM 'illus' AND type <> 'naturalist' AND length(name) > 4 AND (position(lower(name) in lower($1)) > 0 OR (sci_name IS NOT NULL AND length(sci_name) > 6 AND position(lower(sci_name) in lower($1)) > 0))
              ORDER BY position(lower(name) in lower($2)) > 0 DESC, views DESC LIMIT 3`, [`${item.title} ${text}`, item.title]);
         if (!cards.length) continue;
         const main = cards[0];

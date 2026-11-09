@@ -65,7 +65,7 @@ function useShowcase(catalog) {
             if (c) usedTypes.add(c.type);
             return c;
         }).filter(Boolean);
-        const types = Object.keys(TYPES).map((key) => {
+        const types = Object.keys(TYPES).filter((key) => key !== 'naturalist').map((key) => {
             const all = byViews.filter((c) => c.type === key);
             return { key, star: all[0], count: Object.values(catalog.types[key] || {}).reduce((a, n) => a + n, 0) };
         }).sort((a, b) => (b.star?.views || 0) - (a.star?.views || 0));

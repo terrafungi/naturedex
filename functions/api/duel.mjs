@@ -1,11 +1,13 @@
 /**
  * « Duel » — the card game (tcg.mjs) against the AI.
  *
- * Énergies and Naturalistes are counted per player in tcg_cards (key 'e:foret', 't:darwin'…);
- * creatures are the species of the collection. Every player gets a small starter kit the first
- * time; winning duels earns more Énergie and Naturaliste cards.
+ * Énergies are counted per player in tcg_cards (key 'e:foret'…); Naturalistes ('t:darwin') are
+ * regular collection cards (naturalists.mjs); creatures are the other species of the collection.
+ * Every player gets a small starter kit the first time; winning duels earns more Énergie and
+ * Naturaliste cards; each booster also gives one Énergie.
  * The player can save their own deck (tcg_decks); without one, it is built from the collection.
  */
+import { NATURALIST, addNaturalists, ownedNaturalists } from './naturalists.mjs';
 import { BIOMES, DECK_MAX, DECK_MIN, DECK_MIN_CREATURES, ITEM_KEYS, MAX_COPIES, STARTER_TRAINERS, TRAINERS, UNIVERSAL, act, autoDeck, cardBiome, creatureCard, deckProblems, itemCard, newGame, view } from './tcg.mjs';
 
 const MIN_CREATURES = 6;
@@ -23,18 +25,21 @@ const RARITY_ORDER = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
 
 async function ownedRows(db, userId) {
     const { rows } = await db.query(
-        `SELECT ${CARD_FIELDS}, uc.count FROM user_cards uc JOIN cards c ON c.id = uc.card_id WHERE uc.user_id = $1 AND uc.count > 0`, [userId]);
+        `SELECT ${CARD_FIELDS}, uc.count FROM user_cards uc JOIN cards c ON c.id = uc.card_id WHERE uc.user_id = $1 AND uc.count > 0 AND c.type <> $2`, [userId, NATURALIST]);
     return rows;
 }
 
 async function ownedItems(db, userId) {
-    const { rows } = await db.query(`SELECT key, count FROM tcg_cards WHERE user_id = $1 AND count > 0`, [userId]);
-    return Object.fromEntries(rows.map((r) => [r.key, r.count]));
+    const { rows } = await db.query(`SELECT key, count FROM tcg_cards WHERE user_id = $1 AND count > 0 AND key LIKE 'e:%'`, [userId]);
+    return { ...Object.fromEntries(rows.map((r) => [r.key, r.count])), ...await ownedNaturalists(db, userId) };
 }
 
-const addItems = (db, userId, keys) => db.query(
-    `INSERT INTO tcg_cards (user_id, key, count) SELECT $1, k, count(*) FROM unnest($2::text[]) AS k GROUP BY k
-     ON CONFLICT (user_id, key) DO UPDATE SET count = tcg_cards.count + EXCLUDED.count`, [userId, keys]);
+async function addItems(db, userId, keys) {
+    await db.query(
+        `INSERT INTO tcg_cards (user_id, key, count) SELECT $1, k, count(*) FROM unnest($2::text[]) AS k GROUP BY k
+         ON CONFLICT (user_id, key) DO UPDATE SET count = tcg_cards.count + EXCLUDED.count`, [userId, keys.filter((k) => k.startsWith('e:'))]);
+    await addNaturalists(db, userId, keys.filter((k) => k.startsWith('t:')));
+}
 
 /**
  * The first time: 10 Énergies of the player's two main biomes and 4 simple Naturalistes.
@@ -72,10 +77,10 @@ async function playerDeck(db, userId, rows, items) {
     return { deck: creatures.length >= MIN_CREATURES ? buildDeck(creatures, items) : [], custom: false, broken: !!saved };
 }
 
-/** One Énergie or Naturaliste card that comes with every booster; Énergies lean to the biomes just drawn. */
+/** The Énergie that comes with every booster, leaning to the biomes just drawn. */
 export async function boosterBonus(client, userId, cardIds) {
-    const { rows } = await client.query(`SELECT type, stats FROM cards WHERE id = ANY($1)`, [cardIds]);
-    const [key] = rollRewards(1, [...new Set(rows.map(cardBiome))]);
+    const { rows } = await client.query(`SELECT type, stats FROM cards WHERE id = ANY($1) AND type <> $2`, [cardIds, NATURALIST]);
+    const [key] = rollRewards(1, [...new Set(rows.map(cardBiome))], 1);
     await addItems(client, userId, [key]);
     return itemCard(key);
 }
@@ -115,10 +120,10 @@ async function foeDeck(db, level) {
 }
 
 /** Random Énergie or Naturaliste cards; Énergies lean to the biomes of the player's deck. */
-function rollRewards(n, deckBiomes) {
+function rollRewards(n, deckBiomes, energyShare = 0.5) {
     const out = [];
     for (let i = 0; i < n; i++) {
-        if (Math.random() < 0.5) {
+        if (Math.random() < energyShare) {
             const pool = Math.random() < 0.7 && deckBiomes.length ? deckBiomes : Object.keys(BIOMES);
             out.push(Math.random() < 0.08 ? `e:${UNIVERSAL}` : `e:${pool[Math.floor(Math.random() * pool.length)]}`);
             continue;

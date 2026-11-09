@@ -34,7 +34,7 @@ async function batch(db) {
         UPDATE cards SET stats = stats || jsonb_build_object('biome_claim', extract(epoch FROM now())::int)
         WHERE id IN (
             SELECT id FROM cards
-            WHERE stats->>'biome' IS NULL AND coalesce((stats->>'biome_claim')::int, 0) < extract(epoch FROM now()) - 300
+            WHERE stats->>'biome' IS NULL AND type <> 'naturalist' AND coalesce((stats->>'biome_claim')::int, 0) < extract(epoch FROM now()) - 300
             ORDER BY EXISTS (SELECT 1 FROM user_cards uc WHERE uc.card_id = cards.id) DESC, views DESC -- players' cards first: their decks need them
             LIMIT ${PER_BATCH} FOR UPDATE SKIP LOCKED)
         RETURNING id, name, sci_name, type`);

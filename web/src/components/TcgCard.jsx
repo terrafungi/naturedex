@@ -136,7 +136,7 @@ export function CardText({ card, damageOf }) {
             <p className="text-xs font-bold uppercase tracking-wider" style={{ color: KIND_COLOR[card.kind] || biomeColor(card.biome) }}>
                 {KIND_LABEL[card.kind]}{card.kind === 'supporter' ? ' · 1 par tour' : card.kind === 'item' ? ' · sans limite' : card.kind === 'stadium' ? ' · 1 en jeu' : card.kind === 'tool' ? ' · 1 par créature' : ' · 1 par tour'}
             </p>
-            {card.years && <p className="text-xs text-white/50">Naturaliste · {card.years}</p>}
+            {card.years && <p className="text-xs text-white/50">{card.role || 'Naturaliste'} · {card.years}</p>}
             <p className="text-white/85">{card.text}</p>
         </div>
     );

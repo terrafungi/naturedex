@@ -118,7 +118,7 @@ export async function speciesEnrichTick(db) {
     const { rows: cards } = await db.query(`
         WITH next AS (
             SELECT c.id FROM cards c LEFT JOIN species_texts t ON t.card_id = c.id
-            WHERE length(coalesce(c.extract, '')) < ${MIN_EXTRACT}
+            WHERE length(coalesce(c.extract, '')) < ${MIN_EXTRACT} AND c.type <> 'naturalist'
               AND (t.card_id IS NULL OR (t.status IN ('failed', 'quota') AND t.attempts < ${MAX_ATTEMPTS})
                    OR (t.status = 'working' AND t.updated_at < now() - interval '5 minutes'))
             ORDER BY c.views DESC LIMIT ${PER_TICK}

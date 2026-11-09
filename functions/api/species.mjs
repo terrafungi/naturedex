@@ -11,7 +11,7 @@ const PAGE_SIZE = 60;
 const SITEMAP_SIZE = 10000;
 const MIN_EXTRACT = 200; // characters of Wikipédia text for a page to be worth indexing
 // cards c; the enriched text is looked up by id, so this works in any query on cards
-const INDEXABLE = `c.art IS DISTINCT FROM 'illus' AND (length(coalesce(c.extract, '')) >= ${MIN_EXTRACT}
+const INDEXABLE = `c.art IS DISTINCT FROM 'illus' AND c.type <> 'naturalist' AND (length(coalesce(c.extract, '')) >= ${MIN_EXTRACT}
     OR EXISTS (SELECT 1 FROM species_texts t WHERE t.card_id = c.id AND t.status = 'ok'))`;
 
 const TYPES = {
@@ -62,7 +62,7 @@ function summary(text, max = 158) {
 
 async function hubPage(db) {
     const [{ rows: counts }, { rows: stars }] = await Promise.all([
-        db.query(`SELECT type, count(*)::int AS n FROM cards GROUP BY type ORDER BY n DESC`),
+        db.query(`SELECT type, count(*)::int AS n FROM cards WHERE type <> 'naturalist' GROUP BY type ORDER BY n DESC`),
         db.query(`SELECT id, name, sci_name, thumb_url FROM cards c WHERE ${INDEXABLE} ORDER BY views DESC LIMIT 24`),
     ]);
     const total = counts.reduce((a, r) => a + r.n, 0);
@@ -206,7 +206,7 @@ ${parts.map((loc) => `<sitemap><loc>${esc(loc)}</loc></sitemap>`).join('\n')}
 }
 
 async function pagesSitemap(db) {
-    const { rows } = await db.query(`SELECT type, count(*)::int AS n FROM cards GROUP BY type`);
+    const { rows } = await db.query(`SELECT type, count(*)::int AS n FROM cards WHERE type <> 'naturalist' GROUP BY type`);
     const urls = [`${SITE}/`, SPECIES];
     for (const r of rows) if (TYPES[r.type]) for (let p = 1; p <= Math.ceil(r.n / PAGE_SIZE); p++) urls.push(typeUrl(r.type, p));
     return xml(`<?xml version="1.0" encoding="UTF-8"?>

@@ -379,7 +379,7 @@ export function pendingBooster(owner) {
 }
 const sameCards = (a, b) => a.length === b.length && a.every((c, i) => c.id === b[i].id);
 
-export default function BoosterOpening({ cards, bonus, onClose, onAgain, canOpenAgain, demo, owner }) {
+export default function BoosterOpening({ cards, bonus, godPack, onClose, onAgain, canOpenAgain, demo, owner }) {
     const frame = useMyFrame();
     const [resumeAt] = useState(() => {
         const p = !demo && owner != null && pendingBooster(owner);
@@ -500,8 +500,14 @@ export default function BoosterOpening({ cards, bonus, onClose, onAgain, canOpen
                                 whileHover={{ scale: 1.04 }}
                                 whileTap={{ scale: 0.95 }}
                             >
-                                <Pack />
+                                <div style={godPack ? { filter: 'drop-shadow(0 0 28px rgb(255 197 61 / 0.9)) drop-shadow(0 0 60px rgb(255 95 210 / 0.5))' } : undefined}><Pack /></div>
                             </motion.button>
+                            {godPack && (
+                                <motion.div className="text-center" initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: [0.6, 1.15, 1] }} transition={{ duration: 0.8 }}>
+                                    <p className="font-display text-4xl font-bold nd-grad-text">God pack !</p>
+                                    <p className="text-paper/80 text-sm mt-1">1 booster sur 3 500 : que des légendaires, une Full art, une Illustration et une secrète.</p>
+                                </motion.div>
+                            )}
                             <p className="font-display text-paper text-xl italic">Touche le booster pour le déchirer</p>
                         </motion.div>
                     )}
@@ -558,7 +564,7 @@ export default function BoosterOpening({ cards, bonus, onClose, onAgain, canOpen
                     {stage === 'summary' && (
                         <motion.div key="summary" className="w-full max-w-5xl flex flex-col items-center gap-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                             <h2 className="font-display text-paper text-3xl font-bold text-center">
-                                {demo ? <>Joli tirage ! <span className="nd-grad-text">Garde-le pour de vrai.</span></> : <>{cards.filter((c) => c.isNew).length} nouvelle{cards.filter((c) => c.isNew).length > 1 ? 's' : ''} espèce{cards.filter((c) => c.isNew).length > 1 ? 's' : ''} !</>}
+                                {godPack ? <span className="nd-grad-text">God pack : 6 cartes de légende !</span> : demo ? <>Joli tirage ! <span className="nd-grad-text">Garde-le pour de vrai.</span></> : <>{cards.filter((c) => c.isNew).length} nouvelle{cards.filter((c) => c.isNew).length > 1 ? 's' : ''} espèce{cards.filter((c) => c.isNew).length > 1 ? 's' : ''} !</>}
                             </h2>
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
                                 {cards.map((card, i) => (
@@ -574,7 +580,7 @@ export default function BoosterOpening({ cards, bonus, onClose, onAgain, canOpen
                                 <motion.div className="flex items-center gap-4 p-3 pr-5 rounded-2xl bg-white/[0.06] border border-[#f4d88f]/30" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: cards.length * 0.07 + 0.2 }}>
                                     <GameCard card={bonus} size="hand" />
                                     <div className="text-paper">
-                                        <p className="text-[11px] uppercase tracking-wider font-black text-[#f4d88f]">Bonus Duel de cartes</p>
+                                        <p className="text-[11px] uppercase tracking-wider font-black text-[#f4d88f]">Énergie bonus · Duel de cartes</p>
                                         <p className="font-display text-lg font-semibold">{bonus.name}</p>
                                         <Link to="/duel/deck" className="text-sm text-paper/70 underline hover:text-paper">Ajouter à mon deck</Link>
                                     </div>
