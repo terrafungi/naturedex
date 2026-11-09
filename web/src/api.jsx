@@ -29,7 +29,7 @@ export function GameProvider({ children }) {
     const [catalog, setCatalog] = useState(null);
     const [owned, setOwned] = useState({}); // { cardId: count }
     const [ownedInfo, setOwnedInfo] = useState({}); // { cardId: [type, rarity] }
-    const [favs, setFavs] = useState(NO_FAVS); // { binders: [{ id, name, count }], cards: { cardId: [binderId…] } }
+    const [favs, setFavs] = useState(NO_FAVS); // { binders: [{ id, name, parent, count }], cards: { cardId: [binderId…] } }
 
     const refreshCollection = useCallback(async () => {
         const [{ owned, info }, favs] = await Promise.all([api('collection'), api('binders')]);

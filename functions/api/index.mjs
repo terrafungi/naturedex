@@ -786,6 +786,21 @@ const AUCTION_SORTS = {
     cheap: 'COALESCE(a.bid, a.start_price)',
     rarity: `${RARITY_ORDER} DESC, a.ends_at`,
 };
+// Collection sorts (browse): the cards the player owns always come first.
+const CARD_SORTS = {
+    rarity: `${RARITY_ORDER} DESC, c.num`,
+    rarityAsc: `${RARITY_ORDER}, c.num`,
+    recent: 'uc.first_at DESC NULLS LAST, c.num',
+    name: 'c.name COLLATE "fr-FR-x-icu", c.num',
+    num: 'c.num',
+    count: `uc.count DESC NULLS LAST, ${RARITY_ORDER} DESC, c.num`,
+    hp: `(c.stats->>'hp')::int DESC NULLS LAST, c.num`,
+    atk: `(c.stats->>'atk')::int DESC NULLS LAST, c.num`,
+    views: 'c.views DESC, c.num',
+    type: `c.type, ${RARITY_ORDER} DESC, c.num`,
+};
+// finish filter: 'plain' = the ordinary photo cards
+const CARD_ARTS = ['plain', 'holo', 'full', 'illus'];
 const shapeAuction = ({ bid, start_price, ...a }) => ({ ...a, bid, start_price, minBid: minBid({ bid, start_price }) });
 
 const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c.views, c.image_url, c.thumb_url,
@@ -1342,18 +1357,21 @@ async function showcaseContest(db) {
 }
 
 // previews: add the thumbnails of the binder's 3 rarest cards (public profile)
+// A main binder also holds the cards of its sub-folders (parent = the main binder's id).
+// Main binders come first by name, each followed by its sub-folders.
 async function binderState(db, userId, previews = false) {
     const { rows: binders } = await db.query(
         // a card traded or sold away stays in the binder but is neither counted nor shown
-        `SELECT b.id, b.name, COUNT(uc.card_id)::int AS count${previews ? `,
+        `SELECT b.id, b.name, b.parent_id AS parent,
+                (SELECT COUNT(DISTINCT bc.card_id)::int FROM binder_cards bc JOIN binders s ON s.id = bc.binder_id
+                    JOIN user_cards uc ON uc.card_id = bc.card_id AND uc.user_id = b.user_id
+                    WHERE s.id = b.id OR s.parent_id = b.id) AS count${previews ? `,
                 (SELECT COALESCE(json_agg(t.thumb_url), '[]') FROM (
-                    SELECT c.thumb_url FROM binder_cards bc2 JOIN cards c ON c.id = bc2.card_id
-                    JOIN user_cards uc2 ON uc2.card_id = c.id AND uc2.user_id = b.user_id
-                    WHERE bc2.binder_id = b.id ORDER BY ${RARITY_ORDER} DESC, c.num LIMIT 3) t) AS thumbs` : ''}
-         FROM binders b
-         LEFT JOIN binder_cards bc ON bc.binder_id = b.id
-         LEFT JOIN user_cards uc ON uc.card_id = bc.card_id AND uc.user_id = b.user_id
-         WHERE b.user_id = $1 GROUP BY b.id ORDER BY lower(b.name), b.id`,
+                    SELECT c.thumb_url FROM cards c JOIN user_cards uc2 ON uc2.card_id = c.id AND uc2.user_id = b.user_id
+                    WHERE c.id IN (SELECT bc2.card_id FROM binder_cards bc2 JOIN binders s2 ON s2.id = bc2.binder_id WHERE s2.id = b.id OR s2.parent_id = b.id)
+                    ORDER BY ${RARITY_ORDER} DESC, c.num LIMIT 3) t) AS thumbs` : ''}
+         FROM binders b LEFT JOIN binders p ON p.id = b.parent_id
+         WHERE b.user_id = $1 ORDER BY lower(COALESCE(p.name, b.name)), COALESCE(p.id, b.id), b.parent_id IS NOT NULL, lower(b.name), b.id`,
         [userId]
     );
     const { rows } = await db.query(
@@ -1518,6 +1536,9 @@ const actions = {
         const binder = body.binder === 'all' ? 0 : body.binder ? Number(body.binder) : null;
         // IUCN status, or 'NE' for the species never assessed
         const iucn = IUCN_CODES.includes(body.iucn) ? body.iucn : null;
+        const art = CARD_ARTS.includes(body.art) ? body.art : null;
+        // the default sort puts the cards whose name matches the search first; a chosen sort applies as is
+        const sort = CARD_SORTS[body.sort] ? body.sort : 'rarity';
         const search = cardSearchSql('$5');
         const { rows } = await db.query(
             `SELECT ${LIGHT_FIELDS}, uc.count, COUNT(*) OVER()::int AS matches
@@ -1527,12 +1548,13 @@ const actions = {
                AND (NOT $4 OR uc.count IS NOT NULL)
                AND ($5 = '' OR (uc.count IS NOT NULL AND ${search.any}))
                AND ($8::int IS NULL OR EXISTS (SELECT 1 FROM binder_cards bc JOIN binders b ON b.id = bc.binder_id
-                    WHERE bc.card_id = c.id AND b.user_id = $1 AND ($8 = 0 OR b.id = $8)))
+                    WHERE bc.card_id = c.id AND b.user_id = $1 AND ($8 = 0 OR b.id = $8 OR b.parent_id = $8)))
                AND (NOT $9 OR uc.count > 1)
                AND ($10::text IS NULL OR c.iucn = $10 OR ($10 = 'NE' AND c.iucn IS NULL))
-             ORDER BY uc.count IS NULL, n.by_name DESC, ${RARITY_ORDER} DESC, c.num
+               AND ($11::text IS NULL OR c.art = $11 OR ($11 = 'plain' AND c.art IS NULL))
+             ORDER BY uc.count IS NULL, ${sort === 'rarity' ? 'n.by_name DESC, ' : ''}${CARD_SORTS[sort]}
              LIMIT $6 OFFSET $7`,
-            [user.id, body.type || null, body.rarity || null, Boolean(body.onlyOwned || q || binder != null), q, limit, offset, binder, Boolean(body.duplicates), iucn]
+            [user.id, body.type || null, body.rarity || null, Boolean(body.onlyOwned || q || binder != null), q, limit, offset, binder, Boolean(body.duplicates), iucn, art]
         );
         return {
             matches: rows[0]?.matches || 0,
@@ -1552,7 +1574,7 @@ const actions = {
         };
     },
 
-    // Favourites: { binders: [{ id, name, count }], cards: { cardId: [binderId…] } }
+    // Favourites: { binders: [{ id, name, parent, count }], cards: { cardId: [binderId…] } }
     async binders(db, body, event) {
         const user = await requireUser(db, event);
         return binderState(db, user.id);
@@ -1563,7 +1585,13 @@ const actions = {
         const name = binderName(body.name);
         const { rows: [{ n }] } = await db.query(`SELECT COUNT(*)::int AS n FROM binders WHERE user_id = $1`, [user.id]);
         if (n >= MAX_BINDERS) throw new HttpError(400, `${MAX_BINDERS} classeurs maximum`);
-        const { rows: [b] } = await db.query(`INSERT INTO binders (user_id, name) VALUES ($1, $2) RETURNING id`, [user.id, name]);
+        // parent: a sub-folder goes in one of the player's main binders (one level only)
+        const parent = body.parent ? Number(body.parent) : null;
+        if (parent) {
+            const { rows } = await db.query(`SELECT 1 FROM binders WHERE id = $1 AND user_id = $2 AND parent_id IS NULL`, [parent, user.id]);
+            if (!rows.length) throw new HttpError(404, 'Classeur introuvable');
+        }
+        const { rows: [b] } = await db.query(`INSERT INTO binders (user_id, name, parent_id) VALUES ($1, $2, $3) RETURNING id`, [user.id, name, parent]);
         if (body.cardId) await addToBinder(db, user.id, b.id, Number(body.cardId));
         return { ...(await binderState(db, user.id)), id: b.id };
     },
@@ -1719,7 +1747,7 @@ const actions = {
             ...rest,
             seasons: seasons.map((r) => ({ ...r, label: seasonLabel(r.season) })),
             binders: shared ? binders.filter((b) => b.count) : null,
-            binderCount: binders.filter((b) => b.count).length,
+            binderCount: binders.filter((b) => b.count && !b.parent).length,
             showcase: await loadShowcase(db, p.id).then(async (s) => s && { ...s, ...(await showcaseVotes(db, p.id, user.id)) }),
         } };
     },
@@ -1869,16 +1897,16 @@ const actions = {
         const user = await requireUser(db, event);
         const other = await findUser(db, body.username);
         if (other.id !== user.id) await requireFriend(db, user.id, other.username);
-        const { rows: [binder] } = await db.query(`SELECT id, name FROM binders WHERE id = $1 AND user_id = $2`, [Number(body.id), other.id]);
+        const { rows: [binder] } = await db.query(`SELECT id, name, parent_id AS parent FROM binders WHERE id = $1 AND user_id = $2`, [Number(body.id), other.id]);
         if (!binder) throw new HttpError(404, 'Classeur introuvable');
         const limit = Math.min(Number(body.limit) || 60, 120);
         const offset = Math.max(Number(body.offset) || 0, 0);
         const { rows } = await db.query(
             `SELECT ${LIGHT_FIELDS}, uc.count, COALESCE(mine.count, 0) AS mine, COUNT(*) OVER()::int AS matches
-             FROM binder_cards bc JOIN cards c ON c.id = bc.card_id
+             FROM cards c
              JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $2
              LEFT JOIN user_cards mine ON mine.card_id = c.id AND mine.user_id = $3
-             WHERE bc.binder_id = $1
+             WHERE c.id IN (SELECT bc.card_id FROM binder_cards bc JOIN binders b ON b.id = bc.binder_id WHERE b.id = $1 OR b.parent_id = $1)
              ORDER BY ${RARITY_ORDER} DESC, c.num
              LIMIT $4 OFFSET $5`,
             [binder.id, other.id, user.id, limit, offset]

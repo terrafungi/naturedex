@@ -151,6 +151,9 @@ const PAGE = 60;
 function Binders({ player }) {
     const [params, setParams] = useSearchParams();
     const open = player.binders?.find((b) => String(b.id) === params.get('classeur'));
+    // tiles for the main binders; the open one lists its sub-folders above its cards
+    const main = open && (open.parent ? player.binders.find((b) => b.id === open.parent) : open);
+    const subs = main ? player.binders.filter((b) => b.parent === main.id) : [];
 
     if (!player.binders) {
         if (!player.binderCount) return null;
@@ -172,8 +175,8 @@ function Binders({ player }) {
         <section className="mt-10">
             <h2 className="flex items-center gap-2 font-display text-2xl text-white"><Star className="w-5 h-5 text-[#e9c46a] fill-current" />Classeurs</h2>
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {player.binders.map((b) => {
-                    const active = open?.id === b.id;
+                {player.binders.filter((b) => !b.parent).map((b) => {
+                    const active = main?.id === b.id;
                     return (
                         <button key={b.id} onClick={() => setParams(active ? {} : { classeur: b.id }, { replace: !!open })}
                             className={`group text-left rounded-2xl p-3 ring-1 transition-colors ${active ? 'bg-[#e9c46a]/15 ring-[#e9c46a]/70' : 'nd-glass ring-white/10 hover:ring-white/30'}`}>
@@ -190,6 +193,16 @@ function Binders({ player }) {
                     );
                 })}
             </div>
+            {subs.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                    {[main, ...subs].map((b) => (
+                        <button key={b.id} onClick={() => setParams({ classeur: b.id }, { replace: true })}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${open.id === b.id ? 'bg-[#c9a227] border-transparent text-paper' : 'border-white/10 text-ink hover:bg-white/10'}`}>
+                            {b === main ? `Tout « ${b.name} »` : b.name} · {b.count}
+                        </button>
+                    ))}
+                </div>
+            )}
             {open && <BinderCards key={open.id} player={player} binder={open} />}
         </section>
     );

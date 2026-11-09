@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigationType } from 'react-router-dom';
-import { ChevronDown, Copy, FolderPlus, Frame, Pencil, Recycle, Search, Star, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, CornerDownRight, FolderPlus, Frame, Pencil, Recycle, Search, Star, Trash2 } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { FavoriteStar } from '../components/Favorite.jsx';
@@ -26,6 +26,21 @@ function Chip({ active, onClick, children, color }) {
 // Most threatened first; « Non évaluée » = species never assessed by the IUCN.
 const IUCN_ORDER = ['CR', 'EN', 'VU', 'NT', 'LC', 'DD', 'EW', 'EX'];
 
+// Server-side sorts (CARD_SORTS in the API); '' = rarest first, the default.
+const SORTS = [
+    ['', 'Rareté (rares d\'abord)'],
+    ['rarityAsc', 'Rareté (communes d\'abord)'],
+    ['recent', 'Obtenues récemment'],
+    ['name', 'Nom (A → Z)'],
+    ['num', 'Numéro'],
+    ['count', 'Nombre d\'exemplaires'],
+    ['type', 'Type'],
+    ['hp', 'Points de vie'],
+    ['atk', 'Attaque'],
+    ['views', 'Popularité'],
+];
+const ARTS = { plain: 'Photo classique', holo: 'Holographique', full: 'Full art', illus: 'Illustration' };
+
 function Select({ value, onChange, label, children, color }) {
     return (
         <label className="relative flex-1 min-w-[10rem] sm:flex-none">
@@ -48,6 +63,8 @@ export default function Collection() {
     const [type, setType] = useState(restore?.type ?? null);
     const [rarity, setRarity] = useState(restore?.rarity ?? null);
     const [iucn, setIucn] = useState(restore?.iucn ?? null);
+    const [art, setArt] = useState(restore?.art ?? null); // finish: plain photo, holo, full art, illustration
+    const [sort, setSort] = useState(restore?.sort ?? null);
     const [query, setQuery] = useState(restore?.query ?? '');
     const [debounced, setDebounced] = useState(restore?.query ?? '');
     const [page, setPage] = useState(restore?.page ?? null); // { cards, matches } for the current filters
@@ -62,7 +79,7 @@ export default function Collection() {
 
     // The catalogue is far too big for the browser: the server sorts and filters, we fetch pages.
     // Only the player's own cards are listed; undiscovered ones stay hidden.
-    const filters = useMemo(() => ({ binder, type, rarity, iucn, onlyOwned: true, duplicates: dupes, query: debounced }), [binder, dupes, type, rarity, iucn, debounced]);
+    const filters = useMemo(() => ({ binder, type, rarity, iucn, art, sort, onlyOwned: true, duplicates: dupes, query: debounced }), [binder, dupes, type, rarity, iucn, art, sort, debounced]);
     // inside a binder, starring or unstarring a card changes the list
     const favKey = binder ? favs.cards : null;
     useEffect(() => {
@@ -75,7 +92,7 @@ export default function Collection() {
         return () => { alive = false; };
     }, [filters, owned, favKey]);
 
-    useEffect(() => { saved = { ...saved, binder, dupes, type, rarity, iucn, query, page }; }, [binder, dupes, type, rarity, iucn, query, page]);
+    useEffect(() => { saved = { ...saved, binder, dupes, type, rarity, iucn, art, sort, query, page }; }, [binder, dupes, type, rarity, iucn, art, sort, query, page]);
     // back from a card: return to the same spot, retrying for a moment while the grid grows tall enough
     // (and after the layout's scroll-to-top)
     useEffect(() => {
@@ -118,6 +135,9 @@ export default function Collection() {
 
     const favCount = useMemo(() => Object.keys(favs.cards).filter((id) => owned[id]).length, [favs.cards, owned]);
     const current = favs.binders.find((b) => b.id === binder);
+    // the main binder shown with its sub-folders: the open one, or the parent of the open sub-folder
+    const main = current && (current.parent ? favs.binders.find((b) => b.id === current.parent) : current);
+    const subs = main ? favs.binders.filter((b) => b.parent === main.id) : [];
     useEffect(() => { if (typeof binder === 'number' && !current) setBinder(null); }, [binder, current]);
 
     async function binderAction(action, params) {
@@ -133,12 +153,22 @@ export default function Collection() {
         const name = window.prompt('Nom du nouveau classeur (ex. Plantes, Mes requins…)');
         if (name?.trim()) { const id = await binderAction('createBinder', { name }); if (id) setBinder(id); }
     }
+    async function newSubBinder() {
+        const name = window.prompt(`Nom du sous-dossier dans « ${main.name} » (ex. Oiseaux de mer, Orchidées…)`);
+        if (name?.trim()) { const id = await binderAction('createBinder', { name, parent: main.id }); if (id) setBinder(id); }
+    }
     async function renameBinder() {
         const name = window.prompt('Nouveau nom du classeur', current.name);
         if (name?.trim() && name.trim() !== current.name) await binderAction('renameBinder', { id: current.id, name });
     }
     async function deleteBinder() {
-        if (window.confirm(`Supprimer le classeur « ${current.name} » ? Les cartes restent dans ta collection.`)) await binderAction('deleteBinder', { id: current.id });
+        const n = current.parent ? 0 : subs.length;
+        const what = current.parent ? `le sous-dossier « ${current.name} »` : `le classeur « ${current.name} »${n ? ` et ${n > 1 ? `ses ${n} sous-dossiers` : 'son sous-dossier'}` : ''}`;
+        if (window.confirm(`Supprimer ${what} ? Les cartes restent dans ta collection.`)) {
+            const parent = current.parent;
+            await binderAction('deleteBinder', { id: current.id });
+            if (parent) setBinder(parent);
+        }
     }
 
     async function recycleAll() {
@@ -183,8 +213,8 @@ export default function Collection() {
                         <Chip active={dupes} onClick={() => (dupes ? showAll() : (setBinder(null), setDupes(true)))}><Copy className="w-3.5 h-3.5" />Doublons · {duplicates.cards}</Chip>
                     )}
                     <Chip active={binder === 'all'} color="#c9a227" onClick={() => { setDupes(false); setBinder('all'); }}><Star className="w-3.5 h-3.5 fill-current" />Favoris · {favCount}</Chip>
-                    {favs.binders.map((b) => (
-                        <Chip key={b.id} active={binder === b.id} color="#c9a227" onClick={() => { setDupes(false); setBinder(binder === b.id ? null : b.id); }}>{b.name} · {b.count}</Chip>
+                    {favs.binders.filter((b) => !b.parent).map((b) => (
+                        <Chip key={b.id} active={main?.id === b.id} color="#c9a227" onClick={() => { setDupes(false); setBinder(binder === b.id ? null : b.id); }}>{b.name} · {b.count}</Chip>
                     ))}
                     <button onClick={newBinder} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-white/25 text-white/80 hover:bg-white/10">
                         <FolderPlus className="w-3.5 h-3.5" />Nouveau classeur
@@ -195,12 +225,25 @@ export default function Collection() {
                                 <Frame className="w-3.5 h-3.5" />Créer une vitrine
                             </Link>
                             {current && <>
-                                <button onClick={renameBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title="Renommer le classeur" aria-label="Renommer le classeur"><Pencil className="w-4 h-4" /></button>
-                                <button onClick={deleteBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title="Supprimer le classeur" aria-label="Supprimer le classeur"><Trash2 className="w-4 h-4" /></button>
+                                <button onClick={renameBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title={current.parent ? 'Renommer le sous-dossier' : 'Renommer le classeur'} aria-label={current.parent ? 'Renommer le sous-dossier' : 'Renommer le classeur'}><Pencil className="w-4 h-4" /></button>
+                                <button onClick={deleteBinder} className="grid place-items-center w-8 h-8 rounded-full hover:bg-white/10 text-white/80" title={current.parent ? 'Supprimer le sous-dossier' : 'Supprimer le classeur'} aria-label={current.parent ? 'Supprimer le sous-dossier' : 'Supprimer le classeur'}><Trash2 className="w-4 h-4" /></button>
                             </>}
                         </span>
                     )}
                 </div>
+                {main && (
+                    // sub-folders of the open binder: « Tout » shows the main binder with all of them
+                    <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-white/10">
+                        <CornerDownRight className="w-4 h-4 text-[#e9c46a]" aria-hidden="true" />
+                        <Chip active={binder === main.id} color="#c9a227" onClick={() => setBinder(main.id)}>Tout « {main.name} » · {main.count}</Chip>
+                        {subs.map((b) => (
+                            <Chip key={b.id} active={binder === b.id} color="#b98a1e" onClick={() => setBinder(binder === b.id ? main.id : b.id)}>{b.name} · {b.count}</Chip>
+                        ))}
+                        <button onClick={newSubBinder} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-[#e9c46a]/40 text-[#f4d88f] hover:bg-white/10">
+                            <FolderPlus className="w-3.5 h-3.5" />Sous-dossier
+                        </button>
+                    </div>
+                )}
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative w-full lg:w-auto lg:flex-1 lg:max-w-sm">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
@@ -220,8 +263,15 @@ export default function Collection() {
                         {IUCN_ORDER.map((key) => <option key={key} value={key}>{IUCN[key].label}</option>)}
                         <option value="NE">Non évaluée</option>
                     </Select>
-                    {(type || rarity || iucn || query) && (
-                        <button onClick={() => { setType(null); setRarity(null); setIucn(null); setQuery(''); }} className="px-3 py-2 text-xs font-semibold text-ink-soft hover:text-white underline">Effacer les filtres</button>
+                    <Select label="Finition" value={art} onChange={setArt} color="#c9a227">
+                        <option value="">Toutes les finitions</option>
+                        {Object.entries(ARTS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                    </Select>
+                    <Select label="Trier" value={sort} onChange={setSort} color="#4fd18b">
+                        {SORTS.map(([key, label]) => <option key={key} value={key}>Trier : {label}</option>)}
+                    </Select>
+                    {(type || rarity || iucn || art || query) && (
+                        <button onClick={() => { setType(null); setRarity(null); setIucn(null); setArt(null); setQuery(''); }} className="px-3 py-2 text-xs font-semibold text-ink-soft hover:text-white underline">Effacer les filtres</button>
                     )}
                 </div>
             </div>
@@ -243,9 +293,9 @@ export default function Collection() {
             {page?.matches === 0 && (binder ? (
                 <p className="py-20 text-center text-ink-soft">{binder === 'all' && !favs.binders.length
                     ? <>Aucun favori pour l'instant. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour la ranger dans un classeur.</>
-                    : <>Aucune carte ici{type || rarity || iucn || debounced ? ' avec ces filtres' : ''}. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour l'ajouter.</>}</p>
+                    : <>Aucune carte ici{type || rarity || iucn || art || debounced ? ' avec ces filtres' : ''}. Touche l'étoile <Star className="inline w-4 h-4 -mt-1" /> d'une carte pour l'ajouter.</>}</p>
             ) : dupes ? (
-                <p className="py-20 text-center text-ink-soft">Aucun doublon{type || rarity || iucn || debounced ? ' avec ces filtres' : ''}.</p>
+                <p className="py-20 text-center text-ink-soft">Aucun doublon{type || rarity || iucn || art || debounced ? ' avec ces filtres' : ''}.</p>
             ) : Object.keys(owned).length ? (
                 <p className="py-20 text-center text-ink-soft">Aucune de tes cartes ne correspond à ces filtres.</p>
             ) : (

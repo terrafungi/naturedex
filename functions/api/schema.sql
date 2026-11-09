@@ -620,3 +620,7 @@ CREATE TABLE IF NOT EXISTS tcg_decks (
     keys       text[] NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Binder sub-folders: one level under a main binder (deleting the main one deletes them too).
+ALTER TABLE binders ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES binders(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS binders_parent ON binders (parent_id) WHERE parent_id IS NOT NULL;

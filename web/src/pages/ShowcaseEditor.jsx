@@ -264,7 +264,7 @@ export default function ShowcaseEditor() {
                     </Section>
                     <Section title="Choisir dans">
                         <div className="flex flex-wrap gap-2">
-                            {[['all', `Tous les favoris`], ...favs.binders.filter((b) => b.count).map((b) => [b.id, b.name]), ['collection', 'Toute ma collection']].map(([id, name]) => (
+                            {[['all', `Tous les favoris`], ...favs.binders.filter((b) => b.count).map((b) => [b.id, b.parent ? `↳ ${b.name}` : b.name]), ['collection', 'Toute ma collection']].map(([id, name]) => (
                                 <button key={id} onClick={() => setSource(id)}
                                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${source === id ? 'bg-[#c9a227] border-transparent text-paper' : 'border-white/10 text-ink hover:bg-white/10'}`}>
                                     {id === 'all' && <Star className="w-3.5 h-3.5 fill-current" />}{name}

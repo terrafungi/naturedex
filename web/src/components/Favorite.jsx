@@ -66,11 +66,12 @@ function BinderPicker({ card, onClose }) {
                         {favs.binders.map((b) => {
                             const on = inBinders.includes(b.id);
                             return (
-                                <li key={b.id}>
+                                // sub-folders sit indented under their main binder
+                                <li key={b.id} className={b.parent ? 'pl-6' : ''}>
                                     <button type="button" disabled={busy} onClick={() => toggle(b)}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left ring-1 transition-colors disabled:opacity-70 ${on ? 'bg-[#e9c46a]/15 ring-[#e9c46a]/60' : 'bg-white/[0.04] ring-white/10 hover:bg-white/10'}`}>
                                         <span className={`grid place-items-center w-6 h-6 rounded-md ring-1 ${on ? 'bg-[#e9c46a] ring-[#e9c46a] text-[#3b2a05]' : 'ring-white/30'}`}>{on && <Check className="w-4 h-4" />}</span>
-                                        <span className="flex-1 font-semibold text-white truncate">{b.name}</span>
+                                        <span className={`flex-1 truncate ${b.parent ? 'text-white/90' : 'font-semibold text-white'}`}>{b.name}</span>
                                         <span className="text-xs text-ink-soft tabular-nums">{b.count} carte{b.count > 1 ? 's' : ''}</span>
                                     </button>
                                 </li>
