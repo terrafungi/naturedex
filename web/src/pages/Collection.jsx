@@ -245,7 +245,7 @@ export default function Collection() {
                     </div>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative w-full lg:w-auto lg:flex-1 lg:max-w-sm">
+                    <div className="relative w-full">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
                         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nom, ou mot de la description…" type="search"
                             className="w-full pl-9 pr-3 py-2 rounded-full bg-white/5 border border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
