@@ -684,7 +684,7 @@ function drawBleedCard(ctx, card, img, w, h, type, rarity, frame) {
     shade.addColorStop(0.55, 'rgba(0,0,0,0)'); shade.addColorStop(0.75, 'rgba(0,0,0,0.6)'); shade.addColorStop(1, 'rgba(0,0,0,0.88)');
     ctx.fillStyle = shade;
     ctx.fillRect(ix, iy, iw, ih);
-    rainbow(ctx, ix, iy, iw, ih, 0.3);
+    rainbow(ctx, ix, iy, iw, ih, 0.14);
     ctx.restore();
 
     const inner = w - 4 * p;
@@ -786,7 +786,7 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     if (img) cover(ctx, img, ix, iy, iw, ih, card.focus || undefined);
     // holo: a light glitter on the picture
     if (holo) {
-        rainbow(ctx, ix, iy, iw, ih, 0.22);
+        rainbow(ctx, ix, iy, iw, ih, 0.12);
         const rand = (i) => ((Math.sin((card.id || 1) * 97 + i * 13.7) + 1) / 2);
         for (let i = 0; i < 14; i++) sparkle(ctx, ix + rand(i) * iw, iy + rand(i + 50) * ih, w * (0.012 + rand(i + 99) * 0.02), 'rgba(255,255,255,0.75)');
     }
