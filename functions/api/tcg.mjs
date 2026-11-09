@@ -12,6 +12,7 @@
  * endangered species. First to CAPTURES_TO_WIN wins, or when the foe has no creature left.
  */
 import { battleStats, PROFILES, STRONG } from './battle.mjs';
+import { SCIENTISTS } from './scientists.mjs';
 
 export const DECK_MIN = 20;
 export const DECK_MAX = 40;
@@ -84,7 +85,43 @@ export const TRAINERS = {
     lamarck: { kind: 'supporter', role: 'Botaniste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a5/Jean-Baptiste_de_Lamarck.jpg/330px-Jean-Baptiste_de_Lamarck.jpg', name: 'Jean-Baptiste de Lamarck', rarity: 'uncommon', years: '1744–1829', target: 'mine', text: 'Soigne 40 PV à une de tes créatures (70 si c\'est une plante ou un arbre).' },
     mendel: { kind: 'supporter', role: 'Botaniste', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/b/ba/Gregor_Mendel_2.jpg/330px-Gregor_Mendel_2.jpg', name: 'Gregor Mendel', rarity: 'rare', years: '1822–1884', text: 'Pioche 2 cartes, puis prends une Plante ou un Arbre au hasard dans ton deck.' },
     pasteur: { kind: 'supporter', role: 'Chercheur', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Louis_Pasteur_%281822_-_1895%29%2C_microbiologist_and_chemist_Wellcome_V0026980.jpg/330px-Louis_Pasteur_%281822_-_1895%29%2C_microbiologist_and_chemist_Wellcome_V0026980.jpg', name: 'Louis Pasteur', rarity: 'epic', years: '1822–1895', text: 'Retire le poison de tes créatures et soigne 50 PV à ta créature active. La créature active adverse est empoisonnée.' },
+    // ...et plus de 250 autres scientifiques aux effets génériques (fx)
+    ...SCIENTISTS,
 };
+
+/** Text of a generic scientist effect, in the order playFx applies it. */
+export function fxText(fx) {
+    const types = (list) => list.map((t) => TYPE_LABEL[t]).join(', ').replace(/, ([^,]+)$/, ' ou $1');
+    const n = (k, one, many) => `${k} ${k > 1 ? many : one}`;
+    const out = [];
+    if (fx.refresh) out.push(`Mélange ta main dans ton deck, puis pioche ${fx.refresh} cartes`);
+    if (fx.switchMine) out.push('Échange ta créature active avec une de ton Banc');
+    if (fx.switchFoe) out.push('Échange la créature active adverse avec une de son Banc, au choix');
+    if (fx.heal) out.push(`Soigne ${fx.heal.n} PV à une de tes créatures${fx.heal.types ? ` (${fx.heal.more} pour une créature ${types(fx.heal.types)})` : ''}${fx.cure ? ' et retire son poison' : ''}`);
+    if (fx.healAll) out.push(`Soigne ${fx.healAll} PV à toutes tes créatures${fx.cure ? ' et retire leur poison' : ''}`);
+    if (fx.healActive) out.push(`Soigne ${fx.healActive} PV à ta créature active${fx.cure ? ' et retire son poison' : ''}`);
+    if (fx.recover) out.push('Prends 1 Énergie au hasard dans ta défausse et attache-la à ta créature active');
+    if (fx.search) {
+        const { what, n: k = 1 } = fx.search;
+        out.push(`Prends ${what === 'energy' ? n(k, 'Énergie', 'Énergies') : what === 'stadium' ? 'un Stade' : what === 'creature' ? n(k, 'créature', 'créatures')
+            : `${n(k, 'créature', 'créatures')} ${types(what)}`} au hasard dans ton deck`);
+    }
+    if (fx.boost) out.push(`Ce tour-ci, tes créatures infligent +${fx.boost.n} dégâts${fx.boost.types ? ` (+${fx.boost.n + 20} pour une créature ${types(fx.boost.types)})` : ''}`);
+    if (fx.poison) out.push('La créature active adverse est empoisonnée');
+    const drawText = fx.draw && n(fx.draw, 'carte', 'cartes');
+    if (drawText && out.length === 1 && (fx.search || fx.recover || fx.boost || fx.switchFoe || fx.switchMine)) out[0] += `, puis pioche ${drawText}`;
+    else if (drawText) out.push(`Pioche ${drawText}`);
+    return out.join('. ') + '.';
+}
+const TYPE_LABEL = {
+    mammal: 'Mammifère', bird: 'Oiseau', reptile: 'Reptile', fish: 'Poisson', arthropod: 'Insecte', terrestrial: 'Mollusque terrestre',
+    aquatic: 'Mollusque aquatique', marine: 'Aquatique', plant: 'Plante', tree: 'Arbre', alga: 'Algue', fungus: 'Champignon',
+    mold: 'Moisissure', bacteria: 'Bactérie', virus: 'Virus', fossil: 'Fossile', mineral: 'Minéral',
+};
+const fxTarget = (fx) => (fx.heal ? 'mine' : fx.switchMine ? 'myBench' : fx.switchFoe ? 'foeBench' : undefined);
+const fxSearch = (fx) => (c) => (fx.search.what === 'energy' ? c.kind === 'energy' : fx.search.what === 'stadium' ? c.kind === 'stadium'
+    : c.kind === 'creature' && (fx.search.what === 'creature' || fx.search.what.includes(c.type)));
+for (const t of Object.values(TRAINERS)) if (t.fx) Object.assign(t, { text: fxText(t.fx), target: fxTarget(t.fx) });
 
 /** Every card that is not a species, by key: 'e:foret', 't:darwin'. */
 export function itemCard(key) {
@@ -274,7 +311,7 @@ export function attackDamage(state, side, att, attack, def) {
     if (attack.swarm) dmg += attack.swarm * me.bench.filter((c) => c.type === 'arthropod').length;
     if (att.tool === 'loupe') dmg += 20;
     if (state.stadium && TRAINERS[state.stadium.key].boost.includes(att.biome)) dmg += 20;
-    if (me.boost) dmg += me.boost + ((me.boostType || (me.boostArthropod && 'arthropod')) === att.type ? 20 : 0);
+    if (me.boost) dmg += me.boost + ([].concat(me.boostType || (me.boostArthropod && 'arthropod') || []).includes(att.type) ? 20 : 0);
     if (att.weak) dmg -= att.weak;
     const chain = chainMult(att.type, def.type);
     if (chain === 'prey') dmg *= 2;
@@ -330,6 +367,12 @@ function blockedPlay(state, side, tr) {
     if (trKey(tr) === 'jumelles' && !p.deck.slice(0, 5).some((c) => c.kind === 'creature')) return true;
     if (trKey(tr) === 'cousteau' && !p.deck.some((c) => c.kind === 'energy')) return true;
     if (trKey(tr) === 'monod' && (!p.discard.some((c) => c.kind === 'energy') || !p.active)) return true;
+    if (tr.fx) { // blocked when its every effect would do nothing
+        const fx = tr.fx;
+        const useful = (fx.draw || fx.refresh) && p.deck.length || fx.search && p.deck.some(fxSearch(fx)) || fx.healAll || fx.boost
+            || (fx.healActive || fx.poison) && p.active && state.players[opp(side)].active || fx.recover && p.active && p.discard.some((c) => c.kind === 'energy');
+        return !useful;
+    }
     return false;
 }
 const trKey = (tr) => Object.keys(TRAINERS).find((k) => TRAINERS[k] === tr);
@@ -602,7 +645,32 @@ function playTrainer(state, side, action, events) {
             break;
         }
         case 'maathai': draw(state, events, side, 2); if (p.active) event(state, events, { k: 'heal', side, uid: p.active.uid, amount: heal(p.active, 40) }); break;
-        default: break;
+        default: {
+            const fx = TRAINERS[key].fx;
+            if (!fx) break;
+            if (fx.refresh) { p.deck.push(...p.hand.splice(0)); shuffle(state, p.deck); draw(state, events, side, fx.refresh); }
+            if (fx.switchMine) { switchActive(p, target.uid); p.active.poisoned = false; event(state, events, { k: 'switch', side, uid: p.active.uid }); }
+            if (fx.switchFoe) { switchActive(foe, target.uid); event(state, events, { k: 'switch', side: opp(side), uid: foe.active.uid, text: `${foe.active.name} est forcé d'entrer en jeu.` }); }
+            if (fx.heal) {
+                if (fx.cure) target.poisoned = false;
+                event(state, events, { k: 'heal', side, uid: target.uid, amount: heal(target, fx.heal.types?.includes(target.type) ? fx.heal.more : fx.heal.n) });
+            }
+            if (fx.healAll) for (const c of inPlay(p)) { if (fx.cure) c.poisoned = false; const h = heal(c, fx.healAll); if (h) event(state, events, { k: 'heal', side, uid: c.uid, amount: h }); }
+            if (fx.healActive && p.active) { if (fx.cure) p.active.poisoned = false; event(state, events, { k: 'heal', side, uid: p.active.uid, amount: heal(p.active, fx.healActive) }); }
+            if (fx.recover && p.active) {
+                const energies = p.discard.filter((c) => c.kind === 'energy');
+                const e = energies[Math.floor(rand(state) * energies.length)];
+                if (e) {
+                    p.discard.splice(p.discard.indexOf(e), 1);
+                    p.active.energies.push({ biome: e.biome, card: e });
+                    event(state, events, { k: 'energy', side, uid: p.active.uid, biome: e.biome, text: `${e.name} attachée à ${p.active.name}.` });
+                }
+            }
+            if (fx.search) searchDeck(fxSearch(fx), fx.search.n || 1);
+            if (fx.boost) { p.boost = fx.boost.n; p.boostType = fx.boost.types || null; }
+            if (fx.poison && foe.active) { foe.active.poisoned = true; event(state, events, { k: 'poisoned', side: opp(side), uid: foe.active.uid, text: `${foe.active.name} est empoisonné.` }); }
+            if (fx.draw) draw(state, events, side, fx.draw);
+        }
     }
 }
 
@@ -736,9 +804,24 @@ function aiWantsTrainer(state, side, key, action) {
         case 'fabre': case 'cuvier': return !!p.active && p.active.attacks.some((a) => canPay(p.active.energies, a.cost)) && state.turn > 1;
         case 'boussole': case 'audubon': return !!p.active && aiScore(state, side, target, foe.active) > aiScore(state, side, p.active, foe.active) + 50;
         case 'filet': case 'fossey': return !!p.active && attackDamageMax(state, side, p.active, target) >= hpLeft(target); // pull a weak one in to capture it
-        default:
+        default: {
+            const fx = TRAINERS[key]?.fx;
+            if (fx) {
+                const dmg = (c) => c?.damage || 0;
+                if (fx.switchMine) return !!p.active && aiScore(state, side, target, foe.active) > aiScore(state, side, p.active, foe.active) + 50;
+                if (fx.switchFoe) return !!p.active && attackDamageMax(state, side, p.active, target) >= hpLeft(target);
+                if (fx.heal) return dmg(target) >= Math.min(fx.heal.n, 40) || (fx.cure && target.poisoned);
+                if (fx.healAll) return inPlay(p).reduce((s, c) => s + Math.min(fx.healAll, c.damage), 0) >= 40 || (fx.cure && inPlay(p).some((c) => c.poisoned));
+                if (fx.healActive && dmg(p.active) >= 40) return true;
+                if (fx.boost) return !!p.active && p.active.attacks.some((a) => canPay(p.active.energies, a.cost)) && state.turn > 1;
+                if (fx.refresh) return p.hand.length <= 2;
+                if (fx.poison && foe.active && !foe.active.poisoned) return true;
+                if (fx.search || fx.recover) return true;
+                return p.hand.length <= 5;
+            }
             if (TRAINERS[key]?.kind === 'stadium') return inPlay(p).filter((c) => TRAINERS[key].boost.includes(c.biome)).length >= 2;
             return false;
+        }
     }
 }
 

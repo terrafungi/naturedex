@@ -1,7 +1,8 @@
 /**
  * The Naturaliste cards of the duel (tcg.mjs TRAINERS) are also regular collection cards
  * (type 'naturalist', qid 'tcg:<key>', stats.trainer = key): they come out of boosters, can be
- * traded and recycled like any species. Supporters and Stades also have a Full art, one rarity up.
+ * traded and recycled like any species. Stades, the first naturalists and the scientists marked `full`
+ * also have a Full art, one rarity up.
  * The duel counts 't:<key>' as every naturalist card with that trainer key the player owns.
  */
 import { TRAINERS } from './tcg.mjs';
@@ -27,11 +28,11 @@ export function naturalistRows() {
             name: t.name, type: NATURALIST,
             sci_name: t.kind === 'supporter' ? `${t.role || 'Naturaliste'} · ${t.years}` : KIND_LABEL[t.kind],
             image_url: t.big || t.img.replace('/330px-', '/960px-'), thumb_url: t.img,
-            wiki_url: `https://fr.wikipedia.org/wiki/${encodeURIComponent(WIKI[key] || t.name.replace(/ /g, '_'))}`,
+            wiki_url: `https://fr.wikipedia.org/wiki/${encodeURIComponent(t.wiki || WIKI[key] || t.name.replace(/ /g, '_'))}`,
             stats: { trainer: key, kind: t.kind },
         };
         out.push({ ...base, qid: `tcg:${key}`, rarity: t.rarity, art: null });
-        if (t.kind === 'supporter' || t.kind === 'stadium') out.push({ ...base, qid: `tcg:${key}:full`, rarity: NEXT_RARITY[t.rarity], art: 'full', baseQid: `tcg:${key}` });
+        if (t.kind === 'stadium' || (t.kind === 'supporter' && (t.full || !t.fx))) out.push({ ...base, qid: `tcg:${key}:full`, rarity: NEXT_RARITY[t.rarity], art: 'full', baseQid: `tcg:${key}` });
     }
     return out;
 }
