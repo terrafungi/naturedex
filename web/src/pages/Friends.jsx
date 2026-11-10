@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeftRight, Check, Clock, Gift, MessageCircle, Minus, Plus, Search, Send, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowLeftRight, Check, CheckCheck, ChevronDown, Clock, Copy, Gift, MessageCircle, Minus, Plus, Search, Send, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react';
 import InviteBanner from '../components/InviteBanner.jsx';
 import SeasonBadge from '../components/SeasonBadge.jsx';
 import { api, useGame } from '../api.jsx';
 import PlayerAvatar from '../components/PlayerAvatar.jsx';
 import { Card } from '../components/Card.jsx';
-import { RARITIES } from '../game.jsx';
+import { RARITIES, SORTS, TYPES } from '../game.jsx';
 import { Nugget, NUGGET_COLOR, Plant, PLANT_COLOR, Seed, SEED_COLOR } from '../components/Currency.jsx';
 
 const TABS = [
@@ -97,25 +97,50 @@ function AddFriend({ onDone }) {
     );
 }
 
+const MAX_ITEMS = 30; // MAX_TRADE_ITEMS in the API
+
+function Filter({ value, onChange, label, children }) {
+    return (
+        <label className="relative flex-1 min-w-[8.5rem]">
+            <span className="sr-only">{label}</span>
+            <select value={value} onChange={(e) => onChange(e.target.value)}
+                className={`w-full appearance-none pl-3.5 pr-8 py-1.5 rounded-full bg-white/5 ring-1 text-xs font-semibold outline-none cursor-pointer [&>option]:bg-[#0b1f16] [&>option]:text-white ${value ? 'ring-[#4fd18b]/60 text-white' : 'ring-white/10 text-white/70'}`}>
+                {children}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-white/50" />
+        </label>
+    );
+}
+
 // Grid of cards to pick from, for one side of the trade.
-function Picker({ username, selected, onToggle, onQty, total }) {
+function Picker({ username, selected, onToggle, onQty, onBulk, total }) {
     const [query, setQuery] = useState('');
     const [debounced, setDebounced] = useState('');
+    const [sort, setSort] = useState('');
+    const [type, setType] = useState('');
+    const [rarity, setRarity] = useState('');
     const [page, setPage] = useState(null);
     useEffect(() => {
         const t = setTimeout(() => setDebounced(query.trim()), 250);
         return () => clearTimeout(t);
     }, [query]);
+    const params = useMemo(() => ({ username, query: debounced, missing: true, sort: sort || undefined, type: type || null, rarity: rarity || null }), [username, debounced, sort, type, rarity]);
     useEffect(() => {
         let alive = true;
         setPage(null);
-        api('tradeCards', { username, query: debounced, missing: true }).then((r) => alive && setPage(r)).catch(() => alive && setPage({ cards: [], matches: 0 }));
+        api('tradeCards', params).then((r) => alive && setPage(r)).catch(() => alive && setPage({ cards: [], matches: 0 }));
         return () => { alive = false; };
-    }, [username, debounced]);
+    }, [params]);
 
     async function more() {
-        const r = await api('tradeCards', { username, query: debounced, missing: true, offset: page.cards.length });
+        const r = await api('tradeCards', { ...params, offset: page.cards.length });
         setPage({ matches: r.matches, cards: [...page.cards, ...r.cards] });
+    }
+    // bulk picks: every card shown, or my doubles (keeping one of each)
+    const pickShown = () => onBulk(page.cards.map((c) => ({ card: c, qty: selected.get(c.id)?.qty || 1 })));
+    async function pickDoubles() {
+        const r = await api('tradeCards', { sort: 'count' });
+        onBulk(r.cards.filter((c) => c.count > 1).map((c) => ({ card: c, qty: c.count - 1 })));
     }
 
     return (
@@ -124,8 +149,28 @@ function Picker({ username, selected, onToggle, onQty, total }) {
                 <Search className="w-4 h-4 text-white/50" />
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nom, ou mot de la description…" className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-white/40" />
             </label>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+                <Filter label="Trier" value={sort} onChange={setSort}>
+                    <option value="">{username ? 'Trier : celles qui me manquent' : 'Trier : rareté'}</option>
+                    {SORTS.filter(([key]) => key).map(([key, label]) => <option key={key} value={key}>Trier : {label}</option>)}
+                </Filter>
+                <Filter label="Type" value={type} onChange={setType}>
+                    <option value="">Tous les types</option>
+                    {Object.entries(TYPES).map(([key, t]) => <option key={key} value={key}>{t.label}</option>)}
+                </Filter>
+                <Filter label="Rareté" value={rarity} onChange={setRarity}>
+                    <option value="">Toutes les raretés</option>
+                    {Object.entries(RARITIES).map(([key, r]) => <option key={key} value={key}>{r.symbol} {r.label}</option>)}
+                </Filter>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+                <span className={`mr-auto ${selected.size >= MAX_ITEMS ? 'text-[#ffb4a2]' : 'text-white/55'}`}>{selected.size}/{MAX_ITEMS} cartes choisies</span>
+                {page?.cards.length > 0 && <button type="button" onClick={pickShown} className="px-3 py-1.5 rounded-full ring-1 ring-white/15 text-white/85 hover:bg-white/5 flex items-center gap-1"><CheckCheck className="w-3.5 h-3.5" />Tout sélectionner</button>}
+                {!username && <button type="button" onClick={pickDoubles} className="px-3 py-1.5 rounded-full ring-1 ring-white/15 text-white/85 hover:bg-white/5 flex items-center gap-1"><Copy className="w-3.5 h-3.5" />Mes doubles</button>}
+                {selected.size > 0 && <button type="button" onClick={() => onBulk(null)} className="px-3 py-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/5">Tout retirer</button>}
+            </div>
             {!page ? <div className="py-12 text-center text-ink-soft">Chargement…</div> : page.cards.length === 0 ? (
-                <p className="py-12 text-center text-ink-soft">{debounced ? 'Aucune carte trouvée.' : 'Aucune carte dans cette collection.'}</p>
+                <p className="py-12 text-center text-ink-soft">{debounced || type || rarity ? 'Aucune carte trouvée.' : 'Aucune carte dans cette collection.'}</p>
             ) : (
                 <>
                     <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
@@ -169,7 +214,14 @@ function TradeBuilder({ friend, total, onClose, onSent }) {
 
     const toggler = (set) => (c) => set((m) => {
         const next = new Map(m);
-        if (next.has(c.id)) next.delete(c.id); else if (next.size < 10) next.set(c.id, { card: c, qty: 1 });
+        if (next.has(c.id)) next.delete(c.id); else if (next.size < MAX_ITEMS) next.set(c.id, { card: c, qty: 1 });
+        return next;
+    });
+    // adds the given cards (up to MAX_ITEMS in all); null clears the side
+    const buller = (set) => (items) => set((m) => {
+        if (!items) return new Map();
+        const next = new Map(m);
+        for (const it of items) if (next.has(it.card.id) || next.size < MAX_ITEMS) next.set(it.card.id, it);
         return next;
     });
     const qtyer = (set) => (c, qty) => set((m) => {
@@ -216,8 +268,8 @@ function TradeBuilder({ friend, total, onClose, onSent }) {
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3">
                     {side === 'get'
-                        ? <Picker key="get" username={friend} selected={get} onToggle={toggler(setGet)} onQty={qtyer(setGet)} total={total} />
-                        : <Picker key="give" selected={give} onToggle={toggler(setGive)} onQty={qtyer(setGive)} total={total} />}
+                        ? <Picker key="get" username={friend} selected={get} onToggle={toggler(setGet)} onQty={qtyer(setGet)} onBulk={buller(setGet)} total={total} />
+                        : <Picker key="give" selected={give} onToggle={toggler(setGive)} onQty={qtyer(setGive)} onBulk={buller(setGive)} total={total} />}
                 </div>
                 <div className="shrink-0 border-t border-white/10 p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3 bg-black/20 sm:rounded-b-[2rem]">
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm">

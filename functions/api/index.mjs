@@ -998,7 +998,7 @@ function cardSearchSql(p) {
 }
 
 // ---- Friends & trades ----
-const MAX_TRADE_ITEMS = 10;
+const MAX_TRADE_ITEMS = 30;
 const MAX_PENDING_TRADES = 20;
 
 async function findUser(db, username) {
@@ -2454,6 +2454,7 @@ const actions = {
 
     // ---- Trades ----
     // Cards to pick from when building a trade: mine, or a friend's (with how many I already have).
+    // Default order: name matches, then the cards I am missing, then the rarest; `sort` picks a collection sort instead.
     async tradeCards(db, body, event) {
         const user = await requireUser(db, event);
         const owner = body.username ? await requireFriend(db, user.id, body.username) : user;
@@ -2465,7 +2466,8 @@ const actions = {
              LEFT JOIN user_cards mine ON mine.user_id = $2 AND mine.card_id = uc.card_id
              WHERE uc.user_id = $1 AND ($3::text IS NULL OR c.type = $3) AND ($4::text IS NULL OR c.rarity = $4)
                AND ($5 = '' OR ${search.any})
-             ORDER BY ${q ? `(${search.byName}) DESC, ` : ''}${body.missing && owner.id !== user.id ? '(mine.count IS NULL) DESC, ' : ''}${RARITY_ORDER} DESC, c.views DESC
+             ORDER BY ${CARD_SORTS[body.sort] ? CARD_SORTS[body.sort]
+                : `${q ? `(${search.byName}) DESC, ` : ''}${body.missing && owner.id !== user.id ? '(mine.count IS NULL) DESC, ' : ''}${RARITY_ORDER} DESC, c.views DESC`}
              LIMIT 60 OFFSET $6`,
             [owner.id, user.id, body.type || null, body.rarity || null, q, Math.max(Number(body.offset) || 0, 0)]
         );

@@ -63,6 +63,20 @@ export const RARITIES = {
     secret:    { label: 'Secrète', symbol: '✦', order: 5, color: '#ff5fd2' },
 };
 
+// Server-side sorts (CARD_SORTS in the API); '' = rarest first, the default.
+export const SORTS = [
+    ['', 'Rareté (rares d\'abord)'],
+    ['rarityAsc', 'Rareté (communes d\'abord)'],
+    ['recent', 'Obtenues récemment'],
+    ['name', 'Nom (A → Z)'],
+    ['num', 'Numéro'],
+    ['count', 'Nombre d\'exemplaires'],
+    ['type', 'Type'],
+    ['hp', 'Points de vie'],
+    ['atk', 'Attaque'],
+    ['views', 'Popularité'],
+];
+
 export const IUCN = {
     LC: { label: 'Préoccupation mineure', color: '#4f7a3a' },
     NT: { label: 'Quasi menacée', color: '#8a8f2a' },

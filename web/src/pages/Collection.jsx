@@ -4,7 +4,7 @@ import { ChevronDown, Copy, CornerDownRight, FolderPlus, Frame, Pencil, Recycle,
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { FavoriteStar } from '../components/Favorite.jsx';
-import { IUCN, RARITIES, TYPES } from '../game.jsx';
+import { IUCN, RARITIES, SORTS, TYPES } from '../game.jsx';
 
 const PAGE = 60;
 
@@ -26,19 +26,6 @@ function Chip({ active, onClick, children, color }) {
 // Most threatened first; « Non évaluée » = species never assessed by the IUCN.
 const IUCN_ORDER = ['CR', 'EN', 'VU', 'NT', 'LC', 'DD', 'EW', 'EX'];
 
-// Server-side sorts (CARD_SORTS in the API); '' = rarest first, the default.
-const SORTS = [
-    ['', 'Rareté (rares d\'abord)'],
-    ['rarityAsc', 'Rareté (communes d\'abord)'],
-    ['recent', 'Obtenues récemment'],
-    ['name', 'Nom (A → Z)'],
-    ['num', 'Numéro'],
-    ['count', 'Nombre d\'exemplaires'],
-    ['type', 'Type'],
-    ['hp', 'Points de vie'],
-    ['atk', 'Attaque'],
-    ['views', 'Popularité'],
-];
 const ARTS = { plain: 'Photo classique', holo: 'Holographique', full: 'Full art', illus: 'Illustration', gold: 'Gold' };
 
 function Select({ value, onChange, label, children, color }) {
