@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, Camera, Check, Flag, Layers, MapPin, RefreshCw, Sparkles, Trash2, Users, X } from 'lucide-react';
+import { AlertTriangle, Camera, Check, Flag, Gift, Layers, MapPin, RefreshCw, Sparkles, Trash2, Users, X } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, FieldCard } from '../components/Card.jsx';
 import { Amount } from '../components/Currency.jsx';
@@ -151,7 +151,7 @@ export default function Terrain() {
                                 </p>
                             )}
                             <ul className="mt-5 grid sm:grid-cols-3 gap-2 text-left text-xs text-white/70">
-                                <li className="p-3 rounded-2xl bg-white/[0.04]"><b className="block text-white">De 30 à 150 graines</b>selon la rareté, que tu aies déjà la carte ou non.</li>
+                                <li className="p-3 rounded-2xl bg-white/[0.04]"><b className="block text-white">De 30 à 150 graines</b>selon la rareté, seulement si tu as déjà pioché la carte dans un booster.</li>
                                 <li className="p-3 rounded-2xl bg-white/[0.04]"><b className="block text-white">+50 graines</b>si tu es le premier joueur à observer l'espèce.</li>
                                 <li className="p-3 rounded-2xl bg-white/[0.04]"><b className="block text-white">Zoo, aquarium, serre</b>acceptés, à moitié prix, avec la mention « en captivité ».</li>
                             </ul>
@@ -193,7 +193,7 @@ export default function Terrain() {
                                         <span>L'IA peut se tromper, surtout entre espèces qui se ressemblent. Compare avec la photo de la carte avant de valider, et choisis « Aucune de ces espèces » en cas de doute.</span>
                                     </p>
                                     <div className="mt-3 space-y-2">
-                                        {result.observation.candidates.map(({ card, confidence, hasField }) => {
+                                        {result.observation.candidates.map(({ card, confidence, hasField, drawn }) => {
                                             const r = RARITIES[card.rarity] || RARITIES.common;
                                             return (
                                                 <button key={card.id} disabled={busy} onClick={() => confirm(card.id)}
@@ -205,6 +205,7 @@ export default function Terrain() {
                                                         <span className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] font-semibold">
                                                             <span style={{ color: r.color }}>{r.symbol} {r.label}</span>
                                                             {hasField && <span className="text-white/60">Remplace ta photo</span>}
+                                                            {drawn ? <span className="text-[#7dffb0]">Piochée en booster : bonus</span> : <span className="text-white/45">Pas encore piochée : sans graines</span>}
                                                         </span>
                                                     </span>
                                                     <span className="shrink-0 text-right">
@@ -426,6 +427,8 @@ function Rewards({ res }) {
     return (
         <div className="mt-5 space-y-1.5">
             {res.reward > 0 && <p className="font-display text-2xl text-white"><Amount seeds={res.reward} sign /></p>}
+            {res.reward > 0 && <p className="flex items-center justify-center gap-1.5 text-sm font-bold text-[#7dffb0]"><Gift className="w-4 h-4" />Bonus : tu as pioché cette carte dans un booster !</p>}
+            {res.notDrawn && <p className="text-sm text-white/70">Pas de graines : tu n'as pas encore pioché cette carte dans un booster. Trouve-la, puis reprends l'espèce en photo pour gagner le bonus.</p>}
             {res.firstEver && <p className="flex items-center justify-center gap-1.5 text-sm font-bold text-[#ffd36e]"><Sparkles className="w-4 h-4" />Première observation de cette espèce sur NatureDex !</p>}
             {res.replaced && <p className="text-sm text-white/70">Ta nouvelle photo remplace l'ancienne (pas de nouvelle récompense pour cette espèce).</p>}
             {res.capReached && <p className="text-sm text-white/70">Récompenses du jour épuisées : la carte de terrain est quand même dans ton carnet.</p>}

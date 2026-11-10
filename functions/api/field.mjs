@@ -1,8 +1,9 @@
 /**
  * « Sur le terrain »: a player photographs a real species, the AI identifies it among the
  * NatureDex cards, and once the player confirms, the photo becomes their personal field card
- * (one per species, replaceable by a better photo). Rewards: graines by rarity (the regular card
- * is never given: it still has to be found in boosters), a bonus for the very first observation of a species — 5 rewarded photos a day.
+ * (one per species, replaceable by a better photo). Rewards: graines by rarity, only for a species
+ * the player has drawn in a booster (the regular card is never given by a photo), a bonus for the
+ * very first observation of a species — 5 rewarded photos a day.
  * The photo is resized in the browser; the server stores it under media/terrain/ (CloudFront).
  */
 import crypto from 'node:crypto';
@@ -15,6 +16,8 @@ const DAILY_ATTEMPTS = 15; // AI identifications per Paris day, rejected photos 
 const REWARDS = { common: 30, uncommon: 45, rare: 70, epic: 100, legendary: 150, secret: 150 };
 const FIRST_BONUS = 50; // first NatureDex observation of the species
 const REPORTS_TO_HIDE = 3;
+// graines only for a species the player has drawn in a booster
+const DRAWN = `EXISTS (SELECT 1 FROM openings op WHERE op.user_id = $1 AND c.id = ANY(op.card_ids))`;
 const THREATENED = new Set(['VU', 'EN', 'CR', 'EW']); // location kept at country level only
 const MAX_PHOTO = 3_000_000; // bytes, after the browser resize (~1600 px JPEG is far below)
 const MIN_CONFIDENCE = 0.3;
@@ -227,14 +230,14 @@ export function fieldActions({ requireUser, inTransaction, HttpError, publicUser
             await db.query(`INSERT INTO field_attempts (user_id, outcome, reason) VALUES ($1, 'identified', $2)`, [user.id, reason]);
             const ids = matched.map((m) => m.card.id);
             const { rows: mine } = await db.query(
-                `SELECT c.id, uc.count IS NOT NULL AS owned, EXISTS (SELECT 1 FROM observations o WHERE o.user_id = $1 AND o.card_id = c.id AND o.status = 'confirmed') AS has_field
+                `SELECT c.id, uc.count IS NOT NULL AS owned, ${DRAWN} AS drawn, EXISTS (SELECT 1 FROM observations o WHERE o.user_id = $1 AND o.card_id = c.id AND o.status = 'confirmed') AS has_field
                  FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1 WHERE c.id = ANY($2)`, [user.id, ids]);
             return {
                 observation: {
                     id: Number(obs.id), captive: !!ai.captive, reason, photo: photoUrl(key), thumb: photoUrl(key, true),
                     candidates: matched.map(({ card: { key: _k, fr: _f, ...card }, confidence }) => {
                         const m = mine.find((x) => x.id === card.id);
-                        return { card, confidence, owned: !!m?.owned, hasField: !!m?.has_field };
+                        return { card, confidence, owned: !!m?.owned, drawn: !!m?.drawn, hasField: !!m?.has_field };
                     }),
                 },
                 daily: await dailyState(db, user.id),
@@ -249,7 +252,7 @@ export function fieldActions({ requireUser, inTransaction, HttpError, publicUser
             if (!pending) throw new HttpError(404, 'Observation introuvable ou déjà validée');
             const cardId = Number(body.cardId);
             if (!pending.candidates.some((c) => c.id === cardId)) throw new HttpError(400, "Cette espèce ne fait pas partie des propositions de l'IA");
-            const { rows: [card] } = await db.query(`SELECT id, rarity, iucn FROM cards WHERE id = $1`, [cardId]);
+            const { rows: [card] } = await db.query(`SELECT c.id, c.rarity, c.iucn, ${DRAWN} AS drawn FROM cards c WHERE c.id = $2`, [user.id, cardId]);
             const threatened = THREATENED.has(card.iucn);
             const region = await regionName(pending.lat, pending.lon, threatened);
 
@@ -264,8 +267,8 @@ export function fieldActions({ requireUser, inTransaction, HttpError, publicUser
                      AND (confirmed_at AT TIME ZONE 'Europe/Paris')::date = ${PARIS_DAY}`, [user.id, DAILY_REWARDED]);
                 // a species is rewarded once per player: a new photo replaces the old one (even a deleted one) for free
                 const { rows: [seen] } = await client.query(
-                    `SELECT 1 FROM observations WHERE user_id = $1 AND card_id = $2 AND status <> 'pending' AND id <> $3 LIMIT 1`, [user.id, cardId, pending.id]);
-                const rewardable = !seen && left > 0;
+                    `SELECT 1 FROM observations WHERE user_id = $1 AND card_id = $2 AND status <> 'pending' AND id <> $3 AND (reward > 0 OR gave_card) LIMIT 1`, [user.id, cardId, pending.id]);
+                const rewardable = !seen && left > 0 && card.drawn;
                 let number = old?.number, firstEver = old?.first_ever || false;
                 if (!old) {
                     await client.query(`SELECT pg_advisory_xact_lock(4242, $1)`, [cardId]); // observation numbers per species
@@ -282,7 +285,7 @@ export function fieldActions({ requireUser, inTransaction, HttpError, publicUser
                     `UPDATE observations SET status = 'confirmed', card_id = $2, number = $3, first_ever = $4, reward = $5, gave_card = $6,
                         region = $7, lat = NULL, lon = NULL, confirmed_at = now() WHERE id = $1`, // only the region is kept
                     [pending.id, cardId, number, firstEver, reward, gaveCard, region]);
-                return { reward, gaveCard, firstEver, replaced: !!seen, capReached: !seen && left <= 0 };
+                return { reward, gaveCard, firstEver, replaced: !!seen, capReached: !seen && card.drawn && left <= 0, notDrawn: !seen && !card.drawn };
             });
             const { rows: [row] } = await db.query(`${FIELD_SELECT} WHERE o.id = $1`, [pending.id]);
             const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);

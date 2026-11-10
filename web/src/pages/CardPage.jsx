@@ -145,7 +145,7 @@ function FieldSection({ cardId }) {
             </div>
             {data.total
                 ? <FieldGrid cards={data.cards} onOpen={setOpen} />
-                : <p className="mt-3 text-white/60">Aucun joueur ne l'a encore photographiée : la première observation rapporte +50 graines.</p>}
+                : <p className="mt-3 text-white/60">Aucun joueur ne l'a encore photographiée : la première observation rapporte +50 graines si tu as pioché la carte dans un booster.</p>}
             <FieldViewer obs={open} onClose={() => setOpen(null)} onDeleted={() => { setOpen(null); api('cardObservations', { cardId }).then(setData); }} />
         </section>
     );
