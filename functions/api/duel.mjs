@@ -106,7 +106,13 @@ function buildDeck(creatures, items) {
     for (let round = 0; round < 16; round++) for (const b of order) if (round < need[b] * 1.6) take(`e:${b}`);
     while (take(`e:${UNIVERSAL}`));
     for (const b of order) while (energies.length < 10 && take(`e:${b}`));
-    return [...picked, ...energies.map(itemCard), ...trainers.map(itemCard)];
+    for (const k of Object.keys(left)) while (energies.length < 10 && take(k)); // any Énergie beats none
+    // few Énergies and Naturalistes yet: more creatures, so that the deck still reaches the minimum
+    const short = DECK_MIN - (picked.length + energies.length + trainers.length);
+    const more = short > 0
+        ? autoDeck(creatures, { size: nCreatures + short, nCreatures: nCreatures + short, trainers: [] }).filter((c) => c.kind === 'creature').slice(picked.length)
+        : [];
+    return [...picked, ...more, ...energies.map(itemCard), ...trainers.map(itemCard)];
 }
 
 async function foeDeck(db, level) {

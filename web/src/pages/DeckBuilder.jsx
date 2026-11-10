@@ -36,7 +36,8 @@ export default function DeckBuilder() {
     // every card the player owns, as game cards, with how many copies may go in the deck
     const { cards, byKey, owned } = useMemo(() => {
         if (!data) return { cards: [], byKey: {}, owned: {} };
-        const creatures = data.species.map((s) => ({ ...creatureCard(s), owned: s.count }));
+        const creatures = data.species.map((s) => { const c = creatureCard(s); return { ...c, owned: s.count, power: power(c) }; })
+            .sort((a, b) => b.power - a.power); // strongest first, once: big collections have thousands
         const items = data.items.map((c) => ({ ...c, owned: c.count }));
         const all = [...creatures, ...items];
         return {
@@ -91,6 +92,7 @@ export default function DeckBuilder() {
         const fuel = {};
         for (const c of cards) if (c.kind === 'energy') fuel[c.biome] = (fuel[c.biome] || 0) + c.owned;
         const powered = (b) => fuel[UNIVERSAL] || fuel[b];
+        const creatures = cards.filter((c) => c.kind === 'creature'); // already strongest first
         for (let guard = 0; next.length < data.rules.max && guard < 200; guard++) {
             const g = groups();
             const order = Object.keys(TARGET).sort((a, b) => g[a] / TARGET[a] - g[b] / TARGET[b]);
@@ -99,7 +101,7 @@ export default function DeckBuilder() {
                 if (want === 'creature') {
                     // the two biomes with the most Énergies owned
                     const main = Object.entries(fuel).filter(([b]) => b !== UNIVERSAL).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([b]) => b);
-                    const pool = cards.filter((c) => c.kind === 'creature' && free(c)).sort((a, b) => power(b) - power(a));
+                    const pool = creatures.filter(free);
                     pick = pool.find((c) => main.includes(c.biome)) || pool.find((c) => powered(c.biome))
                         || (g.creature < data.rules.minCreatures || !Object.keys(fuel).length ? pool[0] : null);
                 } else if (want === 'energy') {
@@ -130,7 +132,7 @@ export default function DeckBuilder() {
             sfx.win?.();
             setDirty(false);
             setNote('Deck enregistré ! Il sera utilisé pour tes prochains duels.');
-        } catch (e) { setError(e.message); } finally { setBusy(false); }
+        } catch (e) { setNote(e.message); sfx.error?.(); } finally { setBusy(false); }
     }
 
     async function reset() {
@@ -139,13 +141,19 @@ export default function DeckBuilder() {
         try { await api('duelSaveDeck', { reset: true }); await load(); setNote('Deck automatique rétabli.'); } catch (e) { setError(e.message); } finally { setBusy(false); }
     }
 
+    const byTab = useMemo(() => {
+        const m = { creature: [], energy: [], trainer: [] };
+        for (const c of cards) m[group(c)].push(c);
+        m.trainer.sort((a, b) => rarityRank(b) - rarityRank(a));
+        return m;
+    }, [cards]);
+    const list = useMemo(() => {
+        const s = q.toLowerCase();
+        return byTab[tab].filter((c) => (!biome || c.biome === biome) && (!s || c.name.toLowerCase().includes(s)));
+    }, [byTab, tab, biome, q]);
+
     if (!data) return <div className="max-w-xl mx-auto px-4 py-16 text-ink-soft">{error || 'Chargement de ta collection…'}</div>;
 
-    const list = cards
-        .filter((c) => group(c) === tab)
-        .filter((c) => !biome || c.biome === biome)
-        .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
-        .sort((a, b) => (tab === 'creature' ? power(b) - power(a) : tab === 'trainer' ? rarityRank(b) - rarityRank(a) : 0));
     const g = deckCards.reduce((m, c) => { m[group(c)] += 1; return m; }, { creature: 0, energy: 0, trainer: 0 });
     const energies = deckCards.filter((c) => c.kind === 'energy').reduce((m, c) => ({ ...m, [c.biome]: (m[c.biome] || 0) + 1 }), {});
     const needs = deckCards.filter((c) => c.kind === 'creature').reduce((m, c) => ({ ...m, [c.biome]: (m[c.biome] || 0) + 1 }), {});
@@ -210,7 +218,7 @@ export default function DeckBuilder() {
                         {TABS.map(([k, l]) => (
                             <button key={k} onClick={() => { setTab(k); setBiome(''); setShown(PAGE); }}
                                 className={`px-3 py-1.5 rounded-full text-sm font-bold shrink-0 ${tab === k ? 'nd-cta-gold' : 'bg-white/[0.06]'}`}>
-                                {l} <span className="opacity-60">({cards.filter((c) => group(c) === k).length})</span>
+                                {l} <span className="opacity-60">({byTab[k].length})</span>
                             </button>
                         ))}
                     </div>
@@ -303,8 +311,11 @@ export default function DeckBuilder() {
                     {dirty && (
                         <button onClick={save} disabled={busy || problems.length > 0}
                             className="w-full py-3 rounded-full nd-cta-gold font-bold shadow-lg disabled:opacity-50">
-                            {problems.length ? `Deck incomplet (${keys.length}/${data.rules.min} min.)` : `Enregistrer mon deck (${keys.length} cartes)`}
+                            {problems.length ? `Deck incomplet (${keys.length}/${data.rules.max})` : `Enregistrer mon deck (${keys.length} cartes)`}
                         </button>
+                    )}
+                    {dirty && problems.length > 0 && (
+                        <p className="px-3 py-1.5 rounded-xl bg-black/75 text-xs text-center text-[#ffd27a] font-bold">{problems[0]}</p>
                     )}
                 </div>
             </div>
