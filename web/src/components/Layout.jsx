@@ -9,6 +9,7 @@ import AwardNotice from './AwardNotice.jsx';
 import GiftNotice from './GiftNotice.jsx';
 import NewsNotice from './NewsNotice.jsx';
 import NoticeCenter from './NoticeCenter.jsx';
+import DonatePrompt from './DonatePrompt.jsx';
 import InstallPrompt, { InstallLink } from './InstallPrompt.jsx';
 
 export const NAV = [
@@ -270,6 +271,7 @@ export default function Layout() {
             {user && <GiftNotice />}
             {user && <AwardNotice />}
             {user && <NoticeCenter />}
+            {user && <DonatePrompt />}
             <InstallPrompt raised={!!user} />
         </div>
     );
