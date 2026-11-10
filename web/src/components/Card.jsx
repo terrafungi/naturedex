@@ -26,8 +26,9 @@ function fallbackToOriginal(e) {
 const sharper = (url) => url?.replace(/\/\d+px-([^/]+)$/, '/960px-$1');
 
 // Special finish (cards.art): 'full' / 'illus' = the picture fills the whole card and the text sits
-// on top of it; 'holo' = the regular layout with a holographic foil (some commons and uncommons).
-export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo' };
+// on top of it; 'holo' = the regular layout with a holographic foil (some commons and uncommons);
+// 'gold' = the regular layout, all in gold: frame, background and a gilded photo (some rares and up).
+export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo', gold: 'Gold' };
 
 /** The signed-in player's card frame (honey shop), for their own cards. */
 /** The Duel effect of a Naturaliste card (type 'naturalist'), by its trainer key or its name. */
@@ -46,9 +47,9 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     const st = card.atk != null ? card : card.stats?.atk != null ? card.stats : battleStats(card);
     const ab = ABILITIES[card.type];
     const art = ART[card.art];
-    const bleed = art && card.art !== 'holo';
+    const bleed = art && card.art !== 'holo' && card.art !== 'gold';
     const foil = art || ['epic', 'legendary', 'secret'].includes(card.rarity);
-    const ink = bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
+    const ink = card.art === 'gold' ? '#7a5310' : bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
     const trainer = trainerOf(card);
     const fact = bleed || trainer ? null : card.fact;
     // where the subject sits in the photo (computed once per card): the 4:3 window crops around it
@@ -111,6 +112,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
             data-fact={fact ? '' : undefined}
             data-art={bleed ? card.art : undefined}
             data-holo={card.art === 'holo' ? '' : undefined}
+            data-gold={card.art === 'gold' ? '' : undefined}
             data-frame={frame && frame !== 'aucun' ? frame : undefined}
             style={{ '--type': t.color }}
             onPointerDown={onMove}

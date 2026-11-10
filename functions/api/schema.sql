@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS cards (
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS num INTEGER;
 CREATE INDEX IF NOT EXISTS cards_num_idx ON cards (num);
 -- special artwork: 'full' = full-art (the photo fills the card), 'illus' = illustrated variant
--- of the species base_id (painted artwork, extra card next to the Wikipédia one)
+-- of the species base_id (painted artwork, extra card next to the Wikipédia one),
+-- 'holo' = holographic foil (some commons / uncommons), 'gold' = all-gold card (some rares and up)
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS art TEXT;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS base_id INTEGER REFERENCES cards(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS cards_rarity_idx ON cards (rarity);

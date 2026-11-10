@@ -359,7 +359,7 @@ function RarityBanner({ card, demo }) {
                     {r.symbol} {r.label}
                 </div>
             )}
-            {ART[card.art] && <div className="nd-art-banner">✦ {ART[card.art]} ✦</div>}
+            {ART[card.art] && <div className="nd-art-banner" data-gold={card.art === 'gold' ? '' : undefined}>✦ {ART[card.art]} ✦</div>}
             <div className="text-white/60 text-sm">Touche ou glisse la carte pour continuer</div>
             {!demo && <ShareButton card={card} className="mt-3" />}
         </motion.div>

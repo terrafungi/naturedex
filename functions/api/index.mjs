@@ -800,7 +800,7 @@ const CARD_SORTS = {
     type: `c.type, ${RARITY_ORDER} DESC, c.num`,
 };
 // finish filter: 'plain' = the ordinary photo cards
-const CARD_ARTS = ['plain', 'holo', 'full', 'illus'];
+const CARD_ARTS = ['plain', 'holo', 'full', 'illus', 'gold'];
 const shapeAuction = ({ bid, start_price, ...a }) => ({ ...a, bid, start_price, minBid: minBid({ bid, start_price }) });
 
 const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c.views, c.image_url, c.thumb_url,

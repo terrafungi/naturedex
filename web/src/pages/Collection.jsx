@@ -39,7 +39,7 @@ const SORTS = [
     ['atk', 'Attaque'],
     ['views', 'Popularité'],
 ];
-const ARTS = { plain: 'Photo classique', holo: 'Holographique', full: 'Full art', illus: 'Illustration' };
+const ARTS = { plain: 'Photo classique', holo: 'Holographique', full: 'Full art', illus: 'Illustration', gold: 'Gold' };
 
 function Select({ value, onChange, label, children, color }) {
     return (
@@ -63,7 +63,7 @@ export default function Collection() {
     const [type, setType] = useState(restore?.type ?? null);
     const [rarity, setRarity] = useState(restore?.rarity ?? null);
     const [iucn, setIucn] = useState(restore?.iucn ?? null);
-    const [art, setArt] = useState(restore?.art ?? null); // finish: plain photo, holo, full art, illustration
+    const [art, setArt] = useState(restore?.art ?? null); // finish: plain photo, holo, full art, illustration, gold
     const [sort, setSort] = useState(restore?.sort ?? null);
     const [query, setQuery] = useState(restore?.query ?? '');
     const [debounced, setDebounced] = useState(restore?.query ?? '');

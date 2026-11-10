@@ -644,6 +644,18 @@ const BLEED_ARTS = ['full', 'illus'];
 // The picture to load for a card: a sharper one when it fills the whole card.
 export const cardImageUrl = (card) => (BLEED_ARTS.includes(card.art) ? card.thumb_url?.replace(/\/\d+px-([^/]+)$/, '/960px-$1') : card.thumb_url);
 
+// Gold cards: polished gold frame, then a gold sheen on the face and a gold tint on the picture.
+const GOLD_FRAME = ['#fff3c0', '#d9a632', '#7a5310'];
+function goldLeaf(ctx, x, y, w, h, alpha) {
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    [['#fff4c8', 0], ['#f0cf6e', 0.3], ['#fbe6a2', 0.52], ['#d6a73e', 0.78], ['#f3d98a', 1]].forEach(([c, at]) => g.addColorStop(at, c));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+}
+
 // Draw `img` to cover the box; fx/fy (0-100) = the point of the picture kept in view (cards.stats.focus).
 function cover(ctx, img, x, y, w, h, [fx, fy] = [50, 50]) {
     const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
@@ -725,7 +737,8 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     const h = w * 1.4;
     const type = TYPES[card.type] || TYPES.plant;
     const rarity = RARITIES[card.rarity] || RARITIES.common;
-    const frame = RARITY_FRAMES[card.rarity] || ['#ffffff', type.color, '#10261a'];
+    const gold = card.art === 'gold';
+    const frame = gold ? GOLD_FRAME : RARITY_FRAMES[card.rarity] || ['#ffffff', type.color, '#10261a'];
     const bleed = BLEED_ARTS.includes(card.art), holo = card.art === 'holo';
     ctx.save();
     ctx.translate(cx, cy);
@@ -761,11 +774,18 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     ctx.fillStyle = '#f8f1df';
     rrect(ctx, p, p, w - 2 * p, h - 2 * p, w * 0.04);
     ctx.fill();
+    if (gold) {
+        ctx.save();
+        rrect(ctx, p, p, w - 2 * p, h - 2 * p, w * 0.04);
+        ctx.clip();
+        goldLeaf(ctx, p, p, w - 2 * p, h - 2 * p, 1);
+        ctx.restore();
+    }
 
     // name and rarity
     const inner = w - 4 * p;
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#1e1a12';
+    ctx.fillStyle = gold ? '#3b2a08' : '#1e1a12';
     ctx.font = `700 ${w * 0.075}px ${SANS}`;
     const symbolWidth = ctx.measureText(rarity.symbol).width;
     const name = fitFont(ctx, card.name || '', 700, DISPLAY, w * 0.085, inner - symbolWidth - p, w * 0.06);
@@ -790,8 +810,19 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
         const rand = (i) => ((Math.sin((card.id || 1) * 97 + i * 13.7) + 1) / 2);
         for (let i = 0; i < 14; i++) sparkle(ctx, ix + rand(i) * iw, iy + rand(i + 50) * ih, w * (0.012 + rand(i + 99) * 0.02), 'rgba(255,255,255,0.75)');
     }
+    // gold: the picture is gilded, with gold glitter
+    if (gold) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'color';
+        goldLeaf(ctx, ix, iy, iw, ih, 0.55);
+        ctx.globalCompositeOperation = 'soft-light';
+        goldLeaf(ctx, ix, iy, iw, ih, 0.5);
+        ctx.restore();
+        const rand = (i) => ((Math.sin((card.id || 1) * 97 + i * 13.7) + 1) / 2);
+        for (let i = 0; i < 14; i++) sparkle(ctx, ix + rand(i) * iw, iy + rand(i + 50) * ih, w * (0.012 + rand(i + 99) * 0.02), 'rgba(255,240,190,0.85)');
+    }
     ctx.restore();
-    ctx.strokeStyle = type.color;
+    ctx.strokeStyle = gold ? '#9a6b14' : type.color;
     ctx.lineWidth = Math.max(2, w * 0.012);
     rrect(ctx, ix, iy, iw, ih, w * 0.03);
     ctx.stroke();
@@ -799,7 +830,7 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     // scientific name, then type pill and rarity label
     const below = iy + ih;
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#5c5240';
+    ctx.fillStyle = gold ? '#5a4210' : '#5c5240';
     ctx.fillText(fitFont(ctx, card.sci_name || type.label, 'italic 500', DISPLAY, w * 0.056, inner, w * 0.04), 2 * p, below + w * 0.075);
     const pillY = below + w * 0.14, pillH = w * 0.1;
     ctx.font = `700 ${w * 0.05}px ${SANS}`;
@@ -811,11 +842,11 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(label, 2 * p + w * 0.035, pillY + pillH / 2);
     ctx.textAlign = 'right';
-    ctx.fillStyle = card.rarity === 'common' ? '#6b7280' : frame[2];
-    ctx.fillText(fitFont(ctx, rarity.label, 700, SANS, w * 0.05, inner - pillW - p, w * 0.035), w - 2 * p, pillY + pillH / 2);
+    ctx.fillStyle = gold ? '#7a5310' : card.rarity === 'common' ? '#6b7280' : frame[2];
+    ctx.fillText(fitFont(ctx, gold ? `Gold · ${rarity.label}` : rarity.label, 700, SANS, w * 0.05, inner - pillW - p, w * 0.035), w - 2 * p, pillY + pillH / 2);
 
     // foil sheen on the rarest cards
-    if (RARITY_FRAMES[card.rarity] && card.rarity !== 'rare') {
+    if (gold || (RARITY_FRAMES[card.rarity] && card.rarity !== 'rare')) {
         ctx.save();
         rrect(ctx, 0, 0, w, h, w * 0.06);
         ctx.clip();
