@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS user_cards (
     first_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, card_id)
 );
+-- who owns a card: the biome check gives players' cards their biome first
+CREATE INDEX IF NOT EXISTS user_cards_card_idx ON user_cards (card_id);
 
 CREATE TABLE IF NOT EXISTS openings (
     id          SERIAL PRIMARY KEY,
