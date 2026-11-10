@@ -3,6 +3,7 @@
  *
  *   DATABASE_URL="$(openkbs postgres connection --libpq)" node scripts/import-wikispecies.mjs          # preview only
  *   DATABASE_URL="$(openkbs postgres connection --libpq)" node scripts/import-wikispecies.mjs --apply  # write the cards
+ *   ... --all --apply   # every remaining species with a photo and an en.wikipedia article, Wikispecies page or not, no TOTAL cap
  *
  * Candidates: species with a Wikispecies page, a Commons photo (P18) and an en.wikipedia article
  * (for the intro and the popularity), but no fr.wikipedia article (those already come from build-catalog.mjs).
@@ -19,7 +20,8 @@ import pg from 'pg';
 import { RANK, TYPES, IUCN, sleep, cache, sparql, commonsImage, qidOf, resolveAnchors, hpFor } from './build-catalog.mjs';
 import { battleStats } from '../functions/api/battle.mjs';
 
-const TOTAL = Number(process.env.TOTAL) || 8000;
+const ALL = process.argv.includes('--all');
+const TOTAL = ALL ? Infinity : Number(process.env.TOTAL) || 8000;
 const POOL_FACTOR = 2.5; // candidates per kept card whose page views are fetched
 const APPLY = process.argv.includes('--apply');
 const UA_CONTACT = 'NatureDex/1.0 (https://naturedex.fr; contact@naturedex.fr)';
@@ -34,7 +36,7 @@ async function fetchCandidates(type, anchorIds) {
                (SAMPLE(?vn0) AS ?vn) (SAMPLE(?gbif0) AS ?gbif) (SAMPLE(?iucn0) AS ?iucn) WHERE {
         ${taxonClause}
         ?item wdt:P18 ?img0; wikibase:sitelinks ?sl0.
-        ?ws schema:about ?item; schema:isPartOf <https://species.wikimedia.org/>.
+        ${ALL ? '' : '?ws schema:about ?item; schema:isPartOf <https://species.wikimedia.org/>.'}
         ?en schema:about ?item; schema:isPartOf <https://en.wikipedia.org/>; schema:name ?title0.
         MINUS { ?fr schema:about ?item; schema:isPartOf <https://fr.wikipedia.org/>. }
         OPTIONAL { ?item wdt:P225 ?sci0. }
@@ -110,7 +112,7 @@ async function main() {
     console.log('Querying Wikidata (Wikispecies + photo + en.wikipedia, no fr.wikipedia) per type…');
     const byType = {};
     const seen = new Set();
-    const candidatesCache = cache('wikispecies-candidates'); // delete the file to re-query Wikidata
+    const candidatesCache = cache(ALL ? 'enwiki-candidates' : 'wikispecies-candidates'); // delete the file to re-query Wikidata
     for (const type of TYPES) {
         if (!candidatesCache.data[type.key]) {
             candidatesCache.data[type.key] = await fetchCandidates(type, anchorIds);
@@ -128,7 +130,8 @@ async function main() {
     const share = {};
     for (const c of frwiki) share[c.type] = (share[c.type] || 0) + 1 / frwiki.length;
     const quota = Object.fromEntries(TYPES.map((t) => [t.key, 0]));
-    let left = TOTAL;
+    if (ALL) for (const t of TYPES) quota[t.key] = byType[t.key].length;
+    let left = ALL ? 0 : TOTAL;
     for (let pass = 0; pass < 5 && left > 0; pass++) {
         const open = TYPES.map((t) => t.key).filter((k) => byType[k].length > quota[k]);
         const sum = open.reduce((a, k) => a + (share[k] || 0), 0);
