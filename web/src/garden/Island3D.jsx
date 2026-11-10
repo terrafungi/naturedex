@@ -900,11 +900,13 @@ export default function Island3D({ plots, maxPlots, now, decor, rain, hour, labe
         // taps (a short press without dragging)
         const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
         let down = null;
+        // the raycaster ignores visibility: a hidden group (unbought decor, lock sign) would steal the tap
+        const shown = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
         function pick(e) {
             const box = renderer.domElement.getBoundingClientRect();
             ndc.set(((e.clientX - box.left) / box.width) * 2 - 1, -((e.clientY - box.top) / box.height) * 2 + 1);
             ray.setFromCamera(ndc, camera);
-            const hit = ray.intersectObjects(scene.children, true).find((h) => h.object.visible && h.object.userData.tap && !h.object.isPoints && !h.object.isLineSegments && !h.object.isSprite);
+            const hit = ray.intersectObjects(scene.children, true).find((h) => h.object.userData.tap && !h.object.isPoints && !h.object.isLineSegments && !h.object.isSprite && shown(h.object));
             return hit?.object.userData.tap || null;
         }
         const onDown = (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; };
@@ -913,7 +915,7 @@ export default function Island3D({ plots, maxPlots, now, decor, rain, hour, labe
             const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
             const quick = performance.now() - down.t < 600;
             down = null;
-            if (moved > 8 || !quick) return;
+            if (moved > (e.pointerType === 'mouse' ? 8 : 16) || !quick) return;
             const tap = pick(e);
             if (tap) tapRef.current?.(tap);
         };
