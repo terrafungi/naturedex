@@ -146,13 +146,22 @@ function chargeState(user, now = Date.now()) {
 
 const quizPerDay = (user) => QUIZ_PER_DAY + (passActive(user) ? PASS.quizzes : 0);
 
+// Catalogue size — counting ~156k cards on every request was the costliest query; cached per Lambda container for 5 min.
+let cardTotal, cardTotalAt = 0;
+async function cardsTotal(db) {
+    if (cardTotal === undefined || Date.now() - cardTotalAt > 300_000) {
+        cardTotal = (await db.query(`SELECT COUNT(*)::int AS n FROM cards`)).rows[0].n;
+        cardTotalAt = Date.now();
+    }
+    return cardTotal;
+}
+
 async function publicUser(db, user) {
-    const { rows } = await db.query(
-        `SELECT COUNT(*)::int AS discovered, COALESCE(SUM(count), 0)::int AS owned,
-                (SELECT COUNT(*)::int FROM cards) AS total
-         FROM user_cards WHERE user_id = $1`,
-        [user.id]
-    );
+    const [{ rows }, total] = await Promise.all([
+        db.query(`SELECT COUNT(*)::int AS discovered, COALESCE(SUM(count), 0)::int AS owned FROM user_cards WHERE user_id = $1`, [user.id]),
+        cardsTotal(db),
+    ]);
+    rows[0].total = total;
     const charge = chargeState(user);
     const nextDaily = user.last_daily ? new Date(user.last_daily).getTime() + DAILY_COOLDOWN_MS : 0;
     return {
@@ -279,12 +288,14 @@ function challengesOf(day) {
 
 async function dailyChallenges(db, userId) {
     const { rows: [{ day }] } = await db.query(`SELECT to_char((now() AT TIME ZONE 'Europe/Paris')::date, 'YYYY-MM-DD') AS day`);
-    const today = `(o.at AT TIME ZONE 'Europe/Paris')::date = $2::date`;
+    // Paris day as a range on the raw column, so the (user_id, at) / (user_id, …) indexes serve the date too
+    const dayRange = (col) => `${col} >= ($2::date::timestamp AT TIME ZONE 'Europe/Paris') AND ${col} < (($2::date + 1)::timestamp AT TIME ZONE 'Europe/Paris')`;
+    const today = dayRange('o.at');
     const [{ rows: pulled }, { rows: [stats] }, { rows: claims }] = await Promise.all([
         db.query(`SELECT c.type, c.rarity FROM openings o CROSS JOIN unnest(o.card_ids) AS u(card_id) JOIN cards c ON c.id = u.card_id
                   WHERE o.user_id = $1 AND ${today}`, [userId, day]),
         db.query(`SELECT (SELECT COUNT(*)::int FROM openings o WHERE o.user_id = $1 AND ${today}) AS opened,
-                         (SELECT COUNT(*)::int FROM user_cards uc WHERE uc.user_id = $1 AND (uc.first_at AT TIME ZONE 'Europe/Paris')::date = $2::date) AS discovered`,
+                         (SELECT COUNT(*)::int FROM user_cards uc WHERE uc.user_id = $1 AND ${dayRange('uc.first_at')}) AS discovered`,
         [userId, day]),
         db.query(`SELECT key FROM challenge_claims WHERE user_id = $1 AND day = $2`, [userId, day]),
     ]);
@@ -536,10 +547,7 @@ async function inviteState(db, user) {
 
 async function trophyList(db, userId) {
     const [{ rows: [m] }, { rows: groups }, { rows: claims }] = await Promise.all([
-        db.query(`SELECT
-                    (SELECT COUNT(*)::int FROM user_cards WHERE user_id = $1) AS discovered,
-                    (SELECT COALESCE(SUM(count), 0)::int FROM user_cards WHERE user_id = $1) AS owned,
-                    (SELECT COALESCE(MAX(count), 0)::int FROM user_cards WHERE user_id = $1) AS "maxCount",
+        db.query(`SELECT uc.*,
                     (SELECT COUNT(*)::int FROM openings WHERE user_id = $1) AS opened,
                     (SELECT COUNT(*)::int FROM challenge_claims WHERE user_id = $1) AS challenges,
                     (SELECT COUNT(*)::int FROM auctions WHERE seller_id = $1 AND status = 'sold') AS sold,
@@ -572,9 +580,13 @@ async function trophyList(db, userId) {
                         AND c.rarity = 'legendary') AS "exploreLegendary",
                     (SELECT COUNT(*)::int FROM explore_catches WHERE user_id = $1 AND caught AND perfect) AS "explorePerfect",
                     (SELECT COUNT(DISTINCT (at AT TIME ZONE 'Europe/Paris')::date)::int FROM explore_catches WHERE user_id = $1 AND caught) AS "exploreDays",
-                    recycled FROM users WHERE id = $1`, [userId]),
-        db.query(`SELECT c.type, c.rarity, COUNT(*)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
-                  WHERE uc.user_id = $1 GROUP BY 1, 2`, [userId]),
+                    recycled
+                  FROM users, LATERAL (SELECT COUNT(*)::int AS discovered, COALESCE(SUM(count), 0)::int AS owned,
+                                              COALESCE(MAX(count), 0)::int AS "maxCount"
+                                       FROM user_cards WHERE user_id = $1) uc
+                  WHERE id = $1`, [userId]),
+        // kept up to date by a trigger on user_cards (schema.sql)
+        db.query(`SELECT type, rarity, n FROM user_card_groups WHERE user_id = $1 AND n > 0`, [userId]),
         db.query(`SELECT key FROM trophy_claims WHERE user_id = $1`, [userId]),
     ]);
     const perType = {};

@@ -48,7 +48,7 @@ export function GameProvider({ children }) {
             .finally(() => setReady(true));
     }, [refreshCollection]);
 
-    // Counters per page (`/defis`: 2…) for the navigation badges, refreshed every 30 s,
+    // Counters per page (`/defis`: 2…) for the navigation badges, refreshed every 60 s,
     // on page change and shortly after any action that returns a new user.
     const [badges, setBadges] = useState({});
     const [gifts, setGifts] = useState([]); // gifts received and not yet shown (pop-up)
@@ -63,7 +63,7 @@ export function GameProvider({ children }) {
     useEffect(() => {
         if (!loggedIn) return;
         refreshBadges();
-        const t = setInterval(() => document.visibilityState === 'visible' && refreshBadges(), 30_000);
+        const t = setInterval(() => document.visibilityState === 'visible' && refreshBadges(), 60_000);
         const onShow = () => document.visibilityState === 'visible' && refreshBadges();
         document.addEventListener('visibilitychange', onShow);
         return () => { clearInterval(t); document.removeEventListener('visibilitychange', onShow); };

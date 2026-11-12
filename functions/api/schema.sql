@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS openings (
     card_ids    INTEGER[] NOT NULL,
     at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- today's openings of a player (daily challenges)
+CREATE INDEX IF NOT EXISTS okbs_openings_user_id_at_idx ON openings (user_id, at);
 
 -- daily challenges already rewarded (day = Europe/Paris calendar day)
 CREATE TABLE IF NOT EXISTS challenge_claims (
@@ -627,3 +629,36 @@ CREATE TABLE IF NOT EXISTS tcg_decks (
 -- Binder sub-folders: one level under a main binder (deleting the main one deletes them too).
 ALTER TABLE binders ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES binders(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS binders_parent ON binders (parent_id) WHERE parent_id IS NOT NULL;
+
+-- Distinct cards owned per player, type and rarity (trophies), kept up to date by a trigger
+-- instead of joining the whole collection to cards on every request. Created and filled under
+-- a lock so no card is added or removed between the backfill and the trigger.
+BEGIN;
+LOCK TABLE user_cards IN SHARE ROW EXCLUSIVE MODE;
+CREATE TABLE IF NOT EXISTS user_card_groups (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type        TEXT NOT NULL,
+    rarity      TEXT NOT NULL,
+    n           INTEGER NOT NULL,
+    PRIMARY KEY (user_id, type, rarity)
+);
+CREATE OR REPLACE FUNCTION user_card_groups_sync() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP IN ('DELETE', 'UPDATE') THEN
+        UPDATE user_card_groups g SET n = g.n - 1 FROM cards c
+         WHERE c.id = OLD.card_id AND g.user_id = OLD.user_id AND g.type = c.type AND g.rarity = c.rarity;
+    END IF;
+    IF TG_OP IN ('INSERT', 'UPDATE') THEN
+        INSERT INTO user_card_groups (user_id, type, rarity, n)
+        SELECT NEW.user_id, c.type, c.rarity, 1 FROM cards c WHERE c.id = NEW.card_id
+        ON CONFLICT (user_id, type, rarity) DO UPDATE SET n = user_card_groups.n + 1;
+    END IF;
+    RETURN NULL;
+END $$;
+DROP TRIGGER IF EXISTS user_card_groups_sync ON user_cards;
+CREATE TRIGGER user_card_groups_sync AFTER INSERT OR DELETE OR UPDATE OF user_id, card_id ON user_cards
+    FOR EACH ROW EXECUTE FUNCTION user_card_groups_sync();
+INSERT INTO user_card_groups (user_id, type, rarity, n)
+SELECT uc.user_id, c.type, c.rarity, COUNT(*) FROM user_cards uc JOIN cards c ON c.id = uc.card_id GROUP BY 1, 2, 3
+ON CONFLICT DO NOTHING;
+COMMIT;
