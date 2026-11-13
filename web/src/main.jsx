@@ -28,6 +28,10 @@ import Friends from './pages/Friends.jsx';
 import Quiz from './pages/Quiz.jsx';
 import Shop from './pages/Shop.jsx';
 import Privacy from './pages/Privacy.jsx';
+
+// ?applixir on any page tries AppLixir in this browser before it is live for everyone (?applixir=0 stops)
+const applixirParam = new URLSearchParams(location.search).get('applixir');
+if (applixirParam !== null) localStorage.setItem('applixirTest', applixirParam === '0' ? '0' : '1');
 import Combat from './pages/Combat.jsx';
 import Battle from './pages/Battle.jsx';
 const Duel = lazy(() => import('./pages/Duel.jsx'));

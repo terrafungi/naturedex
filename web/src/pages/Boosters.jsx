@@ -84,9 +84,7 @@ export default function Boosters() {
     const [adNote, setAdNote] = useState('');
     useEffect(() => {
         if (!adsEnabled()) return;
-        // ?applixir in the address tries AppLixir in this browser before it is live for everyone (?applixir=0 stops)
-        const param = new URLSearchParams(location.search).get('applixir');
-        if (param !== null) localStorage.setItem('applixirTest', param === '0' ? '0' : '1');
+        // AppLixir test flag, set by ?applixir on any page (main.jsx)
         const test = localStorage.getItem('applixirTest') === '1';
         api('adStatus').then((s) => {
             const status = test ? { ...s, provider: 'applixir' } : s;
