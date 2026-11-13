@@ -39,7 +39,7 @@ async function batch(db) {
             ORDER BY EXISTS (SELECT 1 FROM user_cards uc WHERE uc.card_id = cards.id) DESC, views DESC -- players' cards first: their decks need them
             LIMIT ${PER_BATCH} FOR UPDATE SKIP LOCKED)
         RETURNING id, name, sci_name, type`);
-    if (!cards.length) return 0;
+    if (!cards.length) { idleUntil = Date.now() + IDLE_MS; return 0; }
     const answers = await llm(prompt(cards));
     const byId = new Map((Array.isArray(answers) ? answers : []).map((a) => [Number(a.id), String(a.b || '').toLowerCase()]));
     const ids = [], biomes = [];
@@ -53,9 +53,13 @@ async function batch(db) {
     return ids.length;
 }
 
+// once every card has a biome, look for new ones only once an hour (per Lambda container)
+const IDLE_MS = 3_600_000;
+let idleUntil = 0;
+
 /** Called every minute by the schedule. */
 export async function biomeCheckTick(db) {
-    if (!process.env.GEMINI_API_KEY) return;
+    if (!process.env.GEMINI_API_KEY || Date.now() < idleUntil) return;
     const done = await Promise.all(Array.from({ length: BATCHES }, () => batch(db).catch((err) => { console.error('biomeCheck', err.message); return 0; })));
     const n = done.reduce((a, b) => a + b, 0);
     if (n) console.log(`biome check: ${n} cartes`);

@@ -27,9 +27,13 @@ Si tu ne sais vraiment pas, mets null. Réponds uniquement en JSON : [{"id": <id
 
 ${cards.map((c) => `${c.id} | ${c.sci_name || ''} | ${c.name} | ${c.type}`).join('\n')}`;
 
+// once every mass is checked, look for new ones only once an hour (per Lambda container)
+const IDLE_MS = 3_600_000;
+let idleUntil = 0;
+
 /** Called every minute by the schedule. */
 export async function massCheckTick(db) {
-    if (!process.env.GEMINI_API_KEY) return;
+    if (!process.env.GEMINI_API_KEY || Date.now() < idleUntil) return;
     // claim a batch (a claim older than 5 minutes is a crashed run: take it again)
     const { rows: cards } = await db.query(`
         UPDATE cards SET stats = stats || jsonb_build_object('mass_claim', extract(epoch FROM now())::int)
@@ -39,7 +43,7 @@ export async function massCheckTick(db) {
               AND coalesce((stats->>'mass_claim')::int, 0) < extract(epoch FROM now()) - 300
             ORDER BY views DESC LIMIT ${PER_TICK} FOR UPDATE SKIP LOCKED)
         RETURNING id, name, sci_name, type, (stats->>'mass_kg')::float AS kg`);
-    if (!cards.length) return;
+    if (!cards.length) { idleUntil = Date.now() + IDLE_MS; return; }
     const answers = await llm(prompt(cards));
     const byId = new Map((Array.isArray(answers) ? answers : []).map((a) => [Number(a.id), Number(a.kg)]));
     let fixed = 0;
