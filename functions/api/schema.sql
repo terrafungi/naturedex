@@ -568,6 +568,8 @@ CREATE TABLE IF NOT EXISTS ad_views (
     claimed_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS ad_views_user_claimed ON ad_views (user_id, claimed_at);
+-- AppLixir transaction id of the confirmed ad (unique: a replayed callback pays nothing)
+ALTER TABLE ad_views ADD COLUMN IF NOT EXISTS tid TEXT UNIQUE;
 
 -- Card source: 'frwiki' (build-catalog.mjs, fr.wikipedia articles) or 'wikispecies' (import-wikispecies.mjs:
 -- Wikispecies taxa with a photo and an English article, intro translated to French on first view).
@@ -662,3 +664,6 @@ INSERT INTO user_card_groups (user_id, type, rarity, n)
 SELECT uc.user_id, c.type, c.rarity, COUNT(*) FROM user_cards uc JOIN cards c ON c.id = uc.card_id GROUP BY 1, 2, 3
 ON CONFLICT DO NOTHING;
 COMMIT;
+
+-- Test: the account's next booster is a god pack (set by hand, reset when opened)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS force_god_pack BOOLEAN NOT NULL DEFAULT false;

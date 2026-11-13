@@ -51,7 +51,12 @@ const DAILY_COINS = 100;
 const MAX_CHARGES = 10;
 const CHARGE_MS = 30 * 60 * 1000; // a full refill takes 5 h
 const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
-// Rewarded ads can't be verified server-side (web ads have no callback), so the reward is small and capped.
+// Rewarded ads. Google's can't be verified server-side (no callback), so the reward is small and capped.
+// AppLixir confirms each completed ad to /applixir-callback (signed): with it live, only that confirmation pays.
+// Turn APPLIXIR_LIVE on once AppLixir has approved the site (dashboard status no longer "Under Review");
+// until then it can be tried by opening the site with ?applixir (that browser only).
+const APPLIXIR_LIVE = false;
+const APPLIXIR_API_KEY = 'd127191f-1eea-49d5-a7e6-d54914014da5'; // public: the site sends it to the ad player
 const AD_DAILY = 5; // bonus boosters per Paris day
 const AD_MIN_SECONDS = 12; // minimum time between starting and claiming an ad
 const SESSION_DAYS = 60;
@@ -772,6 +777,35 @@ async function adsLeft(db, userId) {
     return Math.max(0, AD_DAILY - n);
 }
 
+/**
+ * AppLixir server callback (GET, mode md5AndTid): a player watched a whole ad. userId is our user id;
+ * the booster goes to that player's latest unclaimed adStart of the last hour (adStart checked the daily cap).
+ * tid is unique per ad, so a replayed URL pays nothing. Always 200 unless forged: AppLixir never retries.
+ */
+async function applixirCallback(db, q) {
+    const text = (body, statusCode = 200) => ({ statusCode, headers: { 'Content-Type': 'text/plain' }, body });
+    const same = (a, b) => { const x = Buffer.from(String(a || '')), y = Buffer.from(String(b || '')); return x.length === y.length && crypto.timingSafeEqual(x, y); };
+    const secret = process.env.APPLIXIR_SECRET;
+    if (!secret || !same(q.gameApiKey, APPLIXIR_API_KEY)) return text('forbidden', 403);
+    const signature = crypto.createHash('md5')
+        .update([q.gameApiKey, q.gameId, q.userId, q.tid].map((v) => v || '').join('') + secret).digest('hex');
+    if (!(q.signature ? same(String(q.signature).toLowerCase(), signature) : same(q.secretKey, secret))) return text('forbidden', 403);
+    const userId = Number(q.userId);
+    if (!Number.isInteger(userId) || userId <= 0 || !/^[0-9a-f]{16,64}$/i.test(q.tid || '')) return text('ignored');
+    return inTransaction(db, async (client) => {
+        if ((await client.query(`SELECT 1 FROM ad_views WHERE tid = $1`, [q.tid])).rowCount) return text('duplicate');
+        await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [userId]);
+        if (await adsLeft(client, userId) <= 0) return text('capped');
+        const { rowCount } = await client.query(
+            `UPDATE ad_views SET claimed_at = now(), tid = $2
+             WHERE id = (SELECT id FROM ad_views WHERE user_id = $1 AND claimed_at IS NULL AND started_at > now() - interval '1 hour'
+                         ORDER BY started_at DESC LIMIT 1)`, [userId, q.tid]);
+        if (!rowCount) return text('no pending ad');
+        await client.query(`UPDATE users SET boosters = boosters + 1 WHERE id = $1`, [userId]);
+        return text('credited');
+    });
+}
+
 async function inTransaction(db, fn) {
     const client = await db.connect();
     try {
@@ -1479,9 +1513,11 @@ const actions = {
                 throw new HttpError(402, body.pay === 'plants' ? 'Pas assez de plantes : récolte ton jardin'
                     : body.pay ? 'Pas assez de graines' : 'Plus de charge : attends la prochaine ou paie en graines');
             }
+            // force_god_pack: set by hand on an account to test the god pack, used once
+            if (current.force_god_pack) update += ', force_god_pack = false';
             ({ rows: [locked] } = await client.query(`UPDATE users SET ${update} WHERE id = $1 RETURNING *`, [user.id, ...params]));
 
-            godPack = isGodPack(pools);
+            godPack = (current.force_god_pack && Object.values(pools.god).every((g) => g.length)) || isGodPack(pools);
             ids = drawBooster(pools, godPack);
             const { rows: before } = await client.query(
                 `SELECT card_id FROM user_cards WHERE user_id = $1 AND card_id = ANY($2)`,
@@ -1989,7 +2025,7 @@ const actions = {
 
     async adStatus(db, body, event) {
         const user = await requireUser(db, event);
-        return { adsLeft: await adsLeft(db, user.id), adDaily: AD_DAILY };
+        return { adsLeft: await adsLeft(db, user.id), adDaily: AD_DAILY, provider: APPLIXIR_LIVE ? 'applixir' : 'google', adUser: String(user.id) };
     },
 
     async adStart(db, body, event) {
@@ -2003,6 +2039,14 @@ const actions = {
 
     async adClaim(db, body, event) {
         const user = await requireUser(db, event);
+        if (APPLIXIR_LIVE || body.wait) {
+            // AppLixir (live, or tested with ?applixir): the booster is granted by its callback, just report whether it arrived
+            const { rows: [view] } = await db.query(
+                `SELECT claimed_at FROM ad_views WHERE token = $2 AND user_id = $1`, [user.id, String(body.token || '')]);
+            if (!view?.claimed_at) throw new HttpError(409, 'Pub pas encore confirmée');
+            const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
+            return { user: await publicUser(db, fresh), adsLeft: await adsLeft(db, user.id) };
+        }
         return inTransaction(db, async (client) => {
             await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
             if (await adsLeft(client, user.id) <= 0) throw new HttpError(429, 'Plus de pub récompensée aujourd\'hui, reviens demain');
@@ -3063,6 +3107,15 @@ export const handler = async (event) => {
         } catch (error) {
             console.error('share', error);
             return { statusCode: 302, headers: { Location: SITE }, body: '' };
+        }
+    }
+    if (event.rawPath === '/applixir-callback') {
+        try {
+            return await applixirCallback(getPool(), event.queryStringParameters || {});
+        } catch (error) {
+            if (error.code === '23505') return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: 'duplicate' }; // same tid at the same time
+            console.error('applixir', error.message);
+            return { statusCode: 500, headers: { 'Content-Type': 'text/plain' }, body: 'error' };
         }
     }
     if (event.rawPath === '/stripe-webhook') {

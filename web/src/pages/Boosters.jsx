@@ -78,13 +78,21 @@ export default function Boosters() {
     const open = () => run('openBooster', (res) => { addCards(res.cards); setBonus(res.bonus || null); setGodPack(!!res.godPack); setOpening(res.cards); }, { pay: payWith === 'plants' ? 'plants' : payWith === 'coins' });
     const daily = () => run('claimDaily');
 
-    // Rewarded ad: the server hands out a token, the reward is claimable once the ad was watched.
+    // Rewarded ad: the server hands out a token, the reward is claimable once the ad was watched
+    // (with AppLixir, once AppLixir's servers have confirmed it to ours).
     const [ads, setAds] = useState(null);
     const [adNote, setAdNote] = useState('');
     useEffect(() => {
         if (!adsEnabled()) return;
-        loadAds();
-        api('adStatus').then(setAds).catch(() => {});
+        // ?applixir in the address tries AppLixir in this browser before it is live for everyone (?applixir=0 stops)
+        const param = new URLSearchParams(location.search).get('applixir');
+        if (param !== null) localStorage.setItem('applixirTest', param === '0' ? '0' : '1');
+        const test = localStorage.getItem('applixirTest') === '1';
+        api('adStatus').then((s) => {
+            const status = test ? { ...s, provider: 'applixir' } : s;
+            loadAds(status.provider);
+            setAds(status);
+        }).catch(() => {});
     }, []);
     async function watchAd() {
         setBusy(true);
@@ -92,14 +100,31 @@ export default function Boosters() {
         setAdNote('');
         try {
             const started = Date.now();
-            const { token } = await api('adStart');
-            const result = await showRewardedAd();
+            const applixir = ads.provider === 'applixir';
+            // AppLixir's player must open inside the click, so the token is asked for at the same time
+            const starting = api('adStart');
+            if (!applixir) await starting;
+            const result = await showRewardedAd(ads.provider, ads.adUser);
+            const { token } = await starting;
             if (result !== 'viewed') {
                 setAdNote(result === 'dismissed' ? 'Pub interrompue : pas de booster cette fois.' : 'Aucune pub disponible pour l\'instant, réessaie un peu plus tard.');
                 return;
             }
-            await new Promise((r) => setTimeout(r, Math.max(0, started + 12500 - Date.now())));
-            const res = await api('adClaim', { token });
+            let res;
+            if (applixir) {
+                setAdNote('Pub terminée, ton booster arrive…');
+                for (let i = 0; i < 15 && !res; i++) {
+                    await new Promise((r) => setTimeout(r, 2000));
+                    res = await api('adClaim', { token, wait: true }).catch(() => null);
+                }
+                if (!res) {
+                    setAdNote('Confirmation en attente : ton booster apparaîtra dans quelques minutes.');
+                    return;
+                }
+            } else {
+                await new Promise((r) => setTimeout(r, Math.max(0, started + 12500 - Date.now())));
+                res = await api('adClaim', { token });
+            }
             setUser(res.user);
             setAds((a) => ({ ...a, adsLeft: res.adsLeft }));
             setAdNote('+1 booster offert ! Ouvre-le avec le bouton du paquet.');
