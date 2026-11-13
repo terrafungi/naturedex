@@ -91,7 +91,9 @@ function getPool() {
         pool = new pg.Pool({
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: true },
-            max: 3,
+            // one connection per Lambda container (shared Postgres Flex): never query through the
+            // pool while holding a client from db.connect() / inTransaction, it would wait forever
+            max: 1,
             idleTimeoutMillis: 60_000,
             connectionTimeoutMillis: 5_000,
         });
@@ -1452,6 +1454,8 @@ const actions = {
         const user = await requireUser(db, event);
         const pools = await getRarityPools(db);
         const client = await db.connect();
+        // set in the transaction, used after the connection is released (the pool holds a single one)
+        let locked, ids, ownedBefore, bonus, paidWith, godPack;
         try {
             await client.query('BEGIN');
             const { rows: [current] } = await client.query(`SELECT * FROM users WHERE id = $1 FOR UPDATE`, [user.id]);
@@ -1460,7 +1464,7 @@ const actions = {
             if (recent) throw new HttpError(429, 'Booster déjà en cours d\'ouverture');
             const now = Date.now();
             const charge = chargeState(current, now);
-            let update, params, paidWith;
+            let update, params;
             if (charge.charges > 0) {
                 // A full gauge starts its 30-minute timer at this opening; otherwise keep the timer running.
                 const since = charge.charges >= MAX_CHARGES ? now : charge.from + charge.ticks * charge.step;
@@ -1475,15 +1479,15 @@ const actions = {
                 throw new HttpError(402, body.pay === 'plants' ? 'Pas assez de plantes : récolte ton jardin'
                     : body.pay ? 'Pas assez de graines' : 'Plus de charge : attends la prochaine ou paie en graines');
             }
-            const { rows: [locked] } = await client.query(`UPDATE users SET ${update} WHERE id = $1 RETURNING *`, [user.id, ...params]);
+            ({ rows: [locked] } = await client.query(`UPDATE users SET ${update} WHERE id = $1 RETURNING *`, [user.id, ...params]));
 
-            const godPack = isGodPack(pools);
-            const ids = drawBooster(pools, godPack);
+            godPack = isGodPack(pools);
+            ids = drawBooster(pools, godPack);
             const { rows: before } = await client.query(
                 `SELECT card_id FROM user_cards WHERE user_id = $1 AND card_id = ANY($2)`,
                 [user.id, ids]
             );
-            const ownedBefore = new Set(before.map((r) => r.card_id));
+            ownedBefore = new Set(before.map((r) => r.card_id));
             for (const id of ids) {
                 await client.query(
                     `INSERT INTO user_cards (user_id, card_id) VALUES ($1, $2)
@@ -1492,29 +1496,29 @@ const actions = {
                 );
             }
             await client.query(`INSERT INTO openings (user_id, card_ids) VALUES ($1, $2)`, [user.id, ids]);
-            const bonus = await boosterBonus(client, user.id, ids); // an Énergie for the card duel
+            bonus = await boosterBonus(client, user.id, ids); // an Énergie for the card duel
             await client.query('COMMIT');
-
-            const { rows: cards } = await db.query(`SELECT ${CARD_FIELDS} FROM cards c WHERE c.id = ANY($1)`, [ids]);
-            // a few words about each species under the revealed card (intros are fetched lazily)
-            await Promise.all(cards.filter((c) => !c.extract && c.wiki_url).map(async (c) => {
-                c.extract = await fillExtract(db, c).catch(() => null);
-            }));
-            for (const c of cards) c.fact = intro(c.extract, 320);
-            const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
-            const seen = new Set();
-            const pack = ids.map((id) => {
-                const isNew = !ownedBefore.has(id) && !seen.has(id);
-                seen.add(id);
-                return { ...byId[id], isNew };
-            });
-            return { cards: pack, bonus, paidWith, ...(godPack ? { godPack: true } : {}), user: await publicUser(db, locked) };
         } catch (err) {
             await client.query('ROLLBACK').catch(() => {});
             throw err;
         } finally {
             client.release();
         }
+
+        const { rows: cards } = await db.query(`SELECT ${CARD_FIELDS} FROM cards c WHERE c.id = ANY($1)`, [ids]);
+        // a few words about each species under the revealed card (intros are fetched lazily)
+        await Promise.all(cards.filter((c) => !c.extract && c.wiki_url).map(async (c) => {
+            c.extract = await fillExtract(db, c).catch(() => null);
+        }));
+        for (const c of cards) c.fact = intro(c.extract, 320);
+        const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
+        const seen = new Set();
+        const pack = ids.map((id) => {
+            const isNew = !ownedBefore.has(id) && !seen.has(id);
+            seen.add(id);
+            return { ...byId[id], isNew };
+        });
+        return { cards: pack, bonus, paidWith, ...(godPack ? { godPack: true } : {}), user: await publicUser(db, locked) };
     },
 
     // Catalogue overview (tens of thousands of cards: never sent whole): counts per type
@@ -2599,12 +2603,12 @@ const actions = {
             }
             let questions, reserve = null;
             if (mode === 'daily') {
-                ({ questions, reserve } = await dailyQuestions(db, day));
+                ({ questions, reserve } = await dailyQuestions(client, day));
             } else {
                 const { rows: seenRows } = await client.query(`SELECT card_id, at FROM quiz_seen WHERE user_id = $1`, [user.id]);
                 const seen = new Map(seenRows.map((r) => [r.card_id, new Date(r.at).getTime()]));
                 const levels = mode === 'classic' ? [...LEVELS, 2] : Array.from({ length: 10 }, (_, i) => levelAt(mode, i));
-                questions = await buildQuiz(db, theme, seen, { levels, kinds: kindsFor(mode) });
+                questions = await buildQuiz(client, theme, seen, { levels, kinds: kindsFor(mode) });
                 if (mode === 'classic' && questions.length > LEVELS.length) reserve = questions.pop();
             }
             if (questions.length < 5) throw new HttpError(503, 'Impossible de préparer un quiz pour ce thème, essaie un autre thème');
@@ -2632,7 +2636,7 @@ const actions = {
             if (q.status === 'done') return { quiz: quizProgress(q), done: true };
             if (!q.questions[q.current]) {
                 // An endless run went past its prepared questions (a skip at the very end): add more.
-                const more = await moreQuestions(db, q);
+                const more = await moreQuestions(client, q);
                 if (!more.length) throw new HttpError(503, 'Plus de questions disponibles, réessaie dans un instant');
                 ({ rows: [q] } = await client.query(`UPDATE quizzes SET questions = questions || $2::jsonb WHERE id = $1 RETURNING *`, [q.id, JSON.stringify(more)]));
             }
@@ -2996,7 +3000,7 @@ const actions = {
                 [user.id, nuggets, recycled]
             );
             await client.query('COMMIT');
-            return { recycled, nuggets, user: await publicUser(db, updated) };
+            return { recycled, nuggets, user: await publicUser(client, updated) };
         } catch (err) {
             await client.query('ROLLBACK').catch(() => {});
             throw err;
