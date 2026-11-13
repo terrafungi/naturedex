@@ -1,6 +1,6 @@
 import { GameCard } from './TcgCard.jsx';
 import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react';
+import { AnimatePresence, motion, useAnimationControls, useMotionValue, useTransform } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { ART, Card, CardBack, useMyFrame } from './Card.jsx';
@@ -77,6 +77,8 @@ function Implode({ fx }) {
 }
 
 // Secret seal breaking: rainbow light leaking through cracks drawn over the card back.
+// No CSS filter / blur in here: inside the 3D-flipped card, iPhones (Safari) render those badly and slowly,
+// so the glow is drawn with wider, fainter strokes and the halos fade out with a mask.
 const CRACK_PATHS = [
     ['M50 0 L46 22.4 L54 37.8 L47 54.6'],
     ['M47 54.6 L60 72.8 L40 98', 'M46 22.4 L0 42', 'M54 37.8 L100 35'],
@@ -84,8 +86,7 @@ const CRACK_PATHS = [
 ];
 function Cracks({ n }) {
     return (
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 140" preserveAspectRatio="none"
-            style={{ filter: 'drop-shadow(0 0 3px #fff) drop-shadow(0 0 8px #ff5fd2) drop-shadow(0 0 14px #6ec8ff)' }}>
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 140" preserveAspectRatio="none">
             <defs>
                 <linearGradient id="nd-crack" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="140">
                     {RAINBOW_LIST.map((c, i) => <stop key={c} offset={i / 4} stopColor={c} />)}
@@ -93,6 +94,10 @@ function Cracks({ n }) {
             </defs>
             {CRACK_PATHS.slice(0, n).flat().map((d) => (
                 <g key={d}>
+                    {[[6, 0.18], [3.2, 0.35]].map(([w, o]) => (
+                        <motion.path key={w} d={d} fill="none" stroke="url(#nd-crack)" strokeWidth={w} strokeOpacity={o} strokeLinejoin="round" strokeLinecap="round"
+                            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }} />
+                    ))}
                     <motion.path d={d} fill="none" stroke="url(#nd-crack)" strokeWidth="1.1" strokeLinejoin="round" strokeLinecap="round"
                         initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }} />
                     <motion.path d={d} fill="none" stroke="#fff" strokeWidth="0.4" strokeLinejoin="round" strokeLinecap="round"
@@ -105,7 +110,7 @@ function Cracks({ n }) {
 function CrackGlow({ n }) {
     return (
         <motion.div className="absolute inset-[-25%] -z-10 rounded-full pointer-events-none"
-            style={{ background: `conic-gradient(from 0deg, ${RAINBOW})`, filter: 'blur(36px)' }}
+            style={{ background: `conic-gradient(from 0deg, ${RAINBOW})`, maskImage: 'radial-gradient(circle, black 25%, transparent 70%)', WebkitMaskImage: 'radial-gradient(circle, black 25%, transparent 70%)' }}
             animate={{ opacity: 0.35 + n * 0.2, scale: 0.8 + n * 0.15, rotate: 360 }}
             transition={{ opacity: { duration: 0.3 }, scale: { type: 'spring', damping: 8 }, rotate: { duration: 4, repeat: Infinity, ease: 'linear' } }} />
     );
@@ -142,7 +147,7 @@ function Shards() {
 function GodRays({ fx }) {
     const rainbow = fx.level === 5;
     return (
-        <motion.div className="fixed left-1/2 top-[45%] w-[220vmax] h-[220vmax] -ml-[110vmax] -mt-[110vmax] pointer-events-none"
+        <motion.div className="fixed left-1/2 top-[45%] w-[160vmax] h-[160vmax] -ml-[80vmax] -mt-[80vmax] pointer-events-none"
             style={{
                 background: rainbow
                     ? `repeating-conic-gradient(from 0deg, #ff5fd255 0deg 5deg, transparent 5deg 12deg, #6ec8ff55 12deg 17deg, transparent 17deg 24deg, #ffd36e55 24deg 29deg, transparent 29deg 36deg)`
@@ -157,7 +162,7 @@ function GodRays({ fx }) {
 const STAR = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
 function Rain({ fx }) {
     const rainbow = fx.level === 5;
-    const n = rainbow ? 90 : 60;
+    const n = 60;
     return (
         <div className="fixed inset-0 z-20 pointer-events-none overflow-hidden">
             {Array.from({ length: n }, (_, i) => {
@@ -218,7 +223,8 @@ function Burst({ fx }) {
                     }} />
             )}
             <motion.div className="absolute rounded-full"
-                style={{ inset: `${-18 - Math.min(level, 4) * 8}%`, background: rainbow ? `conic-gradient(${RAINBOW})` : `radial-gradient(circle, ${color}, transparent 62%)`, filter: `blur(${rainbow ? 40 : 18}px)` }}
+                style={{ inset: `${-18 - Math.min(level, 4) * 8}%`, background: rainbow ? `conic-gradient(${RAINBOW})` : `radial-gradient(circle, ${color}, transparent 62%)`,
+                    ...(rainbow ? { maskImage: 'radial-gradient(circle, black 25%, transparent 70%)', WebkitMaskImage: 'radial-gradient(circle, black 25%, transparent 70%)' } : { filter: 'blur(18px)' }) }}
                 initial={{ opacity: 0, scale: 0.4 }}
                 animate={{ opacity: [0, 0.95, 0.3 + level * 0.07], scale: [0.4, 1.15, 1] }}
                 transition={{ duration: 0.8 }} />
@@ -243,6 +249,10 @@ function FlipCard({ card, revealed, charging, cracks, onClick, demo }) {
     const shatter = fx.level === 5;
     const cracking = cracks > 0 && !revealed;
     const lifted = (charging || cracking) && chargeFx.level >= 4;
+    const shake = useAnimationControls();
+    useEffect(() => {
+        if (cracking) shake.start({ x: [0, -12, 11, -8, 6, -3, 0], rotate: [0, -3, 3, -2, 1, 0], transition: { duration: 0.4 } });
+    }, [cracks]); // eslint-disable-line react-hooks/exhaustive-deps
     return (
         <div className="relative w-[var(--deal-w)] cursor-pointer isolate" style={{ perspective: 1200 }} onClick={onClick}>
             {charging && <Charging fx={chargeFx} />}
@@ -254,9 +264,7 @@ function FlipCard({ card, revealed, charging, cracks, onClick, demo }) {
             <motion.div
                 animate={charging && amp ? { x: [0, -amp, amp, -amp * 1.6, amp * 1.6, -amp * 2.2, amp * 2.2, 0], rotate: [0, -1, 1, -1.5, 1.5, -2, 2, 0] } : { x: 0, rotate: 0 }}
                 transition={charging && amp ? { duration: chargeFx.charge / 1000, ease: 'easeIn' } : { duration: 0.2 }}>
-                <motion.div key={cracking ? cracks : 0}
-                    animate={cracking ? { x: [0, -12, 11, -8, 6, -3, 0], rotate: [0, -3, 3, -2, 1, 0] } : { x: 0 }}
-                    transition={{ duration: 0.4 }}>
+                <motion.div animate={shake}>
                 <motion.div
                     className="relative"
                     style={{ transformStyle: 'preserve-3d' }}
@@ -267,10 +275,10 @@ function FlipCard({ card, revealed, charging, cracks, onClick, demo }) {
                         ? { rotateY: { duration: 0 }, scale: { type: 'spring', damping: 9, stiffness: 120 } }
                         : { duration: fx.level >= 4 ? 0.9 : 0.6, ease: [0.3, 1.2, 0.5, 1] }}
                 >
-                    <div style={{ backfaceVisibility: 'hidden' }}>
+                    <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
                         <Card card={card} tilt frame={demo ? undefined : frame} />
                     </div>
-                    <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                    <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
                         <CardBack />
                         {cracking && <Cracks n={cracks} />}
                     </div>
