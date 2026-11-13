@@ -35,10 +35,9 @@ function cameraTokenOk(token, userId) {
     return want.length === got.length && crypto.timingSafeEqual(want, got);
 }
 
-// Cheapest vision models first: the "lite" line costs about 20× less than gemini-3.5-flash.
+// Free Gemini key only, the "lite" vision models: never billed to the project's credits.
 const MODEL = 'gemini-flash-lite-latest';
 const FREE_MODELS = [MODEL, 'gemini-3.5-flash-lite'];
-const PAID_MODEL = MODEL; // cheapest model in the OpenKBS proxy catalog
 const FIELD_CARD = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.views, c.thumb_url, c.iucn, c.stats`;
 
 const photoUrl = (key, small = false) => `${SITE}/${small ? key.replace(/\.jpg$/, '-s.jpg') : key}`;
@@ -89,8 +88,8 @@ class AiError extends Error {}
 async function identify(photo, where) {
     const key = process.env.GEMINI_API_KEY;
     const endpoints = [
+        // free Gemini key only: never billed to the project's credits
         ...(key ? FREE_MODELS.map((m) => ({ name: `free:${m}`, url: `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, headers: { 'x-goog-api-key': key } })) : []),
-        { name: 'openkbs', url: `https://proxy.openkbs.com/v1/google/models/${PAID_MODEL}:generateContent`, headers: { Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` } },
     ];
     const body = JSON.stringify({
         contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'image/jpeg', data: photo.toString('base64') } }, { text: PROMPT(where) }] }],
@@ -100,11 +99,10 @@ async function identify(photo, where) {
     const errors = [];
     for (const ep of endpoints) {
         const left = deadline - Date.now();
-        const paid = ep.name === 'openkbs';
-        if (left < (paid ? 10_000 : 45_000)) continue; // always leave the paid fallback 30 s
+        if (left < 10_000) continue;
         const res = await fetch(ep.url, {
             method: 'POST', headers: { 'Content-Type': 'application/json', ...ep.headers }, body,
-            signal: AbortSignal.timeout(paid ? left : Math.min(left - 30_000, 30_000)),
+            signal: AbortSignal.timeout(Math.min(left, 35_000)),
         }).catch((err) => ({ ok: false, status: 0, text: async () => err.message }));
         if (!res.ok) { errors.push(`${ep.name} ${res.status} ${(await res.text()).slice(0, 120)}`); continue; }
         const data = await res.json();

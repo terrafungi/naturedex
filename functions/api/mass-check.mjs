@@ -4,14 +4,15 @@
  * value more than MAX_RATIO away from it is replaced (the Wikidata value is kept as mass_wd).
  * stats.mass_checked: 'ok' = trusted (the quiz only compares these), 'unknown' = no estimate.
  * Runs one batch per scheduled minute until every card with a mass is checked.
+ * Free Gemini key only (GEMINI_API_KEY): never billed to the project's credits.
  */
-const MODEL = 'gemini-3.5-flash';
+const MODEL = 'gemini-flash-lite-latest';
 const PER_TICK = 50;
 const MAX_RATIO = 3;
 
 async function llm(text) {
-    const res = await fetch(`https://proxy.openkbs.com/v1/google/models/${MODEL}:generateContent`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` }, signal: AbortSignal.timeout(50_000),
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY }, signal: AbortSignal.timeout(50_000),
         body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 8000 } }),
     });
     if (!res.ok) throw new Error(`LLM ${res.status} ${(await res.text()).slice(0, 150)}`);
@@ -28,7 +29,7 @@ ${cards.map((c) => `${c.id} | ${c.sci_name || ''} | ${c.name} | ${c.type}`).join
 
 /** Called every minute by the schedule. */
 export async function massCheckTick(db) {
-    if (!process.env.OPENKBS_API_KEY) return;
+    if (!process.env.GEMINI_API_KEY) return;
     // claim a batch (a claim older than 5 minutes is a crashed run: take it again)
     const { rows: cards } = await db.query(`
         UPDATE cards SET stats = stats || jsonb_build_object('mass_claim', extract(epoch FROM now())::int)

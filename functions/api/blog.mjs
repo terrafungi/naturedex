@@ -158,14 +158,11 @@ async function pickNews(db) {
     throw new Error('Aucune actualité nature exploitable');
 }
 
-// Google AI Studio free tier first (GEMINI_API_KEY), then the paid OpenKBS proxy.
+// Google AI Studio free tier only (GEMINI_API_KEY): never billed to the project's credits.
 function llmEndpoints() {
     const key = process.env.GEMINI_API_KEY;
     const free = (model) => ({ name: `free:${model}`, url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, headers: { 'x-goog-api-key': key } });
-    return [
-        ...(key ? [free(MODEL), free(FREE_FALLBACK_MODEL)] : []),
-        { name: 'openkbs', url: `https://proxy.openkbs.com/v1/google/models/${MODEL}:generateContent`, headers: { Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` } },
-    ];
+    return key ? [free(MODEL), free(FREE_FALLBACK_MODEL)] : [];
 }
 
 async function llm(prompt) {
@@ -175,12 +172,11 @@ async function llm(prompt) {
     });
     const errors = [];
     const deadline = Date.now() + 95_000; // the whole chain must fit in the 120 s Lambda
-    const PAID_RESERVE = 50_000; // a slow or overloaded free tier must never eat the paid fallback's time
     let res;
     for (const ep of llmEndpoints()) {
         const left = deadline - Date.now();
-        if (left < (ep.name === 'openkbs' ? 20_000 : PAID_RESERVE + 15_000)) continue;
-        res = await fetch(ep.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...ep.headers }, body, signal: AbortSignal.timeout(ep.name === 'openkbs' ? left : Math.min(left - PAID_RESERVE, 50_000)) })
+        if (left < 20_000) continue;
+        res = await fetch(ep.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...ep.headers }, body, signal: AbortSignal.timeout(Math.min(left, 50_000)) })
             .catch((err) => ({ ok: false, status: 0, text: async () => err.message }));
         if (res.ok) { console.log(`blog: LLM via ${ep.name}`); break; }
         console.log(`blog: ${ep.name} failed ${res.status}`);
@@ -288,7 +284,7 @@ const parisNow = () => {
 
 /** Called every minute by the schedule: the launch batch first, then one article per Paris day. */
 export async function blogTick(db) {
-    if (!process.env.OPENKBS_API_KEY) return;
+    if (!process.env.GEMINI_API_KEY) return;
     await db.query(`UPDATE blog_posts SET status = 'failed', error = coalesce(error, 'timeout') WHERE status = 'generating' AND created_at < now() - interval '4 minutes'`);
     const { rows: [s] } = await db.query(`SELECT count(*) FILTER (WHERE status = 'published')::int AS published,
         count(*) FILTER (WHERE status = 'failed' AND created_at > now() - interval '1 hour')::int AS recent_failures FROM blog_posts`);

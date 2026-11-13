@@ -2,15 +2,16 @@
  * Biome of each card, for the card game's energy system: an LLM picks the one biome where
  * the species mostly lives (or lived). stats.biome = one of BIOMES; 'none' when it cannot tell.
  * Runs a few batches per scheduled minute until every card has one.
+ * Free Gemini key only (GEMINI_API_KEY): never billed to the project's credits.
  */
-const MODEL = 'gemini-3.5-flash';
+const MODEL = 'gemini-flash-lite-latest';
 const PER_BATCH = 150;
 const BATCHES = 2;
 export const BIOMES = ['foret', 'ocean', 'montagne', 'desert', 'prairie', 'humide', 'ciel'];
 
 async function llm(text) {
-    const res = await fetch(`https://proxy.openkbs.com/v1/google/models/${MODEL}:generateContent`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` }, signal: AbortSignal.timeout(50_000),
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY }, signal: AbortSignal.timeout(50_000),
         body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 12000 } }),
     });
     if (!res.ok) throw new Error(`LLM ${res.status} ${(await res.text()).slice(0, 150)}`);
@@ -54,7 +55,7 @@ async function batch(db) {
 
 /** Called every minute by the schedule. */
 export async function biomeCheckTick(db) {
-    if (!process.env.OPENKBS_API_KEY) return;
+    if (!process.env.GEMINI_API_KEY) return;
     const done = await Promise.all(Array.from({ length: BATCHES }, () => batch(db).catch((err) => { console.error('biomeCheck', err.message); return 0; })));
     const n = done.reduce((a, b) => a + b, 0);
     if (n) console.log(`biome check: ${n} cartes`);

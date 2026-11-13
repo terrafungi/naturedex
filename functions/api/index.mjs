@@ -840,8 +840,8 @@ async function fillExtract(db, card) {
 async function translateIntro(text, card) {
     const key = process.env.GEMINI_API_KEY;
     const endpoints = [
+        // free Gemini key only: never billed to the project's credits
         ...(key ? [{ url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent', headers: { 'x-goog-api-key': key } }] : []),
-        { url: 'https://proxy.openkbs.com/v1/google/models/gemini-flash-lite-latest:generateContent', headers: { Authorization: `Bearer ${process.env.OPENKBS_API_KEY}` } },
     ];
     const body = JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: `Traduis en français ce résumé Wikipédia de l'espèce ${card.sci_name || card.name}${card.name !== card.sci_name ? ` (nom français : ${card.name})` : ''}. Garde les noms scientifiques en latin, n'ajoute rien. Réponds uniquement avec la traduction, sans markdown.\n\n${text}` }] }],
