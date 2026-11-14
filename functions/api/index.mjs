@@ -1466,6 +1466,18 @@ const actions = {
         return { ok: true };
     },
 
+    async changePassword(db, body, event) {
+        const user = await requireUser(db, event);
+        const password = String(body.newPassword || '');
+        if (!(await verifyPassword(String(body.password || ''), user.pass_hash))) throw new HttpError(403, 'Mot de passe actuel incorrect');
+        if (password.length < 6) throw new HttpError(400, 'Nouveau mot de passe : 6 caractères minimum');
+        await db.query(`UPDATE users SET pass_hash = $2 WHERE id = $1`, [user.id, await hashPassword(password)]);
+        // sign out the other devices, keep this one
+        const token = (event.headers?.authorization || '').replace(/^Bearer\s+/i, '');
+        await db.query(`DELETE FROM sessions WHERE user_id = $1 AND token <> $2`, [user.id, token]);
+        return { ok: true };
+    },
+
     async me(db, body, event) {
         return { user: await publicUser(db, await requireUser(db, event)) };
     },
