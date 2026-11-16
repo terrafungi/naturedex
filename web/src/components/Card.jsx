@@ -97,9 +97,11 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
         if (tilt && !matchMedia('(prefers-reduced-motion: reduce)').matches) return aim(x * 2 - 1, y * 2 - 1, 1);
         el.style.setProperty('--mx', `${x * 100}%`);
         el.style.setProperty('--my', `${y * 100}%`);
+        el.style.setProperty('--act', '1'); // the foil only shows while the card is handled
     }
     function onLeave() {
         if (tilt && spring.current) aim(0, 0, 0);
+        else ref.current?.style.setProperty('--act', '0');
     }
 
     return (

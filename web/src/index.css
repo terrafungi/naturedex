@@ -299,12 +299,17 @@ body {
 .nd-card[data-rarity="secret"] { --rar: #ff5fd2; }
 .nd-card[data-rarity="rare"] .nd-card-inner { box-shadow: 0 0 0 0.8cqi #2a6fc0 inset, 0 0 0 1.3cqi rgb(255 255 255 / 0.55) inset; }
 
-/* epic + legendary + secret: holographic foil that follows the pointer */
+/* epic + legendary + secret: holographic foil that follows the pointer. Hidden at rest: it only
+   lights up while the card is handled (--act, 0 → 1, set by Card.jsx), up to --foil / --foil-win. */
 .nd-card[data-rarity="epic"],
 .nd-card[data-rarity="legendary"],
 .nd-card[data-rarity="secret"],
 .nd-card[data-art],
-.nd-card[data-holo] { --mx: 50%; --my: 50%; }
+.nd-card[data-holo] { --mx: 50%; --my: 50%; --act: 0; --foil: 0.7; }
+.nd-card[data-rarity="epic"] { --foil: 0.52; }
+.nd-card[data-rarity="secret"] { --foil: 0.75; }
+.nd-card[data-art] { --foil: 0.26; --foil-win: 0.5; }
+.nd-card[data-holo] { --foil: 0.7; --foil-win: 0.48; }
 .nd-card[data-rarity="epic"]::after,
 .nd-card[data-rarity="legendary"]::after,
 .nd-card[data-rarity="secret"]::after,
@@ -316,7 +321,7 @@ body {
     pointer-events: none;
     z-index: 2;
     mix-blend-mode: color-dodge;
-    opacity: 0.55;
+    opacity: calc(var(--act) * var(--foil));
     background:
         radial-gradient(circle at var(--mx) var(--my), rgb(255 255 255 / 0.65), transparent 38%),
         repeating-linear-gradient(115deg, #ff7eb3 0%, #ffd36e 7%, #7dffb0 14%, #6ec8ff 21%, #c18bff 28%, #ff7eb3 35%);
@@ -324,43 +329,23 @@ body {
     background-position: center, var(--mx) var(--my);
     transition: opacity 0.3s;
 }
-.nd-card[data-rarity="epic"]::after { opacity: 0.32; }
-.nd-card[data-art]::after { opacity: 0.16; }
-.nd-card[data-holo]::after { opacity: 0.45; }
 /* holo commons: the text stays crisp above the foil, only the frame and background shimmer */
 .nd-card[data-holo] .nd-card-inner > * { position: relative; z-index: 3; }
-/* full art holo: rainbow bands + glitter over the picture, drifting on its own and following the pointer */
+/* full art and holo: rainbow bands over the picture, sliding with the pointer (no glitter dots,
+   so the photo stays sharp) */
 .nd-card[data-art] .nd-window::after,
 .nd-card[data-holo] .nd-window::after {
     content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
-    mix-blend-mode: color-dodge; opacity: 0.42;
+    mix-blend-mode: color-dodge; opacity: calc(var(--act) * var(--foil-win));
+    transition: opacity 0.3s;
     background:
         radial-gradient(circle at var(--mx) var(--my), rgb(255 255 255 / 0.35), transparent 30%),
-        radial-gradient(circle, rgb(255 255 255 / 0.9) 0.25cqi, transparent 0.6cqi) 0 0 / 4.3cqi 4.3cqi,
-        radial-gradient(circle, rgb(255 240 200 / 0.8) 0.2cqi, transparent 0.5cqi) 2.1cqi 1.7cqi / 6.1cqi 6.1cqi,
-        repeating-linear-gradient(125deg, transparent 0 9%, #ff7eb3 11%, #ffd36e 12.5%, #7dffb0 14%, #6ec8ff 15.5%, #c18bff 17%, transparent 19% 28%) 0 0 / 300% 300%;
-    animation: nd-holo-drift 6s ease-in-out infinite alternate;
+        repeating-linear-gradient(125deg, transparent 0 9%, #ff7eb3 11%, #ffd36e 12.5%, #7dffb0 14%, #6ec8ff 15.5%, #c18bff 17%, transparent 19% 28%) var(--mx) var(--my) / 300% 300%;
 }
 .nd-card[data-art] .nd-window::after {
-    /* full art: only the rainbow sheen, no glitter dots, so the photo stays sharp */
-    background:
-        radial-gradient(circle at var(--mx) var(--my), rgb(255 255 255 / 0.35), transparent 30%),
-        repeating-linear-gradient(125deg, transparent 0 9%, #ff7eb3 11%, #ffd36e 12.5%, #7dffb0 14%, #6ec8ff 15.5%, #c18bff 17%, transparent 19% 28%) 0 0 / 300% 300%;
-    animation-name: nd-holo-sheen;
     -webkit-mask-image: linear-gradient(180deg, black, rgb(0 0 0 / 0.55) 45%, black);
             mask-image: linear-gradient(180deg, black, rgb(0 0 0 / 0.55) 45%, black);
 }
-@keyframes nd-holo-sheen {
-    from { background-position: center, 0% 0%; }
-    to   { background-position: center, 100% 100%; }
-}
-@keyframes nd-holo-drift {
-    from { background-position: center, 0 0, 2.1cqi 1.7cqi, 0% 0%; }
-    to   { background-position: center, 1.4cqi 2.2cqi, 0.6cqi 3.4cqi, 100% 100%; }
-}
-/* holo commons / uncommons: the frame shines, the photo only gets a light glitter */
-.nd-card[data-holo] .nd-window::after { opacity: 0.28; }
-@media (prefers-reduced-motion: reduce) { .nd-card[data-art] .nd-window::after, .nd-card[data-holo] .nd-window::after { animation: none; } }
 .nd-card[data-rarity="legendary"] {
     background: linear-gradient(135deg, #f6e3a1, #c9a24a 30%, #fff1c1 50%, #a77f28 70%, #f0d58a);
 }
@@ -369,10 +354,9 @@ body {
 /* gold: the whole card is gold leaf — polished frame, brushed-gold face, a gilded photo with a
    golden sheen that drifts and follows the pointer, gold glitter */
 .nd-card[data-gold] {
-    --rar: #d4a017; --mx: 50%; --my: 50%;
+    --rar: #d4a017; --mx: 50%; --my: 50%; --act: 0;
     color: #3b2a08;
     background: linear-gradient(115deg, #8a5d12 0%, #f7d774 22%, #fff6c8 30%, #d9a632 42%, #8a5d12 58%, #f2cf6a 78%, #fff3c0 86%, #a8761a 100%) 0 0 / 250% 250%;
-    animation: nd-frame-shine 6s ease-in-out infinite alternate;
 }
 .nd-card[data-gold] .nd-card-inner {
     background:
@@ -393,17 +377,18 @@ body {
 }
 .nd-card[data-gold] .nd-window::after {
     content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
-    mix-blend-mode: color-dodge; opacity: 0.4;
+    mix-blend-mode: color-dodge; opacity: calc(var(--act) * 0.6);
+    transition: opacity 0.3s;
     background:
         radial-gradient(circle at var(--mx) var(--my), rgb(255 246 210 / 0.5), transparent 32%),
         radial-gradient(circle, rgb(255 236 170 / 0.95) 0.25cqi, transparent 0.6cqi) 0 0 / 4.3cqi 4.3cqi,
         radial-gradient(circle, rgb(255 214 120 / 0.85) 0.2cqi, transparent 0.5cqi) 2.1cqi 1.7cqi / 6.1cqi 6.1cqi,
-        repeating-linear-gradient(125deg, transparent 0 10%, #ffd36e 13%, #fff6d0 15%, #e0a92e 17%, transparent 20% 30%) 0 0 / 300% 300%;
-    animation: nd-holo-drift 6s ease-in-out infinite alternate;
+        repeating-linear-gradient(125deg, transparent 0 10%, #ffd36e 13%, #fff6d0 15%, #e0a92e 17%, transparent 20% 30%) var(--mx) var(--my) / 300% 300%;
 }
 .nd-card[data-gold]::after {
     content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
-    mix-blend-mode: color-dodge; opacity: 0.45;
+    mix-blend-mode: color-dodge; opacity: calc(var(--act) * 0.7);
+    transition: opacity 0.3s;
     background:
         radial-gradient(circle at var(--mx) var(--my), rgb(255 248 220 / 0.7), transparent 38%),
         repeating-linear-gradient(115deg, #a8761a 0%, #ffe9a6 8%, #d9a632 16%, #fff6c8 24%, #a8761a 32%);
@@ -419,9 +404,6 @@ body {
 .nd-card[data-gold] .nd-art-tag,
 .nd-art-banner[data-gold] { background: linear-gradient(110deg, #a8761a, #ffe9a6 35%, #fff8dc 50%, #d9a632 75%, #f7d774); color: #3b2a08; }
 .nd-art-banner[data-gold] { box-shadow: 0 0 22px rgb(247 215 116 / 0.8); }
-.nd-card[data-tilt][data-gold]::after { opacity: calc(0.45 + var(--act) * 0.25); }
-.nd-card[data-tilt][data-gold] .nd-window::after { opacity: calc(0.4 + var(--act) * 0.2); }
-@media (prefers-reduced-motion: reduce) { .nd-card[data-gold], .nd-card[data-gold] .nd-window::after { animation: none; } }
 
 /* secret: spinning prismatic frame on a night-sky card */
 @property --spin { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
@@ -431,7 +413,6 @@ body {
     animation: nd-frame-spin 5s linear infinite;
 }
 @keyframes nd-frame-spin { to { --spin: 360deg; } }
-.nd-card[data-rarity="secret"]::after { opacity: 0.4; }
 /* tilt mode (card sheet): turned by the finger, a glare follows it and the foil lights up */
 .nd-card[data-tilt] { --act: 0; touch-action: pan-y; will-change: transform; -webkit-user-select: none; user-select: none; }
 .nd-card[data-tilt] .nd-glare {
@@ -440,15 +421,10 @@ body {
     background: radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 50%), rgb(255 255 255 / 0.6) 5%, rgb(255 255 255 / 0.15) 30%, rgb(0 0 0 / 0.3) 95%);
     opacity: calc(var(--act) * 0.75);
 }
-.nd-card[data-tilt]::after { transition: none; opacity: calc(0.55 + var(--act) * 0.15); }
-.nd-card[data-tilt][data-rarity="epic"]::after { opacity: calc(0.32 + var(--act) * 0.2); }
-.nd-card[data-tilt][data-rarity="secret"]::after { opacity: calc(0.4 + var(--act) * 0.35); }
-.nd-card[data-tilt][data-holo]::after { opacity: calc(0.45 + var(--act) * 0.25); }
-.nd-card[data-tilt][data-art]::after { opacity: calc(0.16 + var(--act) * 0.1); }
-.nd-card[data-tilt][data-art] .nd-window::after { opacity: calc(0.42 + var(--act) * 0.08); }
+/* the spring already eases --act, no extra fade */
+.nd-card[data-tilt]::after, .nd-card[data-tilt] .nd-window::after { transition: none; }
 /* full art: keep the photo sharp, the glare does the shine */
 .nd-card[data-tilt][data-art] .nd-glare { mix-blend-mode: overlay; }
-.nd-card[data-tilt][data-holo] .nd-window::after { opacity: calc(0.28 + var(--act) * 0.2); }
 .nd-card[data-rarity="secret"] .nd-card-inner {
     background:
         radial-gradient(1.2px 1.2px at 18% 22%, #fff, transparent), radial-gradient(1px 1px at 72% 12%, #fff, transparent),
