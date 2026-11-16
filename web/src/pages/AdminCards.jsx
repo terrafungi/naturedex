@@ -65,10 +65,10 @@ export default function AdminCards() {
             <p className="mt-2 text-ink-soft">Toutes les cartes du jeu, même celles que tu ne possèdes pas. Clique sur une carte pour retoucher son image : rien n'est ajouté à ta collection.</p>
 
             <div className="mt-6 flex flex-wrap gap-2">
-                <button onClick={() => setReported(true)} className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${reported ? 'bg-[#e9c46a] text-[#2a1d05]' : 'nd-btn'}`}>
+                <button onClick={() => setReported(true)} className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${reported ? 'bg-[#e9c46a] text-[#2a1d05]' : 'bg-white/5 border border-white/10 text-white/70 hover:text-white'}`}>
                     <Flag className="w-4 h-4" />Signalées par les joueurs{page?.reported ? ` · ${page.reported}` : ''}
                 </button>
-                <button onClick={() => setReported(false)} className={`px-4 py-2 rounded-full text-sm font-bold ${!reported ? 'bg-[#e9c46a] text-[#2a1d05]' : 'nd-btn'}`}>Toutes les cartes</button>
+                <button onClick={() => setReported(false)} className={`px-4 py-2 rounded-full text-sm font-bold ${!reported ? 'bg-[#e9c46a] text-[#2a1d05]' : 'bg-white/5 border border-white/10 text-white/70 hover:text-white'}`}>Toutes les cartes</button>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
