@@ -66,7 +66,7 @@ export default function Duel() {
             {!enough ? (
                 <div className="p-5 rounded-2xl nd-glass text-center space-y-2">
                     <p className="font-bold">Il te faut au moins {data.minCreatures} cartes dans ta collection pour composer un deck.</p>
-                    <Link to="/boosters" className="inline-block px-4 py-2 rounded-full nd-cta-gold font-bold text-sm">Ouvrir des boosters</Link>
+                    <Link to="/booster" className="inline-block px-4 py-2 rounded-full nd-cta-gold font-bold text-sm">Ouvrir des boosters</Link>
                 </div>
             ) : (
                 <section className="space-y-3">

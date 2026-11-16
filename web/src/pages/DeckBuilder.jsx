@@ -269,7 +269,7 @@ export default function DeckBuilder() {
                     </div>
                     {!list.length && (
                         <p className="p-4 rounded-xl bg-white/[0.04] text-sm text-ink-soft text-center">
-                            {tab === 'creature' ? 'Aucune espèce ici.' : <>Tu n'en as pas encore. Ouvre des <Link to="/boosters" className="underline">boosters</Link> ou gagne des duels !</>}
+                            {tab === 'creature' ? 'Aucune espèce ici.' : <>Tu n'en as pas encore. Ouvre des <Link to="/booster" className="underline">boosters</Link> ou gagne des duels !</>}
                         </p>
                     )}
                     {list.length > shown && <button onClick={() => setShown(shown + PAGE * 2)} className="w-full py-2.5 rounded-xl bg-white/[0.06] text-sm font-bold">Voir plus ({list.length - shown})</button>}
