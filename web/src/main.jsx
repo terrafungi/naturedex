@@ -14,6 +14,7 @@ import Collection from './pages/Collection.jsx';
 import ShowcaseEditor from './pages/ShowcaseEditor.jsx';
 import Showcases from './pages/Showcases.jsx';
 import CardPage from './pages/CardPage.jsx';
+import AdminCards from './pages/AdminCards.jsx';
 import Challenges from './pages/Challenges.jsx';
 import Profile from './pages/Profile.jsx';
 import AvatarEditor from './pages/AvatarEditor.jsx';
@@ -94,6 +95,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/vitrine" element={<Private><ShowcaseEditor /></Private>} />
                         <Route path="/vitrines" element={<Private><Showcases /></Private>} />
                         <Route path="/carte/:id" element={<Private><CardPage /></Private>} />
+                        <Route path="/admin/cartes" element={<Private><AdminCards /></Private>} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>
                 </Routes>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Award, Gavel, KeyRound, Layers, LogOut, Package, Pencil } from 'lucide-react';
+import { Award, Crop, Gavel, KeyRound, Layers, LogOut, Package, Pencil } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import PatronBadge from '../components/PatronBadge.jsx';
 import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
@@ -37,6 +37,12 @@ export default function Profile() {
                     <Pencil className="w-5 h-5" />
                 </Link>
             </AvatarStage>
+
+            {user.admin && (
+                <Link to="/admin/cartes" className="mt-6 flex items-center gap-3 rounded-2xl nd-glass p-4 text-white font-semibold hover:bg-white/10">
+                    <Crop className="w-5 h-5 text-[#e9c46a]" />Admin · cadrage des cartes
+                </Link>
+            )}
 
             <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {stats.map(([label, value]) => (

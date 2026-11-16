@@ -165,7 +165,7 @@ function FieldSection({ cardId }) {
 
 // Staff tool: drag the picture to choose what stays in view, zoom with the slider.
 // Saved on the card itself, so every player sees the new framing.
-function FramingEditor({ card, number, total, draft, setDraft, onDone }) {
+export function FramingEditor({ card, number, total, draft, setDraft, onDone }) {
     const box = useRef(null);
     const drag = useRef(null);
     const [busy, setBusy] = useState(false);

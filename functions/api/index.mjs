@@ -1706,6 +1706,28 @@ const actions = {
         return { card };
     },
 
+    // Staff: the whole catalogue, owned or not, to reframe pictures. Special finishes (fan arts) first.
+    async adminCards(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!ADMIN_IDS.has(user.id)) throw new HttpError(403, 'Réservé à l\'équipe');
+        const limit = Math.min(Number(body.limit) || 60, 120);
+        const offset = Math.max(Number(body.offset) || 0, 0);
+        const q = searchText(body.query);
+        const art = CARD_ARTS.includes(body.art) ? body.art : null;
+        const framed = body.framed === 'yes' ? true : body.framed === 'no' ? false : null;
+        const search = cardSearchSql('$1');
+        const { rows } = await db.query(
+            `SELECT ${LIGHT_FIELDS}, COUNT(*) OVER()::int AS matches FROM cards c
+             WHERE ($1 = '' OR ${search.byName}) AND ($2::text IS NULL OR c.type = $2) AND ($3::text IS NULL OR c.rarity = $3)
+               AND ($4::text IS NULL OR c.art = $4 OR ($4 = 'plain' AND c.art IS NULL))
+               AND ($5::boolean IS NULL OR (c.stats ? 'focus') = $5)
+             ORDER BY c.art IS NULL, ${RARITY_ORDER} DESC, c.num
+             LIMIT $6 OFFSET $7`,
+            [q, body.type || null, body.rarity || null, art, framed, limit, offset]
+        );
+        return { matches: rows[0]?.matches || 0, cards: rows.map(({ matches, ...c }) => c) };
+    },
+
     // Staff: the part of the picture kept in view on the card (focus point in %, zoom >= 1), for every player.
     async setFraming(db, body, event) {
         const user = await requireUser(db, event);
