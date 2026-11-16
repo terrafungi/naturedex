@@ -1,15 +1,14 @@
-import { Camera, Compass, MapPin, Trees } from 'lucide-react';
+import { Crop, Flag, Layers } from 'lucide-react';
 
 // « Nouveautés » pop-up shown once per account at the next visit. To announce new features,
 // replace the items and give NEWS a new id (the date): every player who joined before it sees it once.
 export const NEWS = {
-    id: '2026-10-23',
-    title: 'Nouveau : Exploration',
+    id: '2026-11-16',
+    title: 'Nouveau : des images mieux cadrées',
     items: [
-        { Icon: Compass, title: 'Des cartes dans le vrai monde', text: 'Des cartes NatureDex apparaissent sur une carte autour de toi. Marche jusqu\'à elles et attrape-les : elles rejoignent ta collection !', to: '/exploration' },
-        { Icon: Trees, title: 'Plus c\'est sauvage, plus c\'est rare', text: 'Forêts, marais et montagnes cachent bien plus de cartes rares, épiques et légendaires que la ville.', to: '/exploration' },
-        { Icon: MapPin, title: 'De vraies espèces locales', text: 'Seules apparaissent des espèces réellement observées près de toi. Nouvelles cartes toutes les 30 min, 10 captures par jour.', to: '/exploration' },
-        { Icon: Camera, title: 'Sur le terrain', text: 'Le mode photo reste là : photographie une vraie espèce pour gagner des graines et ta carte de terrain.', to: '/terrain' },
+        { Icon: Flag, title: 'Signale une image mal cadrée', text: 'On ne voit que la tête, ou presque rien ? Ouvre la carte et touche « Image mal cadrée ? Signaler », sous la carte.', to: '/collection' },
+        { Icon: Crop, title: 'L\'équipe la recadre', text: 'Chaque signalement arrive chez nous : on recadre l\'image à la main, en déplaçant et en zoomant sur l\'espèce.', to: '/collection' },
+        { Icon: Layers, title: 'Pour tous les joueurs', text: 'Une fois recadrée, la carte est corrigée partout : collection, combats, vitrines, Full art et Illustrations compris.', to: '/collection' },
     ],
 };
 
