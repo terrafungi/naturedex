@@ -41,6 +41,7 @@ export default function Profile() {
             {user.admin && (
                 <Link to="/admin/cartes" className="mt-6 flex items-center gap-3 rounded-2xl nd-glass p-4 text-white font-semibold hover:bg-white/10">
                     <Crop className="w-5 h-5 text-[#e9c46a]" />Admin · cadrage des cartes
+                    {user.framingReports > 0 && <span className="ml-auto px-2.5 py-0.5 rounded-full bg-[#ff6b6b] text-white text-xs font-bold">{user.framingReports} signalée{user.framingReports > 1 ? 's' : ''}</span>}
                 </Link>
             )}
 

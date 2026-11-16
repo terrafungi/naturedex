@@ -667,3 +667,11 @@ COMMIT;
 
 -- Test: the account's next booster is a god pack (set by hand, reset when opened)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS force_god_pack BOOLEAN NOT NULL DEFAULT false;
+
+-- Players flag a badly framed card picture; the staff admin page lists them, cleared once reframed or dismissed
+CREATE TABLE IF NOT EXISTS framing_reports (
+    card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (card_id, user_id)
+);

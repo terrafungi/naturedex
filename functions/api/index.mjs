@@ -198,6 +198,7 @@ async function publicUser(db, user) {
         newsSeen: user.news_seen,
         joinedAt: user.created_at,
         admin: ADMIN_IDS.has(user.id) || undefined,
+        framingReports: ADMIN_IDS.has(user.id) ? (await db.query(`SELECT COUNT(DISTINCT card_id)::int AS n FROM framing_reports`)).rows[0].n : undefined,
         ...rows[0],
     };
 }
@@ -1703,7 +1704,29 @@ const actions = {
         // Undiscovered cards stay a mystery.
         if (!card.count) return { card: { id: card.id, num: card.num, type: card.type, rarity: card.rarity, count: 0 } };
         if (!card.extract) card.extract = await fillExtract(db, card);
+        card.reported = (await db.query(`SELECT 1 FROM framing_reports WHERE card_id = $1 AND user_id = $2`, [card.id, user.id])).rows.length > 0;
         return { card };
+    },
+
+    // « Image mal cadrée » on a card sheet: one flag per player and card, for the staff admin page.
+    async reportFraming(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows } = await db.query(
+            `INSERT INTO framing_reports (card_id, user_id)
+             SELECT c.id, $2 FROM cards c JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $2 WHERE c.id = $1
+             ON CONFLICT DO NOTHING RETURNING card_id`, [Number(body.cardId), user.id]);
+        if (!rows.length && !(await db.query(`SELECT 1 FROM framing_reports WHERE card_id = $1 AND user_id = $2`, [Number(body.cardId), user.id])).rows.length) {
+            throw new HttpError(404, 'Carte introuvable');
+        }
+        return { ok: true };
+    },
+
+    // Staff: drop the flags of a card whose picture is fine after all.
+    async dismissFraming(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!ADMIN_IDS.has(user.id)) throw new HttpError(403, 'Réservé à l\'équipe');
+        await db.query(`DELETE FROM framing_reports WHERE card_id = $1`, [Number(body.cardId)]);
+        return { ok: true };
     },
 
     // Staff: the whole catalogue, owned or not, to reframe pictures. Special finishes (fan arts) first.
@@ -1716,16 +1739,20 @@ const actions = {
         const art = CARD_ARTS.includes(body.art) ? body.art : null;
         const framed = body.framed === 'yes' ? true : body.framed === 'no' ? false : null;
         const search = cardSearchSql('$1');
+        // reported: only the cards flagged by players, the most flagged first
         const { rows } = await db.query(
-            `SELECT ${LIGHT_FIELDS}, COUNT(*) OVER()::int AS matches FROM cards c
+            `SELECT ${LIGHT_FIELDS}, r.n AS reports, COUNT(*) OVER()::int AS matches FROM cards c
+             LEFT JOIN (SELECT card_id, COUNT(*)::int AS n, MAX(created_at) AS at FROM framing_reports GROUP BY 1) r ON r.card_id = c.id
              WHERE ($1 = '' OR ${search.byName}) AND ($2::text IS NULL OR c.type = $2) AND ($3::text IS NULL OR c.rarity = $3)
                AND ($4::text IS NULL OR c.art = $4 OR ($4 = 'plain' AND c.art IS NULL))
                AND ($5::boolean IS NULL OR (c.stats ? 'focus') = $5)
-             ORDER BY c.art IS NULL, ${RARITY_ORDER} DESC, c.num
+               AND (NOT $8 OR r.n IS NOT NULL)
+             ORDER BY ${body.reported ? 'r.n DESC, r.at DESC, ' : ''}c.art IS NULL, ${RARITY_ORDER} DESC, c.num
              LIMIT $6 OFFSET $7`,
-            [q, body.type || null, body.rarity || null, art, framed, limit, offset]
+            [q, body.type || null, body.rarity || null, art, framed, limit, offset, Boolean(body.reported)]
         );
-        return { matches: rows[0]?.matches || 0, cards: rows.map(({ matches, ...c }) => c) };
+        const { rows: [{ n }] } = await db.query(`SELECT COUNT(DISTINCT card_id)::int AS n FROM framing_reports`);
+        return { matches: rows[0]?.matches || 0, reported: n, cards: rows.map(({ matches, ...c }) => c) };
     },
 
     // Staff: the part of the picture kept in view on the card (focus point in %, zoom >= 1), for every player.
@@ -1739,6 +1766,7 @@ const actions = {
                               WHERE id = $1 RETURNING stats`,
                 [Number(body.cardId), Math.round(clamp(body.x, 0, 100)), Math.round(clamp(body.y, 0, 100)), Math.round(clamp(body.zoom, 1, 3) * 100) / 100]);
         if (!card) throw new HttpError(404, 'Carte introuvable');
+        await db.query(`DELETE FROM framing_reports WHERE card_id = $1`, [Number(body.cardId)]);
         catalogCache = null;
         return { stats: card.stats };
     },

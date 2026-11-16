@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Camera, Crop, ExternalLink, Eye, Gavel, Recycle, RotateCcw, Ruler, Weight } from 'lucide-react';
+import { ArrowLeft, Camera, Check, Crop, ExternalLink, Eye, Flag, Gavel, Recycle, RotateCcw, Ruler, Weight } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
 import { IUCN, RARITIES, TYPES, formatViews } from '../game.jsx';
@@ -87,6 +87,7 @@ export default function CardPage() {
                             <Crop className="w-4 h-4" />Recadrer l'image
                         </button>
                     )}
+                    {!user.admin && <ReportFraming card={card} onReported={() => setCard({ ...card, reported: true })} />}
                 </div>
                 <div>
                     <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider">
@@ -216,5 +217,23 @@ export function FramingEditor({ card, number, total, draft, setDraft, onDone }) 
                 <button disabled={busy} onClick={() => onDone(null)} className="px-4 py-2 rounded-full text-sm font-semibold text-white/70 hover:text-white">Annuler</button>
             </div>
         </div>
+    );
+}
+
+// Any player: flag a picture that shows the wrong part of the subject; the team reframes it for everyone.
+function ReportFraming({ card, onReported }) {
+    const [busy, setBusy] = useState(false);
+    if (card.reported) {
+        return <p className="mt-6 flex items-center justify-center gap-1.5 text-sm text-[#7dffb0]"><Check className="w-4 h-4" />Merci ! L'équipe va recadrer cette image.</p>;
+    }
+    async function report() {
+        setBusy(true);
+        try { await api('reportFraming', { cardId: card.id }); onReported(); } finally { setBusy(false); }
+    }
+    return (
+        <button onClick={report} disabled={busy}
+            className="mt-6 mx-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white/60 hover:text-white hover:bg-white/5 disabled:opacity-50">
+            <Flag className="w-3.5 h-3.5" />Image mal cadrée ? Signaler
+        </button>
     );
 }

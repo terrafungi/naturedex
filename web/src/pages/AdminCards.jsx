@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Crop, Search, X } from 'lucide-react';
+import { Crop, Flag, Search, X } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
@@ -12,7 +12,8 @@ const SELECT = 'appearance-none px-4 py-2 rounded-full bg-white/5 border border-
 
 // Staff only: every card of the game, owned or not, to fix badly framed pictures. Nothing here touches the collection.
 export default function AdminCards() {
-    const { user, catalog } = useGame();
+    const { user, setUser, catalog } = useGame();
+    const [reported, setReported] = useState(user?.framingReports > 0); // only the cards flagged by players
     const [query, setQuery] = useState('');
     const [debounced, setDebounced] = useState('');
     const [type, setType] = useState('');
@@ -24,28 +25,38 @@ export default function AdminCards() {
     const [editing, setEditing] = useState(null); // { card, draft }
 
     useEffect(() => { const t = setTimeout(() => setDebounced(query.trim()), 300); return () => clearTimeout(t); }, [query]);
-    const filters = { query: debounced, type: type || null, rarity: rarity || null, art: art || null, framed: framed || null };
+    const filters = { query: debounced, type: type || null, rarity: rarity || null, art: art || null, framed: framed || null, reported };
     useEffect(() => {
         if (!user?.admin) return;
         setPage(null);
         api('adminCards', { ...filters, limit: PAGE }).then(setPage).catch((err) => setError(err.message));
-    }, [user?.admin, debounced, type, rarity, art, framed]);
+    }, [user?.admin, debounced, type, rarity, art, framed, reported]);
 
     if (!user?.admin) return <Navigate to="/" replace />;
 
     async function more() {
         const next = await api('adminCards', { ...filters, limit: PAGE, offset: page.cards.length });
-        setPage({ matches: page.matches, cards: [...page.cards, ...next.cards] });
+        setPage({ ...page, cards: [...page.cards, ...next.cards] });
     }
     function open(card) {
         setEditing({ card, draft: { x: card.focus?.[0] ?? 50, y: card.focus?.[1] ?? 50, zoom: Number(card.zoom) || 1 } });
     }
-    function saved(stats) {
-        if (stats) {
-            const id = editing.card.id;
-            setPage({ ...page, cards: page.cards.map((c) => (c.id === id ? { ...c, focus: stats.focus || null, zoom: stats.zoom || null } : c)) });
-        }
+    // a reframed or dismissed card leaves the « signalées » list
+    function resolved(id, change) {
+        const wasReported = page.cards.find((c) => c.id === id)?.reports;
+        const left = Math.max(0, page.reported - (wasReported ? 1 : 0));
+        const cards = reported ? page.cards.filter((c) => c.id !== id) : page.cards.map((c) => (c.id === id ? { ...c, ...change, reports: null } : c));
+        setPage({ ...page, reported: left, matches: page.matches - (reported ? 1 : 0), cards });
+        setUser((u) => ({ ...u, framingReports: left }));
         setEditing(null);
+    }
+    function saved(stats) {
+        if (stats) resolved(editing.card.id, { focus: stats.focus || null, zoom: stats.zoom || null });
+        else setEditing(null);
+    }
+    async function dismiss() {
+        await api('dismissFraming', { cardId: editing.card.id });
+        resolved(editing.card.id, {});
     }
 
     return (
@@ -53,7 +64,14 @@ export default function AdminCards() {
             <h1 className="flex items-center gap-3 font-display text-4xl text-white"><Crop className="w-8 h-8 text-[#e9c46a]" />Admin · cadrage des cartes</h1>
             <p className="mt-2 text-ink-soft">Toutes les cartes du jeu, même celles que tu ne possèdes pas. Clique sur une carte pour retoucher son image : rien n'est ajouté à ta collection.</p>
 
-            <div className="mt-6 flex flex-wrap items-center gap-2">
+            <div className="mt-6 flex flex-wrap gap-2">
+                <button onClick={() => setReported(true)} className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${reported ? 'bg-[#e9c46a] text-[#2a1d05]' : 'nd-btn'}`}>
+                    <Flag className="w-4 h-4" />Signalées par les joueurs{page?.reported ? ` · ${page.reported}` : ''}
+                </button>
+                <button onClick={() => setReported(false)} className={`px-4 py-2 rounded-full text-sm font-bold ${!reported ? 'bg-[#e9c46a] text-[#2a1d05]' : 'nd-btn'}`}>Toutes les cartes</button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
                 <label className="flex items-center gap-2 px-4 rounded-full bg-white/5 border border-white/10 focus-within:ring-2 focus-within:ring-[#e9c46a] flex-1 min-w-[220px]">
                     <Search className="w-4 h-4 text-ink-soft" />
                     <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nom de la carte…" className="flex-1 bg-transparent py-2 text-sm text-white outline-none" />
@@ -81,11 +99,13 @@ export default function AdminCards() {
             {!page ? <p className="py-20 text-center font-display text-xl text-ink-soft">Chargement…</p> : (
                 <>
                     <p className="mt-5 text-sm text-ink-soft">{page.matches.toLocaleString('fr-FR')} carte{page.matches > 1 ? 's' : ''}</p>
+                    {reported && !page.matches && <p className="py-16 text-center font-display text-xl text-ink-soft">Aucune carte signalée pour l'instant.</p>}
                     <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                         {page.cards.map((c) => (
                             <button key={c.id} onClick={() => open(c)} className="relative text-left rounded-[4%] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e9c46a]">
                                 <Card card={c} number={c.num} total={catalog?.total} />
-                                {c.focus && <span className="absolute top-1 right-1 z-10 px-2 py-0.5 rounded-full bg-[#e9c46a] text-[#2a1d05] text-[10px] font-black uppercase">Recadrée</span>}
+                                {c.reports ? <span className="absolute top-1 right-1 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ff6b6b] text-white text-[10px] font-black uppercase"><Flag className="w-3 h-3" />{c.reports} signalement{c.reports > 1 ? 's' : ''}</span>
+                                    : c.focus && <span className="absolute top-1 right-1 z-10 px-2 py-0.5 rounded-full bg-[#e9c46a] text-[#2a1d05] text-[10px] font-black uppercase">Recadrée</span>}
                             </button>
                         ))}
                     </div>
@@ -102,6 +122,11 @@ export default function AdminCards() {
                         <h2 className="mb-4 pr-10 font-display text-xl text-white">{editing.card.name}</h2>
                         <FramingEditor card={editing.card} number={editing.card.num} total={catalog?.total} draft={editing.draft}
                             setDraft={(draft) => setEditing((e) => ({ ...e, draft }))} onDone={saved} />
+                        {editing.card.reports > 0 && (
+                            <button onClick={dismiss} className="mt-3 mx-auto block text-xs font-semibold text-white/60 hover:text-white underline underline-offset-4">
+                                L'image est bien comme ça : ignorer le signalement
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
