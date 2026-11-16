@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<!-- Vidéo promo 1920×1080 : timeline animée, capturée image par image par video.sh (seek(t) puis capture). -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600..900;1,500..700&family=Plus+Jakarta+Sans:wght@400..800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1920px;height:1080px;overflow:hidden;position:relative;font-family:'Plus Jakarta Sans',sans-serif;color:#fff;
+  background:radial-gradient(1100px 800px at 0% 0%, #1f8a4f45, transparent 70%),linear-gradient(120deg,#0b2419,#05130d 55%,#030b07)}
+em{font-style:italic;background:linear-gradient(120deg,#fbe7a6,#e9c46a 50%,#c8973a);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.06em}
+.glow{position:absolute;width:1300px;height:1300px;border-radius:50%;filter:blur(30px);opacity:.0}
+.scene{position:absolute;inset:0;opacity:0}
+.txt{position:absolute;left:140px;top:0;bottom:0;width:900px;display:flex;flex-direction:column;justify-content:center}
+.eyebrow{font-weight:800;font-size:28px;letter-spacing:.18em;text-transform:uppercase;color:#a8f0c6}
+h1{margin-top:22px;font-family:'Playfair Display',serif;font-weight:800;font-size:100px;line-height:1.03}
+h1 span{display:block}
+p{margin-top:30px;font-size:34px;line-height:1.4;color:rgba(255,255,255,.72);font-weight:500;max-width:720px}
+.phone{position:absolute;width:430px;height:932px;border-radius:62px;padding:14px;
+  background:linear-gradient(145deg,#2c3b33,#0d1612 40%,#1b2620);box-shadow:0 0 0 2px #3d4d44,0 50px 120px -20px #000}
+.phone .scr{position:relative;width:100%;height:100%;border-radius:50px;overflow:hidden;background:#05130d}
+.phone img{position:absolute;inset:0;width:100%;display:block}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.logo{width:190px;height:190px;border-radius:44px;box-shadow:0 20px 80px -10px #e9c46a90}
+.brand{margin-top:34px;font-family:'Playfair Display',serif;font-weight:800;font-size:130px;line-height:1}
+.tag{margin-top:18px;font-family:'Playfair Display',serif;font-style:italic;font-size:64px}
+.pill{margin-top:46px;display:inline-flex;align-items:center;gap:18px;padding:22px 44px;border-radius:999px;background:#fff;color:#05130d;font-weight:800;font-size:34px}
+.pill svg{width:40px;height:40px}
+.url{margin-top:26px;font-size:30px;color:#a8f0c6;font-weight:700;letter-spacing:.04em}
+.grain{position:absolute;inset:0;opacity:.06;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+</style>
+</head>
+<body>
+<div class="glow" id="glow"></div>
+
+<section class="scene" id="s0"><div class="center">
+  <img class="logo a-pop" src="logo.svg">
+  <div class="brand a-up">NatureDex</div>
+  <div class="tag a-up"><em>Collectionne la nature</em></div>
+</div></section>
+
+<section class="scene" id="s1">
+  <div class="txt"><div class="eyebrow a-up">Plus de 150 000 espèces réelles</div><h1><span class="a-up">Ouvre des boosters</span><span class="a-up"><em>de vraie nature</em></span></h1><p class="a-up">Mammifères, oiseaux, insectes, plantes… chaque carte est une espèce qui existe.</p></div>
+  <div class="phone a-phone" style="left:1260px;top:74px"><div class="scr"><img src="shots/open1.jpg"><img class="a-swap" src="shots/reveal_best.jpg"></div></div>
+</section>
+
+<section class="scene" id="s2">
+  <div class="txt"><div class="eyebrow a-up">Collection</div><h1><span class="a-up">Des communes</span><span class="a-up">aux <em>secrètes</em></span></h1><p class="a-up">Six raretés à collectionner. Les 50 espèces stars se cachent en cartes Secrètes.</p></div>
+  <div class="phone a-phone" style="left:1050px;top:110px;transform-origin:bottom"><div class="scr"><img src="shots/collection2.jpg"></div></div>
+  <div class="phone a-phone2" style="left:1390px;top:60px"><div class="scr"><img src="shots/card.jpg"></div></div>
+</section>
+
+<section class="scene" id="s3">
+  <div class="txt"><div class="eyebrow a-up">Exploration</div><h1><span class="a-up">Sors explorer</span><span class="a-up"><em>le monde réel</em></span></h1><p class="a-up">Des cartes apparaissent autour de toi. En forêt, les rares sortent plus souvent.</p></div>
+  <div class="phone a-phone" style="left:1260px;top:74px"><div class="scr"><img class="a-zoom" src="shots/explore3.jpg"></div></div>
+</section>
+
+<section class="scene" id="s4">
+  <div class="txt"><div class="eyebrow a-up">Duels &amp; Quiz Arena</div><h1><span class="a-up">Affronte</span><span class="a-up">les <em>rangers</em></span></h1><p class="a-up">Construis ton deck, gagne de nouvelles cartes et grimpe au classement du quiz.</p></div>
+  <div class="phone a-phone" style="left:1050px;top:110px"><div class="scr"><img src="shots/duelgame3.jpg"></div></div>
+  <div class="phone a-phone2" style="left:1390px;top:60px"><div class="scr"><img src="shots/quizgame.jpg"></div></div>
+</section>
+
+<section class="scene" id="s5">
+  <div class="txt"><div class="eyebrow a-up">Jardin &amp; avatar 3D</div><h1><span class="a-up">Cultive</span><span class="a-up"><em>ton île</em></span></h1><p class="a-up">Plante, récolte, installe ta ruche… et habille ton avatar en 3D.</p></div>
+  <div class="phone a-phone" style="left:1050px;top:110px"><div class="scr"><img src="shots/garden.jpg"></div></div>
+  <div class="phone a-phone2" style="left:1390px;top:60px"><div class="scr"><img src="shots/avatar.jpg"></div></div>
+</section>
+
+<section class="scene" id="s6"><div class="center">
+  <img class="logo a-pop" src="logo.svg" style="width:150px;height:150px">
+  <div class="tag a-up" style="font-size:78px;margin-top:40px">20 % des achats <em>reversés à la nature</em></div>
+  <div class="a-up" style="margin-top:14px;font-size:32px;color:rgba(255,255,255,.7)">LPO ou Wikipédia : c'est toi qui choisis.</div>
+  <div class="pill a-pop"><svg viewBox="0 0 24 24"><path fill="#34a853" d="M3.6 1.8 13.4 12l-9.8 10.2c-.4-.2-.6-.6-.6-1.1V2.9c0-.5.2-.9.6-1.1z"/><path fill="#fbbc04" d="m16.8 8.6-3.4 3.4 3.4 3.4 3.8-2.2c.8-.5.8-1.7 0-2.2z"/><path fill="#4285f4" d="M3.6 1.8c.3-.2.8-.2 1.2 0l12 6.8-3.4 3.4z"/><path fill="#ea4335" d="M13.4 12l3.4 3.4-12 6.8c-.4.2-.9.2-1.2 0z"/></svg>Gratuit sur Google Play</div>
+  <div class="url a-up">naturedex.fr</div>
+</div></section>
+
+<div class="grain"></div>
+<script>
+// Timeline : [id, début, fin, couleur du halo]
+const SCENES = [['s0', 0, 3.4, '#e9c46a'], ['s1', 3.4, 9, '#e9c46a'], ['s2', 9, 13.6, '#c79bff'], ['s3', 13.6, 18, '#4fd18b'], ['s4', 18, 22.6, '#ff8a5c'], ['s5', 22.6, 27, '#7ee0ff'], ['s6', 27, 31, '#e9c46a']];
+const EASE = 'cubic-bezier(.2,.8,.2,1)';
+const anims = [];
+const add = (el, kf, start, dur, easing = EASE) => anims.push(el.animate(kf, { duration: dur * 1000, delay: start * 1000, fill: 'both', easing }));
+
+SCENES.forEach(([id, a, b, color], i) => {
+    const s = document.getElementById(id);
+    const last = i === SCENES.length - 1;
+    add(s, [{ opacity: 0 }, { opacity: 1 }], a, 0.45, 'linear');
+    if (!last) add(s, [{ opacity: 1, filter: 'blur(0px)' }, { opacity: 0, filter: 'blur(6px)' }], b - 0.45, 0.45, 'linear');
+    s.querySelectorAll('.a-up').forEach((el, k) => add(el, [{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], a + 0.15 + k * 0.12, 0.8));
+    s.querySelectorAll('.a-pop').forEach((el, k) => add(el, [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1.06)', offset: .7 }, { opacity: 1, transform: 'scale(1)' }], a + 0.1 + k * 0.5, 0.9));
+    s.querySelectorAll('.a-phone').forEach(el => add(el, [{ opacity: 0, transform: 'translateY(160px) rotate(-4deg)' }, { opacity: 1, transform: 'translateY(0) rotate(-4deg)' }, { opacity: 1, transform: 'translateY(-16px) rotate(-3deg)' }], a + 0.2, b - a - 0.2, 'cubic-bezier(.15,.85,.35,1)'));
+    s.querySelectorAll('.a-phone2').forEach(el => add(el, [{ opacity: 0, transform: 'translateY(200px) rotate(6deg)' }, { opacity: 1, transform: 'translateY(0) rotate(5deg)' }, { opacity: 1, transform: 'translateY(-24px) rotate(4deg)' }], a + 0.45, b - a - 0.45, 'cubic-bezier(.15,.85,.35,1)'));
+    s.querySelectorAll('.a-swap').forEach(el => add(el, [{ opacity: 0, transform: 'scale(1.08)' }, { opacity: 1, transform: 'scale(1)' }], a + 2.3, 0.5));
+    s.querySelectorAll('.a-zoom').forEach(el => add(el, [{ transform: 'scale(1)' }, { transform: 'scale(1.12)' }], a, b - a, 'ease-in-out'));
+    add(document.getElementById('glow'), [{ background: `radial-gradient(${color}50, transparent 65%)` }, { background: `radial-gradient(${color}50, transparent 65%)` }], a, b - a, 'linear');
+});
+const glow = document.getElementById('glow');
+add(glow, [{ opacity: 0, left: '700px', top: '-100px' }, { opacity: 1, left: '800px', top: '-150px', offset: .1 }, { opacity: 1, left: '900px', top: '-80px' }], 0, 31, 'linear');
+anims.forEach(x => x.pause());
+window.DURATION = 31;
+window.seek = t => { anims.forEach(x => { x.currentTime = t * 1000 }); return t };
+seek(0);
+</script>
+</body>
+</html>
