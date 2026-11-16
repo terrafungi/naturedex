@@ -160,6 +160,9 @@ body {
     box-shadow: 0 0 0 0.8cqi color-mix(in oklab, var(--rar) 70%, white), 0 0 0 1.4cqi color-mix(in oklab, var(--type) 60%, black);
 }
 .nd-card .nd-window img { width: 100%; height: 100%; object-fit: cover; }
+/* zoomed-out framing: blurred copy of the picture behind it, filling the edges */
+.nd-card .nd-window img.nd-backdrop { position: absolute; inset: 0; transform: scale(1.15); filter: blur(3cqi) brightness(0.7); }
+.nd-card .nd-window img.nd-backdrop + img { position: relative; }
 /* keep the artwork readable: the foil passes behind it, only a soft sheen on top */
 .nd-card[data-rarity="epic"] .nd-window,
 .nd-card[data-rarity="legendary"] .nd-window,

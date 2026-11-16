@@ -1755,7 +1755,8 @@ const actions = {
         return { matches: rows[0]?.matches || 0, reported: n, cards: rows.map(({ matches, ...c }) => c) };
     },
 
-    // Staff: the part of the picture kept in view on the card (focus point in %, zoom >= 1), for every player.
+    // Staff: the part of the picture kept in view on the card (focus point in %, zoom 0.4-3: below 1 the whole picture
+    // fits, over a blurred copy of itself), for every player.
     async setFraming(db, body, event) {
         const user = await requireUser(db, event);
         if (!ADMIN_IDS.has(user.id)) throw new HttpError(403, 'Réservé à l\'équipe');
@@ -1764,7 +1765,7 @@ const actions = {
             ? await db.query(`UPDATE cards SET stats = COALESCE(stats, '{}') - 'focus' - 'zoom' WHERE id = $1 RETURNING stats`, [Number(body.cardId)])
             : await db.query(`UPDATE cards SET stats = COALESCE(stats, '{}') || jsonb_build_object('focus', jsonb_build_array($2::real, $3::real), 'zoom', $4::real)
                               WHERE id = $1 RETURNING stats`,
-                [Number(body.cardId), Math.round(clamp(body.x, 0, 100)), Math.round(clamp(body.y, 0, 100)), Math.round(clamp(body.zoom, 1, 3) * 100) / 100]);
+                [Number(body.cardId), Math.round(clamp(body.x, 0, 100)), Math.round(clamp(body.y, 0, 100)), Math.round(clamp(body.zoom, 0.4, 3) * 100) / 100]);
         if (!card) throw new HttpError(404, 'Carte introuvable');
         await db.query(`DELETE FROM framing_reports WHERE card_id = $1`, [Number(body.cardId)]);
         catalogCache = null;

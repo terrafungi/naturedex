@@ -658,7 +658,13 @@ function goldLeaf(ctx, x, y, w, h, alpha) {
 
 // Draw `img` to cover the box; fx/fy (0-100) = the point of the picture kept in view (cards.stats.focus).
 function cover(ctx, img, x, y, w, h, [fx, fy] = [50, 50], zoom = 1) {
-    const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight) * Math.max(1, zoom);
+    if (zoom < 1) { // zoomed out: blurred copy of the picture fills the edges, as on the cards
+        ctx.save();
+        ctx.filter = `blur(${Math.round(w * 0.03)}px) brightness(0.7)`;
+        cover(ctx, img, x - w * 0.075, y - h * 0.075, w * 1.15, h * 1.15);
+        ctx.restore();
+    }
+    const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight) * zoom;
     const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
     ctx.drawImage(img, x - (dw - w) * fx / 100, y - (dh - h) * fy / 100, dw, dh);
 }

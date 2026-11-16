@@ -164,7 +164,7 @@ function FieldSection({ cardId }) {
     );
 }
 
-// Staff tool: drag the picture to choose what stays in view, zoom with the slider.
+// Staff tool: drag the picture to choose what stays in view, zoom in or out with the slider.
 // Saved on the card itself, so every player sees the new framing.
 export function FramingEditor({ card, number, total, draft, setDraft, onDone }) {
     const box = useRef(null);
@@ -204,10 +204,10 @@ export function FramingEditor({ card, number, total, draft, setDraft, onDone }) 
                 <div className="absolute inset-0 z-20 cursor-grab active:cursor-grabbing touch-none rounded-[4%] ring-2 ring-[#e9c46a] ring-offset-4 ring-offset-transparent"
                     onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} />
             </div>
-            <p className="mt-4 text-center text-sm text-ink-soft">Fais glisser l'image pour la déplacer, règle le zoom en dessous.</p>
+            <p className="mt-4 text-center text-sm text-ink-soft">Fais glisser l'image pour la déplacer. Zoom à gauche de ×1 : l'image entière rentre, les bords sont flous.</p>
             <label className="mt-3 flex items-center gap-3 text-sm font-semibold text-white">
                 Zoom
-                <input type="range" min="1" max="3" step="0.05" value={draft.zoom} onChange={(e) => setDraft({ ...draft, zoom: Number(e.target.value) })} className="flex-1 accent-[#e9c46a]" />
+                <input type="range" min="0.4" max="3" step="0.05" value={draft.zoom} onChange={(e) => setDraft({ ...draft, zoom: Number(e.target.value) })} className="flex-1 accent-[#e9c46a]" />
                 <span className="w-12 text-right tabular-nums">×{draft.zoom.toFixed(2)}</span>
             </label>
             {error && <p className="mt-2 text-sm text-rust font-semibold">{error}</p>}

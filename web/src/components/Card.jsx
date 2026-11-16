@@ -56,9 +56,10 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     const focus = card.focus || card.stats?.focus;
     const zoom = Number(card.zoom || card.stats?.zoom) || 1;
     // scaling around the focus point keeps it in place (matches cover() in showcase.js)
-    const framing = focus || zoom > 1 ? {
+    // zoomed out (< 1): the whole picture fits, a blurred copy of it fills the edges
+    const framing = focus || zoom !== 1 ? {
         objectPosition: focus ? `${focus[0]}% ${focus[1]}%` : undefined,
-        transform: zoom > 1 ? `scale(${zoom})` : undefined,
+        transform: zoom !== 1 ? `scale(${zoom})` : undefined,
         transformOrigin: focus ? `${focus[0]}% ${focus[1]}%` : undefined,
     } : undefined;
 
@@ -143,6 +144,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                     </div>
                 </div>
                 <div className="nd-window">
+                    {zoom < 1 && <img className="nd-backdrop" src={card.thumb_url} alt="" aria-hidden draggable="false" />}
                     <img src={bleed ? sharper(card.thumb_url) : card.thumb_url} alt={card.name} loading="lazy" draggable="false" onError={fallbackToOriginal}
                         style={framing} />
                 </div>
