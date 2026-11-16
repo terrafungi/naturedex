@@ -46,7 +46,7 @@ export default function Privacy() {
                         Les photos validées sont visibles par les autres joueurs. Ne photographiez pas de personnes : les photos avec un visage reconnaissable sont refusées.
                     </li>
                     <li><b className="text-white">Exploration</b> : si vous activez la carte, votre dernière position connue est enregistrée (une seule, remplacée à chaque mise à jour, jamais d'historique de trajet) pour faire apparaître les espèces autour de vous et empêcher la triche.</li>
-                    <li><b className="text-white">Achats</b> : le paiement est réalisé sur la page sécurisée de Stripe. Nous ne voyons ni ne stockons votre carte bancaire ; nous conservons l'historique des achats (pack, montant, date, référence Stripe), y compris les dons aux associations.</li>
+                    <li><b className="text-white">Achats</b> : le paiement est réalisé sur la page sécurisée de Stripe. Nous ne voyons ni ne stockons votre carte bancaire ; nous conservons l'historique des achats (pack, montant, date, référence Stripe), y compris les dons aux associations. Dans l'application Android, le paiement passe par Google Play : nous recevons seulement une référence d'achat pour vérifier et livrer la commande.</li>
                     <li><b className="text-white">Pubs récompensées</b> : nous enregistrons le nombre de pubs regardées par jour, pour appliquer la limite quotidienne.</li>
                 </ul>
             </Section>
@@ -80,7 +80,8 @@ export default function Privacy() {
             <Section title="Services tiers">
                 <ul className="list-disc pl-5 space-y-2">
                     <li><b className="text-white">Amazon Web Services</b> (via OpenKBS) : hébergement du site, de la base de données et des photos, dans l'Union européenne.</li>
-                    <li><b className="text-white">Stripe</b> : paiements.</li>
+                    <li><b className="text-white">Stripe</b> : paiements sur le site.</li>
+                    <li><b className="text-white">Google Play</b> : paiements dans l'application Android.</li>
                     <li><b className="text-white">Google</b> : identification des espèces sur les photos du mode terrain (Gemini, la photo et la position arrondie lui sont envoyées), publicités AdSense, polices d'écriture (Google Fonts).</li>
                     <li><b className="text-white">OpenStreetMap / Nominatim</b> : nom de la région à partir de la position arrondie ; <b className="text-white">OpenFreeMap</b> : fonds de carte de l'exploration.</li>
                     <li><b className="text-white">Wikipédia / Wikimedia Commons</b> : images et textes des cartes, chargés depuis leurs serveurs.</li>

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fr.naturedex.app",
+      "sha256_cert_fingerprints": [
+        "91:1E:7B:BC:E6:CF:03:1A:93:65:CD:6D:A6:F9:EE:98:22:29:51:74:19:18:F4:1A:79:11:E9:9F:5C:F1:9C:33"
+      ]
+    }
+  }
+]

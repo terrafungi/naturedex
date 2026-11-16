@@ -530,6 +530,28 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_cancel BOOLEAN NOT NULL DEFAULT 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_association TEXT;
 CREATE INDEX IF NOT EXISTS users_pass_sub ON users (pass_until) WHERE pass_sub IS NOT NULL;
 
+-- Google Play Billing (Android app). play_ref = purchase token (packs) or order id (each paid Pass month).
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS play_ref TEXT UNIQUE;
+-- Pass bought through Google Play: its purchase token (Play is then the source of truth for pass_until)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_play TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS users_pass_play ON users (pass_play) WHERE pass_play IS NOT NULL;
+
+-- Web Push notifications (site + Android app). One row per browser / device.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_ok_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS push_subscriptions_user ON push_subscriptions (user_id);
+-- Categories switched off by the player ({ "auctions": false }); absent = on
+ALTER TABLE users ADD COLUMN IF NOT EXISTS push_prefs JSONB NOT NULL DEFAULT '{}'::jsonb;
+-- "Boosters rechargés" sent once per refill: compared with charges_at
+ALTER TABLE users ADD COLUMN IF NOT EXISTS charges_notified_at TIMESTAMPTZ;
+
 -- Avatar: a drawn character ({ skin, hair, hairColor, acc, bg, shirt }); null = generated from the username
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar JSONB;
 -- paid t-shirts bought with pépites (free ones are never stored)

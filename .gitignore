@@ -1,7 +1,9 @@
 node_modules/
 .*
 !.gitignore
+!.well-known/
 openkbs.local.json
+vapid-keys.local.txt
 
 # openkbs: skills and AI instructions travel with the repo
 # (the openkbs skill itself is managed by the CLI and stays out)

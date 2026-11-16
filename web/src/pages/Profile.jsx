@@ -7,6 +7,7 @@ import SeasonBadge, { SeasonHistory } from '../components/SeasonBadge.jsx';
 import { defaultAvatar } from '../components/PlayerAvatar.jsx';
 import AvatarStage, { StageTitle } from '../components/AvatarStage.jsx';
 import { RARITIES } from '../game.jsx';
+import NotificationSettings from '../components/NotificationSettings.jsx';
 
 export default function Profile() {
     const { user, catalog, owned, ownedInfo, logout } = useGame();
@@ -70,6 +71,8 @@ export default function Profile() {
             </div>
 
             {me && <div className="mt-6"><SeasonHistory seasons={me.seasons} /></div>}
+
+            <NotificationSettings />
 
             <PasswordForm />
 

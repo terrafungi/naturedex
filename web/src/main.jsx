@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import './index.css';
 import { GameProvider, useGame } from './api.jsx';
+import { isPlayApp } from './play.js';
+import { watchPush } from './push.js';
 import Layout from './components/Layout.jsx';
 import Landing from './pages/Landing.jsx';
 import Auth from './pages/Auth.jsx';
@@ -58,6 +60,9 @@ function Home() {
     if (!user && new URLSearchParams(search).has('parrain')) return <Navigate to={`/connexion${search}`} replace />;
     return <Landing />;
 }
+
+watchPush(); // keep this device's notification subscription attached to the logged-in player
+isPlayApp(); // remember, for this session, that we run inside the Android app (the ?source=twa start URL is lost on navigation)
 
 createRoot(document.getElementById('root')).render(
     <StrictMode>

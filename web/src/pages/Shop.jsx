@@ -5,6 +5,7 @@ import { Brain, CalendarCheck, Clock, Check, CheckCircle2, Compass, ExternalLink
 import InviteBanner from '../components/InviteBanner.jsx';
 import { api, useGame } from '../api.jsx';
 import { Amount, Nugget, Seed } from '../components/Currency.jsx';
+import { isPlayApp, playBuy, playPrices, playRestore } from '../play.js';
 
 const euros = (cents) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 const ASSOC_COLOR = { lpo: '#4ea8ff', wikipedia: '#f3f7f1' };
@@ -144,9 +145,12 @@ function usePassReturn(onDone) {
     return [state, setState];
 }
 
-function PassCard({ shop, user, assoc, ret, onUser }) {
+function PassCard({ shop, user, assoc, ret: webRet, onUser, inApp, ready, prices }) {
     const p = shop.pass;
     const mine = user?.pass;
+    const [appRet, setAppRet] = useState(null);
+    const ret = appRet || webRet;
+    const price = (inApp && prices[shop.play.passId]) || euros(p.price);
     const [consent, setConsent] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -166,6 +170,13 @@ function PassCard({ shop, user, assoc, ret, onUser }) {
         setBusy(false);
     };
     const subscribe = () => run(async () => {
+        if (inApp) {
+            const res = await playBuy(shop.play.passId, assoc.id);
+            if (!res) return; // closed the Google Play sheet
+            onUser(res.user);
+            setAppRet(res.active ? 'active' : 'slow');
+            return;
+        }
         const { url } = await api('passCheckout', { association: assoc.id, consent });
         window.location.assign(url);
         await new Promise(() => {}); // keep the spinner while leaving
@@ -183,14 +194,14 @@ function PassCard({ shop, user, assoc, ret, onUser }) {
                     <h2 className="font-display text-3xl text-white flex items-center gap-2"><Leaf className="w-7 h-7 text-[#e9c46a]" />{p.label}</h2>
                     <p className="mt-1 text-white/70">Plus de jeu chaque jour, et un vrai coup de pouce régulier à la nature.</p>
                 </div>
-                <p className="font-display text-white"><span className="text-4xl font-bold tabular-nums">{euros(p.price)}</span><span className="text-white/60"> / mois</span></p>
+                <p className="font-display text-white"><span className="text-4xl font-bold tabular-nums">{price}</span><span className="text-white/60"> / mois</span></p>
             </div>
             <ul className="mt-5 grid sm:grid-cols-2 gap-x-6 gap-y-3">
                 {perks.map(([Icon, text], i) => (
                     <li key={i} className="flex items-start gap-3 text-white/85"><Icon className="w-5 h-5 mt-0.5 text-[#e9c46a] shrink-0" /><span className="flex flex-wrap items-center gap-x-1.5">{text}</span></li>
                 ))}
             </ul>
-            {ret === 'checking' && <p className="mt-5 flex items-center gap-2 text-white/85"><Loader2 className="w-5 h-5 animate-spin text-[#a8f0c6]" />Activation du Pass auprès de Stripe…</p>}
+            {ret === 'checking' && <p className="mt-5 flex items-center gap-2 text-white/85"><Loader2 className="w-5 h-5 animate-spin text-[#a8f0c6]" />Activation du Pass en cours…</p>}
             {ret === 'slow' && <p className="mt-5 text-white/80">Le paiement n'est pas encore confirmé. S'il a été accepté, ton Pass s'activera tout seul dans quelques minutes.</p>}
             {ret && !['checking', 'slow', 'active'].includes(ret) && <p className="mt-5 text-sm font-semibold text-[#ffb4a2]">{ret}</p>}
             {mine ? (
@@ -202,22 +213,29 @@ function PassCard({ shop, user, assoc, ret, onUser }) {
                             ? <>Pass actif jusqu'au <b className="text-white">{longDate(mine.until)}</b>, sans renouvellement.</>
                             : <>Pass actif, renouvelé le <b className="text-white">{longDate(mine.until)}</b>.</>}
                     </p>
-                    <button onClick={() => toggle(mine.cancelled)} disabled={busy}
-                        className={`px-4 py-2 rounded-full text-sm font-bold ${mine.cancelled ? 'nd-cta-gold' : 'ring-1 ring-white/20 text-white/80 hover:bg-white/5'} disabled:opacity-40`}>
-                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : mine.cancelled ? 'Reprendre l\'abonnement' : 'Résilier'}
-                    </button>
+                    {mine.store === 'play' ? (
+                        <a href={shop.play.manageUrl || 'https://play.google.com/store/account/subscriptions'} target="_blank" rel="noreferrer"
+                            className="px-4 py-2 rounded-full text-sm font-bold ring-1 ring-white/20 text-white/80 hover:bg-white/5 inline-flex items-center gap-1.5">
+                            Gérer dans Google Play <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                    ) : (
+                        <button onClick={() => toggle(mine.cancelled)} disabled={busy}
+                            className={`px-4 py-2 rounded-full text-sm font-bold ${mine.cancelled ? 'nd-cta-gold' : 'ring-1 ring-white/20 text-white/80 hover:bg-white/5'} disabled:opacity-40`}>
+                            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : mine.cancelled ? 'Reprendre l\'abonnement' : 'Résilier'}
+                        </button>
+                    )}
                 </div>
             ) : (
                 <>
                     <label className="mt-6 flex items-start gap-3 text-sm text-white/80 cursor-pointer">
                         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#4fd18b] shrink-0" />
-                        <span>Je demande l'activation immédiate du Pass et je reconnais perdre mon droit de rétractation de 14 jours. L'abonnement se renouvelle chaque mois et je peux le résilier à tout moment ici, en un clic.</span>
+                        <span>Je demande l'activation immédiate du Pass et je reconnais perdre mon droit de rétractation de 14 jours. L'abonnement se renouvelle chaque mois et je peux le résilier à tout moment {inApp ? 'depuis Google Play (Abonnements)' : 'ici, en un clic'}.</span>
                     </label>
                     <p className="mt-3 text-xs text-white/55 flex gap-2"><Info className="w-4 h-4 shrink-0" />Si tu as moins de 18 ans, demande l'accord d'un parent avant de t'abonner.</p>
-                    <button onClick={subscribe} disabled={!consent || busy || !shop.ready}
+                    <button onClick={subscribe} disabled={!consent || busy || !ready}
                         className="mt-5 w-full sm:w-auto nd-cta-gold inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full font-bold disabled:opacity-40 disabled:pointer-events-none">
                         {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
-                        {shop.ready ? `S'abonner · ${euros(p.price)} / mois` : 'Paiement bientôt disponible'}
+                        {ready ? `S'abonner · ${price} / mois` : 'Paiement bientôt disponible'}
                     </button>
                 </>
             )}
@@ -226,7 +244,7 @@ function PassCard({ shop, user, assoc, ret, onUser }) {
     );
 }
 
-function PackCard({ pack, assoc, selected, onSelect }) {
+function PackCard({ pack, assoc, selected, onSelect, price }) {
     const used = pack.once && !pack.available;
     return (
         <button onClick={onSelect} disabled={used}
@@ -242,7 +260,7 @@ function PackCard({ pack, assoc, selected, onSelect }) {
             {pack.once && <p className="mt-1 text-xs font-semibold text-[#a8f0c6]"><Sparkles className="inline w-3.5 h-3.5 -mt-0.5" /> 2× le sachet de graines, pépites en plus</p>}
             {pack.bonus && <p className="mt-1 text-xs font-semibold text-[#a8f0c6]"><Sparkles className="inline w-3.5 h-3.5 -mt-0.5" /> dont {pack.bonus.toLocaleString('fr-FR')} offertes</p>}
             <div className="mt-auto pt-4 flex items-end justify-between gap-2">
-                <span className="font-display text-2xl font-bold text-white tabular-nums">{euros(pack.price)}</span>
+                <span className="font-display text-2xl font-bold text-white tabular-nums">{price || euros(pack.price)}</span>
                 <span className="text-right text-xs text-[#a8f0c6] leading-tight">
                     <HeartHandshake className="inline w-3.5 h-3.5 -mt-0.5 mr-0.5" />{euros(pack.donation)}<br /><span className="text-white/50">pour {assoc?.name}</span>
                 </span>
@@ -251,14 +269,21 @@ function PackCard({ pack, assoc, selected, onSelect }) {
     );
 }
 
-function Checkout({ shop, pack, assoc }) {
+function Checkout({ shop, pack, assoc, inApp, ready, price, onPlayDone }) {
     const [consent, setConsent] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     useEffect(() => { setError(''); }, [pack, assoc]);
+    const shown = price || euros(pack.price);
     const pay = async () => {
         setBusy(true); setError('');
         try {
+            if (inApp) {
+                const res = await playBuy(pack.id, assoc.id);
+                setBusy(false);
+                if (res) onPlayDone(res);
+                return;
+            }
             const { url } = await api('shopCheckout', { pack: pack.id, association: assoc.id, consent });
             window.location.assign(url);
         } catch (err) {
@@ -268,7 +293,7 @@ function Checkout({ shop, pack, assoc }) {
     return (
         <div className="mt-6 rounded-3xl nd-glass p-5 sm:p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="font-display text-xl text-white">{pack.label} · {euros(pack.price)}</p>
+                <p className="font-display text-xl text-white">{pack.label} · {shown}</p>
                 <p className="text-sm text-white/70">
                     Dont <b className="text-[#a8f0c6]">{euros(pack.donation)}</b> reversés à <b className="text-white">{assoc.name}</b>
                 </p>
@@ -279,12 +304,14 @@ function Checkout({ shop, pack, assoc }) {
             </label>
             <p className="mt-3 text-xs text-white/55 flex gap-2"><Info className="w-4 h-4 shrink-0" />Si tu as moins de 18 ans, demande l'accord d'un parent avant de payer.</p>
             {error && <p className="mt-3 text-sm font-semibold text-[#ffb4a2]">{error}</p>}
-            <button onClick={pay} disabled={!consent || busy || !shop.ready}
+            <button onClick={pay} disabled={!consent || busy || !ready}
                 className="mt-5 w-full sm:w-auto nd-cta-gold inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full font-bold disabled:opacity-40 disabled:pointer-events-none">
                 {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
-                {shop.ready ? `Payer ${euros(pack.price)}` : 'Paiement bientôt disponible'}
+                {ready ? `Payer ${shown}` : 'Paiement bientôt disponible'}
             </button>
-            <p className="mt-3 text-xs text-white/50 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" />Paiement sécurisé par Stripe : tes coordonnées bancaires ne passent jamais par NatureDex.</p>
+            <p className="mt-3 text-xs text-white/50 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" />
+                {inApp ? 'Paiement sécurisé par Google Play.' : 'Paiement sécurisé par Stripe : tes coordonnées bancaires ne passent jamais par NatureDex.'}
+            </p>
         </div>
     );
 }
@@ -302,10 +329,27 @@ export default function Shop() {
     const [ret, setRet] = useReturn((u) => { setUser(u); load(); });
     const [passRet] = usePassReturn((u) => { setUser(u); load(); });
 
+    // Android app: Google Play prices, and purchases Play still holds (app closed mid-purchase…).
+    const [inApp] = useState(isPlayApp);
+    const [prices, setPrices] = useState({});
+    const playOn = inApp && !!shop?.play?.ready;
+    useEffect(() => {
+        if (!playOn) return;
+        playPrices([...shop.packs.map((p) => p.id), shop.play.passId]).then(setPrices).catch((err) => setError(err.message));
+        playRestore().then((u) => { if (u) { setUser(u); load(); } }).catch(() => {});
+    }, [playOn]); // eslint-disable-line react-hooks/exhaustive-deps
+    const onPlayDone = (res) => {
+        setUser(res.user);
+        setRet(res.purchase?.status === 'paid' ? { status: 'paid', purchase: res.purchase } : { status: 'slow' });
+        setPackId(null);
+        load();
+    };
+
     if (!shop) return <div className="py-32 text-center font-display text-xl text-ink-soft">{error || 'Chargement…'}</div>;
     const assoc = shop.associations.find((a) => a.id === pick) || shop.associations[0];
     const pack = shop.packs.find((p) => p.id === packId);
     const share = Math.round(shop.donationShare * 100);
+    const ready = inApp ? playOn : shop.ready;
 
     return (
         <div className="max-w-5xl mx-auto px-5 py-10">
@@ -327,12 +371,12 @@ export default function Shop() {
                 </div>
             </div>
 
-            {!shop.ready && (
+            {!ready && (
                 <p className="mt-4 rounded-2xl bg-white/[0.04] ring-1 ring-white/10 px-4 py-3 text-sm text-white/75 flex gap-2">
                     <Info className="w-5 h-5 text-brass shrink-0" />Le paiement n'est pas encore activé. Tu peux déjà découvrir les packs, ils seront achetables très bientôt.
                 </p>
             )}
-            {shop.testMode && (
+            {shop.testMode && !inApp && (
                 <p className="mt-4 rounded-2xl bg-[#4ea8ff]/10 ring-1 ring-[#4ea8ff]/30 px-4 py-3 text-sm text-white/85 flex gap-2">
                     <FlaskConical className="w-5 h-5 text-[#4ea8ff] shrink-0" />Mode test : aucun vrai paiement. Carte de test Stripe : 4242 4242 4242 4242, date future, n'importe quel code.
                 </p>
@@ -342,14 +386,14 @@ export default function Shop() {
             <h2 className="mt-10 font-display text-2xl text-white"><span className="text-white/40 mr-2">1.</span>Choisis ton association</h2>
             <div className="mt-4"><Associations list={shop.associations} pick={assoc.id} setPick={setPick} share={shop.donationShare} /></div>
 
-            <PassCard shop={shop} user={user} assoc={assoc} ret={passRet} onUser={setUser} />
+            <PassCard shop={shop} user={user} assoc={assoc} ret={passRet} onUser={setUser} inApp={inApp} ready={ready} prices={prices} />
 
             <h2 className="mt-10 font-display text-2xl text-white"><span className="text-white/40 mr-2">2.</span>Ou choisis un pack</h2>
             <p className="mt-1 text-sm text-ink-soft">Les graines ouvrent des boosters, les pépites servent aux enchères.</p>
             <div className="mt-5 grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {shop.packs.map((p) => <PackCard key={p.id} pack={p} assoc={assoc} selected={p.id === packId} onSelect={() => setPackId(p.id)} />)}
+                {shop.packs.map((p) => <PackCard key={p.id} pack={p} assoc={assoc} selected={p.id === packId} onSelect={() => setPackId(p.id)} price={inApp ? prices[p.id] : null} />)}
             </div>
-            {pack && <Checkout shop={shop} pack={pack} assoc={assoc} />}
+            {pack && <Checkout shop={shop} pack={pack} assoc={assoc} inApp={inApp} ready={ready} price={inApp ? prices[pack.id] : null} onPlayDone={onPlayDone} />}
 
             {shop.purchases.length > 0 && (
                 <>
@@ -379,7 +423,7 @@ export default function Shop() {
                     La part solidaire ({share} % du prix TTC payé) est mise de côté à chaque achat et versée par NatureDex aux associations. Le compteur ci-dessus
                     montre les montants réels. Ce reversement ne donne pas droit à un reçu fiscal pour l'acheteur.
                 </p>
-                <p>Un souci avec un paiement ? Les crédits non reçus sont ajoutés automatiquement dès que Stripe confirme le paiement. <Link to="/profil" className="underline">Mon profil</Link></p>
+                <p>Un souci avec un paiement ? Les crédits non reçus sont ajoutés automatiquement dès que {inApp ? 'Google Play' : 'Stripe'} confirme le paiement{inApp ? ' (rouvre la boutique)' : ''}. <Link to="/profil" className="underline">Mon profil</Link></p>
             </div>
         </div>
     );

@@ -1,0 +1,64 @@
+{
+    "packageId":  "fr.naturedex.app",
+    "host":  "naturedex.fr",
+    "name":  "NatureDex",
+    "launcherName":  "NatureDex",
+    "display":  "standalone",
+    "orientation":  "portrait",
+    "themeColor":  "#05130D",
+    "themeColorDark":  "#05130D",
+    "navigationColor":  "#05130D",
+    "navigationColorDark":  "#05130D",
+    "navigationDividerColor":  "#05130D",
+    "navigationDividerColorDark":  "#05130D",
+    "backgroundColor":  "#05130D",
+    "enableNotifications":  true,
+    "startUrl":  "/?source=twa",
+    "iconUrl":  "https://naturedex.fr/icon-512.png",
+    "maskableIconUrl":  "https://naturedex.fr/icon-maskable-512.png",
+    "splashScreenFadeOutDuration":  300,
+    "signingKey":  {
+                       "path":  "./naturedex-upload.keystore",
+                       "alias":  "upload"
+                   },
+    "appVersionName":  "1.0.0",
+    "appVersionCode":  1,
+    "appVersion":  "1.0.0",
+    "shortcuts":  [
+
+                  ],
+    "generatorApp":  "bubblewrap-cli",
+    "webManifestUrl":  "https://naturedex.fr/manifest.webmanifest",
+    "fallbackType":  "customtabs",
+    "features":  {
+                     "playBilling":  {
+                                         "enabled":  true
+                                     },
+                     "locationDelegation":  {
+                                                "enabled":  true
+                                            }
+                 },
+    "alphaDependencies":  {
+                              "enabled":  false
+                          },
+    "enableSiteSettingsShortcut":  true,
+    "isChromeOSOnly":  false,
+    "isMetaQuest":  false,
+    "fullScopeUrl":  "https://naturedex.fr/",
+    "minSdkVersion":  24,
+    "fingerprints":  [
+
+                     ],
+    "additionalTrustedOrigins":  [
+
+                                 ],
+    "retainedBundles":  [
+
+                        ],
+    "protocolHandlers":  [
+
+                         ],
+    "fileHandlers":  [
+
+                     ]
+}

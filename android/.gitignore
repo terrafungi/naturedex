@@ -1,0 +1,9 @@
+naturedex-upload.keystore
+keystore-password.txt
+*.apk
+*.aab
+*.idsig
+.gradle/
+build/
+app/build/
+local.properties

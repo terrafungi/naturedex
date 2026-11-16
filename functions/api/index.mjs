@@ -8,6 +8,8 @@
  * - DATABASE_URL (Postgres connection string)
  * - STRIPE_SECRET_KEY (shop; without it the shop shows payments as unavailable)
  * - STRIPE_WEBHOOK_SECRET (optional; Stripe webhook → POST <function url>/stripe-webhook)
+ * - PLAY_PACKAGE_NAME, PLAY_SERVICE_ACCOUNT (Google Play Billing for the Android app, see play.mjs)
+ * - VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY (Web Push notifications, see push.mjs)
  */
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
@@ -20,6 +22,11 @@ import {
     ASSOCIATIONS, DONATION_SHARE, PACKS, PASS, createCheckout, createPassCheckout, donationOf, getCheckout, getSubscription,
     invoiceSubscription, passActive, periodEnd, setCancelAtPeriodEnd, stripeReady, stripeTestMode, verifyWebhook,
 } from './shop.mjs';
+import {
+    PLAY_PASS_ID, acknowledgeSubscription, consumeProduct, getProduct, getSubscription as getPlaySubscription,
+    manageSubscriptionUrl, playReady, subscriptionInfo,
+} from './play.mjs';
+import { PUSH_KINDS, pushReady, sendPush, vapidPublicKey } from './push.mjs';
 import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLabel, seasonRollover } from './arena.mjs';
 import { boosterBonus, duelActions } from './duel.mjs';
 import { NATURALIST, syncNaturalistCards } from './naturalists.mjs';
@@ -193,7 +200,7 @@ async function publicUser(db, user) {
         recycleValue: RECYCLE_VALUE,
         social: await socialCounts(db, user.id),
         quizPerDay: quizPerDay(user),
-        pass: passActive(user) ? { until: user.pass_until, cancelled: user.pass_cancel } : null,
+        pass: passActive(user) ? { until: user.pass_until, cancelled: user.pass_cancel, store: user.pass_play ? 'play' : 'web' } : null,
         avatar: avatarOf(user),
         newsSeen: user.news_seen,
         joinedAt: user.created_at,
@@ -746,6 +753,59 @@ async function giveCard(client, userId, cardId) {
     );
 }
 
+// ---------- push notifications ----------
+// notify() never throws and never blocks a game action for long: call it after the transaction commits.
+// One message per device; dead subscriptions (404/410) are removed.
+async function notify(db, userIds, kind, message) {
+    if (!pushReady()) return;
+    const ids = [...new Set([].concat(userIds).filter(Boolean))];
+    if (!ids.length) return;
+    try {
+        const { rows } = await db.query(
+            `SELECT s.id, s.endpoint, s.p256dh, s.auth FROM push_subscriptions s JOIN users u ON u.id = s.user_id
+             WHERE s.user_id = ANY($1) AND COALESCE((u.push_prefs ->> $2)::boolean, true)`, [ids, kind]);
+        const payload = { icon: '/icon-192.png', badge: '/icon-192.png', ...message };
+        const results = await Promise.all(rows.map((s) => sendPush(s, payload, { topic: message.tag }).then((r) => [s.id, r])));
+        const gone = results.filter(([, r]) => r === 'gone').map(([id]) => id);
+        const ok = results.filter(([, r]) => r === 'ok').map(([id]) => id);
+        if (gone.length) await db.query(`DELETE FROM push_subscriptions WHERE id = ANY($1)`, [gone]);
+        if (ok.length) await db.query(`UPDATE push_subscriptions SET last_ok_at = now() WHERE id = ANY($1)`, [ok]);
+    } catch (err) {
+        console.error('notify', kind, err.message);
+    }
+}
+
+const cardName = async (db, cardId) => (await db.query(`SELECT name FROM cards WHERE id = $1`, [cardId])).rows[0]?.name || 'ta carte';
+
+// After closeAuction: tell the seller (sold / unsold) and the winner.
+async function notifyAuctionClosed(db, a) {
+    const name = await cardName(db, a.card_id);
+    if (a.bidder_id) {
+        await notify(db, a.seller_id, 'auctions', { title: 'Carte vendue ! 🔨', body: `${name} est partie pour ${a.bid.toLocaleString('fr-FR')} pépites.`, url: '/encheres', tag: `auction-${a.id}` });
+        await notify(db, a.bidder_id, 'auctions', { title: 'Enchère remportée 🎉', body: `${name} rejoint ta collection.`, url: '/collection', tag: `auction-${a.id}` });
+    } else {
+        await notify(db, a.seller_id, 'auctions', { title: 'Vente terminée sans offre', body: `${name} est revenue dans ta collection.`, url: '/encheres', tag: `auction-${a.id}` });
+    }
+}
+
+// Schedule: free boosters back to the cap since the last opening, told once per refill.
+async function notifyFullCharges(db) {
+    const { rows } = await db.query(
+        `UPDATE users u SET charges_notified_at = now()
+         WHERE u.id IN (
+            SELECT id FROM users
+            WHERE charges < $1 AND (charges_notified_at IS NULL OR charges_notified_at < charges_at)
+              AND charges_at + ($1 - charges) * CASE WHEN pass_until > now() THEN $2::interval ELSE $3::interval END <= now()
+              AND EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.user_id = users.id)
+            LIMIT 200)
+         RETURNING u.id`,
+        [MAX_CHARGES, `${PASS.chargeMinutes} minutes`, `${CHARGE_MS / 60000} minutes`]);
+    if (!rows.length) return;
+    await notify(db, rows.map((r) => r.id), 'boosters', {
+        title: 'Tes boosters sont rechargés 🎁', body: `${MAX_CHARGES} ouvertures gratuites t'attendent.`, url: '/booster', tag: 'charges',
+    });
+}
+
 // Sold: card to the high bidder, bid minus the fee to the seller. Unsold: card back to the seller.
 async function closeAuction(client, a) {
     if (a.bidder_id) {
@@ -768,9 +828,10 @@ async function settleAuctions(db) {
                 `SELECT * FROM auctions WHERE status = 'open' AND ends_at <= now() ORDER BY id LIMIT 50 FOR UPDATE SKIP LOCKED`
             );
             for (const a of rows) await closeAuction(client, a);
-            return rows.length;
+            return rows;
         });
-        if (settled < 50) return; // the rest (if any) is locked by a concurrent request settling it
+        for (const a of settled) await notifyAuctionClosed(db, a);
+        if (settled.length < 50) return; // the rest (if any) is locked by a concurrent request settling it
     }
 }
 
@@ -1209,6 +1270,77 @@ const refreshPass = async (db, subId) => syncPass(db, await getSubscription(subI
 async function refreshDuePasses(db) {
     const { rows } = await db.query(`SELECT pass_sub FROM users WHERE pass_sub IS NOT NULL AND pass_until < now() + interval '1 hour' LIMIT 20`);
     for (const r of rows) await refreshPass(db, r.pass_sub).catch((err) => console.error('pass refresh', r.pass_sub, err.message));
+}
+
+// ---------- Google Play Billing (Android app) ----------
+// The app pays through Google Play (Digital Goods API) and sends the purchase token here.
+// Google is asked directly: a token is credited once (purchases.play_ref is unique) and only
+// to the player who sends it first.
+
+const badToken = (err) => {
+    if ([400, 404, 410].includes(err.status)) return new HttpError(404, 'Achat Google Play introuvable');
+    return new HttpError(502, 'Google Play ne répond pas, réessaie plus tard');
+};
+
+async function grantPlayProduct(db, user, productId, token, association) {
+    const pack = PACKS[productId];
+    if (!pack) throw new HttpError(400, 'Pack inconnu');
+    const gp = await getProduct(productId, token).catch((err) => { throw badToken(err); });
+    if (gp.purchaseState === 2) return { status: 'pending' }; // slow payment method: Play sends it again once paid
+    if (gp.purchaseState !== 0) throw new HttpError(402, 'Cet achat a été annulé');
+    const assoc = ASSOCIATIONS[association] ? association : 'lpo';
+    const purchase = await inTransaction(db, async (client) => {
+        const { rows: [p] } = await client.query(
+            `INSERT INTO purchases (user_id, username, pack, amount_cents, currency, donation_cents, association, coins, nuggets, play_ref, stripe_payment, livemode, status, paid_at)
+             VALUES ($1, $2, $3, $4, 'eur', $5, $6, $7, $8, $9, $10, $11, 'paid', now())
+             ON CONFLICT (play_ref) DO NOTHING RETURNING *`,
+            [user.id, user.username, productId, pack.price, donationOf(pack.price), assoc, pack.coins, pack.nuggets, token, gp.orderId || null, gp.purchaseType !== 0]
+        );
+        if (p) {
+            await client.query(`UPDATE users SET coins = coins + $2, nuggets = nuggets + $3 WHERE id = $1`, [user.id, p.coins, p.nuggets]);
+            return p;
+        }
+        const { rows: [had] } = await client.query(`SELECT * FROM purchases WHERE play_ref = $1`, [token]);
+        if (had.user_id !== user.id) throw new HttpError(409, 'Cet achat appartient à un autre compte');
+        return had; // already credited (retry, or restored at the next shop visit)
+    });
+    // Consuming lets the same pack be bought again. If it fails, the app re-sends the token later.
+    if (gp.consumptionState === 0) await consumeProduct(productId, token).catch((err) => console.error('play consume', err.message));
+    return purchase;
+}
+
+// Copy the Play subscription onto the player and store each paid month once (donation counter, Mécène trophy).
+async function syncPlayPass(db, userId, token) {
+    const info = subscriptionInfo(await getPlaySubscription(token));
+    if (info.productId !== PLAY_PASS_ID) throw new HttpError(400, 'Abonnement inconnu');
+    const { rows: [other] } = await db.query(`SELECT id FROM users WHERE pass_play = $1 AND id <> $2`, [token, userId]);
+    if (other) throw new HttpError(409, 'Cet abonnement appartient à un autre compte');
+    const expired = !info.live && (!info.until || info.until.getTime() < Date.now());
+    const { rows: [u] } = await db.query(
+        `UPDATE users SET pass_play = $2, pass_cancel = $3,
+                          pass_until = CASE WHEN $4::timestamptz IS NOT NULL THEN $4::timestamptz ELSE pass_until END
+         WHERE id = $1 AND (pass_play IS NULL OR pass_play = $2 OR pass_play = $5 OR pass_until < now())
+         RETURNING id, username, pass_association`,
+        [userId, expired ? null : token, info.cancelled, info.live ? info.until.toISOString() : null, info.linked]);
+    if (!u) throw new HttpError(409, 'Un autre abonnement Google Play est déjà actif sur ce compte');
+    if (info.live && info.order) {
+        const association = ASSOCIATIONS[u.pass_association] ? u.pass_association : 'lpo';
+        await db.query(
+            `INSERT INTO purchases (user_id, username, pack, amount_cents, currency, donation_cents, association, play_ref, stripe_payment, livemode, status, paid_at)
+             VALUES ($1, $2, 'pass', $3, 'eur', $4, $5, $6, $6, $7, 'paid', now())
+             ON CONFLICT (play_ref) DO NOTHING`,
+            [userId, u.username, PASS.price, donationOf(PASS.price), association, info.order, !info.test]);
+    }
+    // Google refunds subscriptions left unacknowledged for 3 days.
+    if (info.live && !info.acknowledged) {
+        await acknowledgeSubscription(PLAY_PASS_ID, token).catch((err) => console.error('play ack', err.message));
+    }
+    return info;
+}
+
+async function refreshDuePlayPasses(db) {
+    const { rows } = await db.query(`SELECT id, pass_play FROM users WHERE pass_play IS NOT NULL AND pass_until < now() + interval '1 hour' LIMIT 20`);
+    for (const r of rows) await syncPlayPass(db, r.id, r.pass_play).catch((err) => console.error('play pass refresh', r.id, err.message));
 }
 
 async function stripeWebhook(event) {
@@ -2286,6 +2418,7 @@ const actions = {
     // price (or calling with `buyNow`) closes the auction at once.
     async bid(db, body, event) {
         const user = await requireUser(db, event);
+        let outbid = null, closed = null;
         const sold = await inTransaction(db, async (client) => {
             const { rows: [a] } = await client.query(`SELECT * FROM auctions WHERE id = $1 FOR UPDATE`, [Number(body.id)]);
             if (!a) throw new HttpError(404, 'Enchère introuvable');
@@ -2305,6 +2438,7 @@ const actions = {
             if (!me) throw new HttpError(402, 'Pas assez de pépites');
             if (a.bidder_id && a.bidder_id !== user.id) {
                 await client.query(`UPDATE users SET nuggets = nuggets + $2 WHERE id = $1`, [a.bidder_id, a.bid]);
+                outbid = { userId: a.bidder_id, refund: a.bid };
             }
             await client.query(`INSERT INTO auction_bids (auction_id, user_id, amount) VALUES ($1, $2, $3)`, [a.id, user.id, amount]);
             // A late bid pushes the end back to 2 minutes so nobody wins by sniping.
@@ -2314,9 +2448,26 @@ const actions = {
                  WHERE id = $1 RETURNING *`,
                 [a.id, amount, user.id]
             );
-            if (buyNow) await closeAuction(client, updated);
+            if (buyNow) { await closeAuction(client, updated); closed = updated; }
+            else if (!a.bidder_id) closed = { first: updated };
             return buyNow;
         });
+        if (outbid || closed) {
+            const auctionId = Number(body.id);
+            const { rows: [a] } = await db.query(`SELECT * FROM auctions WHERE id = $1`, [auctionId]);
+            const name = await cardName(db, a.card_id);
+            if (outbid) {
+                await notify(db, outbid.userId, 'auctions', {
+                    title: 'Tu as été surenchéri ⚠️', body: `Nouvelle offre de ${a.bid.toLocaleString('fr-FR')} pépites sur ${name}. Tes ${outbid.refund.toLocaleString('fr-FR')} pépites te sont rendues.`,
+                    url: '/encheres', tag: `auction-${a.id}`,
+                });
+            }
+            if (closed?.first) {
+                await notify(db, a.seller_id, 'auctions', { title: 'Première offre ! 🔨', body: `${user.username} propose ${a.bid.toLocaleString('fr-FR')} pépites pour ${name}.`, url: '/encheres', tag: `auction-${a.id}` });
+            } else if (closed) {
+                await notifyAuctionClosed(db, closed);
+            }
+        }
         const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
         return { sold, user: await publicUser(db, fresh) };
     },
@@ -2380,9 +2531,11 @@ const actions = {
         if (f && f.requester_id === user.id) throw new HttpError(409, `Demande déjà envoyée à ${other.username}`);
         if (f) {
             await db.query(`UPDATE friendships SET status = 'accepted', accepted_at = now() WHERE requester_id = $1 AND addressee_id = $2`, [other.id, user.id]);
+            await notify(db, other.id, 'social', { title: 'Nouvel ami 🤝', body: `${user.username} a accepté ta demande d'ami.`, url: '/amis', tag: `friend-${user.id}` });
             return { status: 'accepted', username: other.username };
         }
         await db.query(`INSERT INTO friendships (requester_id, addressee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [user.id, other.id]);
+        await notify(db, other.id, 'social', { title: 'Demande d\'ami', body: `${user.username} veut devenir ton ami sur NatureDex.`, url: '/amis', tag: `friend-${user.id}` });
         return { status: 'pending', username: other.username };
     },
 
@@ -2510,6 +2663,11 @@ const actions = {
             `INSERT INTO messages (from_id, to_id, body) VALUES ($1, $2, $3) RETURNING id, body, created_at, read_at, true AS mine`,
             [user.id, other.id, text]
         );
+        // Same tag per conversation: a burst of messages replaces one notification instead of stacking.
+        await notify(db, other.id, 'social', {
+            title: `Message de ${user.username}`, body: text.length > 140 ? `${text.slice(0, 140)}…` : text,
+            url: `/messages/${encodeURIComponent(user.username)}`, tag: `msg-${user.id}`,
+        });
         return { message };
     },
 
@@ -2591,6 +2749,10 @@ const actions = {
         } finally {
             client.release();
         }
+        await notify(db, other.id, 'social', {
+            title: `Cadeau de ${user.username} 🎁`, body: `${amount.toLocaleString('fr-FR')} ${amount > 1 ? currency.many : currency.one}${note ? ` · ${note}` : ''}`,
+            url: `/messages/${encodeURIComponent(user.username)}`, tag: `msg-${user.id}`,
+        });
         const { rows: [fresh] } = await db.query(`SELECT * FROM users WHERE id = $1`, [user.id]);
         return {
             ok: true, amount, currency: body.currency, message,
@@ -3001,6 +3163,7 @@ const actions = {
             await Promise.all(pending.map((p) => refreshPurchase(db, p).catch((err) => console.error('refresh', p.id, err.message))));
             if (user.pass_sub) await refreshPass(db, user.pass_sub).catch((err) => console.error('pass refresh', err.message));
         }
+        if (playReady() && user.pass_play) await syncPlayPass(db, user.id, user.pass_play).catch((err) => console.error('play pass refresh', err.message));
         const live = !stripeTestMode();
         const [{ rows: totals }, { rows: mine }, { rows: bought }] = await Promise.all([
             db.query(`SELECT association, SUM(donation_cents)::int AS donated, COUNT(*)::int AS purchases
@@ -3013,6 +3176,7 @@ const actions = {
         return {
             ready: stripeReady(),
             testMode: stripeReady() && stripeTestMode(),
+            play: { ready: playReady(), passId: PLAY_PASS_ID, manageUrl: playReady() ? manageSubscriptionUrl() : null },
             donationShare: DONATION_SHARE,
             packs: Object.entries(PACKS).map(([id, p]) => ({
                 id, ...p, donation: donationOf(p.price), available: !p.once || !bought.some((b) => b.pack === id),
@@ -3075,7 +3239,7 @@ const actions = {
         if (!stripeReady()) throw new HttpError(503, 'Le paiement n\'est pas encore activé');
         if (!ASSOCIATIONS[body.association]) throw new HttpError(400, 'Choisis une association');
         if (body.consent !== true) throw new HttpError(400, 'Confirme l\'activation immédiate du Pass');
-        if (passActive(user) && user.pass_sub) throw new HttpError(409, 'Ton Pass Naturaliste est déjà actif');
+        if (passActive(user) && (user.pass_sub || user.pass_play)) throw new HttpError(409, 'Ton Pass Naturaliste est déjà actif');
         const origin = SITE_ORIGINS.includes(event.headers?.origin) ? event.headers.origin : SITE_ORIGINS[0];
         try {
             const session = await createPassCheckout({ userId: user.id, association: body.association, username: user.username, origin });
@@ -3099,11 +3263,85 @@ const actions = {
     // Cancel = stop renewing; perks stay until the end of the paid month. `resume` undoes it.
     async passCancel(db, body, event) {
         const user = await requireUser(db, event);
+        if (user.pass_play) throw new HttpError(409, 'Ton Pass a été pris sur Google Play : gère-le depuis l\'appli Google Play (Abonnements)');
         if (!user.pass_sub) throw new HttpError(404, 'Aucun abonnement en cours');
         const sub = await setCancelAtPeriodEnd(user.pass_sub, body.resume !== true).catch(() => null);
         if (!sub) throw new HttpError(502, 'Le service de paiement ne répond pas, réessaie plus tard');
         await refreshPass(db, sub.id);
         return { user: await publicUser(db, await requireUser(db, event)) };
+    },
+
+    // ---- Push notifications ----
+    async pushConfig(db, body, event) {
+        const user = await requireUser(db, event);
+        const endpoint = String(body.endpoint || '');
+        const { rows: [{ n, here }] } = await db.query(
+            `SELECT COUNT(*)::int AS n, COALESCE(bool_or(endpoint = $2), false) AS here FROM push_subscriptions WHERE user_id = $1`, [user.id, endpoint]);
+        return {
+            ready: pushReady(), publicKey: vapidPublicKey(), devices: n, subscribed: here,
+            kinds: Object.entries(PUSH_KINDS).map(([key, label]) => ({ key, label, on: user.push_prefs?.[key] !== false })),
+        };
+    },
+
+    // A browser / phone that accepted notifications. The endpoint moves to this account if it
+    // belonged to another one (same phone, other player logged in).
+    async pushSubscribe(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!pushReady()) throw new HttpError(503, 'Les notifications ne sont pas encore activées');
+        const s = body.subscription || {};
+        const endpoint = String(s.endpoint || ''), p256dh = String(s.keys?.p256dh || ''), auth = String(s.keys?.auth || '');
+        if (!/^https:\/\/[^\s]{10,800}$/.test(endpoint) || !/^[A-Za-z0-9_-]{80,100}$/.test(p256dh) || !/^[A-Za-z0-9_-]{16,32}$/.test(auth)) {
+            throw new HttpError(400, 'Abonnement invalide');
+        }
+        const { rows: [{ n }] } = await db.query(`SELECT COUNT(*)::int AS n FROM push_subscriptions WHERE user_id = $1`, [user.id]);
+        if (n >= 10) await db.query(`DELETE FROM push_subscriptions WHERE id IN (SELECT id FROM push_subscriptions WHERE user_id = $1 ORDER BY COALESCE(last_ok_at, created_at) LIMIT 1)`, [user.id]);
+        await db.query(
+            `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES ($1, $2, $3, $4)
+             ON CONFLICT (endpoint) DO UPDATE SET user_id = $1, p256dh = $3, auth = $4, created_at = now()`,
+            [user.id, endpoint, p256dh, auth]);
+        // Don't announce a refill that happened before notifications were on.
+        await db.query(`UPDATE users SET charges_notified_at = now() WHERE id = $1 AND charges_notified_at IS NULL`, [user.id]);
+        return { ok: true };
+    },
+
+    async pushUnsubscribe(db, body, event) {
+        const user = await requireUser(db, event);
+        await db.query(`DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2`, [user.id, String(body.endpoint || '')]);
+        return { ok: true };
+    },
+
+    async pushPrefs(db, body, event) {
+        const user = await requireUser(db, event);
+        const prefs = { ...(user.push_prefs || {}) };
+        for (const key of Object.keys(PUSH_KINDS)) if (typeof body.prefs?.[key] === 'boolean') prefs[key] = body.prefs[key];
+        await db.query(`UPDATE users SET push_prefs = $2 WHERE id = $1`, [user.id, JSON.stringify(prefs)]);
+        return { ok: true, prefs };
+    },
+
+    async pushTest(db, body, event) {
+        const user = await requireUser(db, event);
+        const { rows: [{ n }] } = await db.query(`SELECT COUNT(*)::int AS n FROM push_subscriptions WHERE user_id = $1`, [user.id]);
+        if (!n) throw new HttpError(404, 'Aucun appareil abonné');
+        await notify(db, user.id, 'test', { title: 'NatureDex 🌿', body: 'Les notifications fonctionnent !', url: '/profil', tag: 'test' });
+        return { ok: true };
+    },
+
+    // Android app: a Google Play purchase token to check and credit (pack or Pass).
+    // Also called at each shop visit for purchases Play still lists (lost connection, crash…).
+    async playPurchase(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!playReady()) throw new HttpError(503, 'Le paiement Google Play n\'est pas encore activé');
+        const productId = String(body.productId || '');
+        const token = String(body.token || '');
+        if (!token || token.length > 1000) throw new HttpError(400, 'Achat invalide');
+        if (productId === PLAY_PASS_ID) {
+            if (ASSOCIATIONS[body.association]) await db.query(`UPDATE users SET pass_association = $2 WHERE id = $1`, [user.id, body.association]);
+            const info = await syncPlayPass(db, user.id, token).catch((err) => { throw err instanceof HttpError ? err : badToken(err); });
+            const fresh = await requireUser(db, event);
+            return { active: info.live, user: await publicUser(db, fresh) };
+        }
+        const p = await grantPlayProduct(db, user, productId, token, body.association);
+        return { purchase: p.id ? shapePurchase(p) : p, user: await publicUser(db, await requireUser(db, event)) };
     },
 
     async recycle(db, body, event) {
@@ -3157,6 +3395,10 @@ export const handler = async (event) => {
         if (stripeReady() && new Date().getUTCMinutes() % 5 === 0) {
             await refreshPendingPurchases(getPool());
             await refreshDuePasses(getPool()).catch((err) => console.error('refreshDuePasses', err));
+        }
+        if (pushReady()) await notifyFullCharges(getPool()).catch((err) => console.error('notifyFullCharges', err));
+        if (playReady() && new Date().getUTCMinutes() % 5 === 0) {
+            await refreshDuePlayPasses(getPool()).catch((err) => console.error('refreshDuePlayPasses', err));
         }
         await showcaseWeekRollover(getPool()).catch((err) => console.error('showcaseWeekRollover', err));
         await quizWeekRollover(getPool()).catch((err) => console.error('quizWeekRollover', err));
