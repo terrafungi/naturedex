@@ -10,6 +10,7 @@
  * - STRIPE_WEBHOOK_SECRET (optional; Stripe webhook → POST <function url>/stripe-webhook)
  * - PLAY_PACKAGE_NAME, PLAY_SERVICE_ACCOUNT (Google Play Billing for the Android app, see play.mjs)
  * - VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY (Web Push notifications, see push.mjs)
+ * - BETA_GROUP (optional; Google Group of the Play closed test, e.g. naturedex-beta@googlegroups.com)
  */
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
@@ -137,6 +138,19 @@ async function createSession(db, userId) {
         [token, userId]
     );
     return token;
+}
+
+// Closed-beta links. BETA_GROUP may be the group address or its URL.
+function betaLinks() {
+    const g = (process.env.BETA_GROUP || '').trim();
+    if (!g) return { open: false };
+    const pkg = process.env.PLAY_PACKAGE_NAME || 'fr.naturedex.app';
+    const group = /^https:\/\//.test(g) ? g : `https://groups.google.com/g/${g.replace(/@googlegroups\.com$/i, '')}`;
+    return {
+        open: true, group,
+        optIn: `https://play.google.com/apps/testing/${pkg}`,
+        store: `https://play.google.com/store/apps/details?id=${pkg}`,
+    };
 }
 
 async function requireUser(db, event) {
@@ -3271,6 +3285,30 @@ const actions = {
         return { user: await publicUser(db, await requireUser(db, event)) };
     },
 
+    // ---- Closed beta of the Android app ----
+    // Hidden until BETA_GROUP (the Google Group added as testers in Play Console) is set.
+    async betaInfo() {
+        return betaLinks();
+    },
+
+    // Keeps the address (to write to testers later) and returns the 3 links: join the group,
+    // opt in as a tester, install from Google Play.
+    async betaSignup(db, body, event) {
+        const links = betaLinks();
+        if (!links.open) throw new HttpError(503, 'La bêta n\'est pas encore ouverte');
+        const email = String(body.email || '').trim().toLowerCase();
+        if (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(email)) throw new HttpError(400, 'Adresse e-mail invalide');
+        const ip = String(event.headers?.['x-forwarded-for'] || '').split(',')[0].trim().slice(0, 64);
+        const { rows: [{ n }] } = await db.query(
+            `SELECT COUNT(*)::int AS n FROM beta_signups WHERE ip = $1 AND created_at > now() - interval '1 hour'`, [ip]);
+        if (ip && n >= 10) throw new HttpError(429, 'Trop d\'inscriptions, réessaie dans une heure');
+        const user = await requireUser(db, event).catch(() => null);
+        await db.query(
+            `INSERT INTO beta_signups (email, user_id, ip) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING`,
+            [email, user?.id || null, ip]);
+        return links;
+    },
+
     // ---- Push notifications ----
     async pushConfig(db, body, event) {
         const user = await requireUser(db, event);
@@ -3386,7 +3424,7 @@ Object.assign(actions, exploreActions({ requireUser, inTransaction, HttpError, p
 Object.assign(actions, gardenActions({ requireUser, publicUser, HttpError }));
 Object.assign(actions, avatarActions({ requireUser, inTransaction, HttpError, publicUser }));
 
-const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest', 'showcaseOfWeek', 'topDonors']);
+const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest', 'showcaseOfWeek', 'topDonors', 'betaInfo', 'betaSignup']);
 
 export const handler = async (event) => {
     if (event.source === 'schedule') {

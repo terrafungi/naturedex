@@ -11,6 +11,7 @@ import NewsNotice from './NewsNotice.jsx';
 import NoticeCenter from './NoticeCenter.jsx';
 import DonatePrompt from './DonatePrompt.jsx';
 import InstallPrompt, { InstallLink } from './InstallPrompt.jsx';
+import BetaPrompt from './BetaPrompt.jsx';
 
 export const NAV = [
     { to: '/', label: 'Accueil', Icon: Home, end: true },
@@ -273,6 +274,7 @@ export default function Layout() {
             {user && <NoticeCenter />}
             {user && <DonatePrompt />}
             <InstallPrompt raised={!!user} />
+            <BetaPrompt />
         </div>
     );
 }

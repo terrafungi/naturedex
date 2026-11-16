@@ -55,7 +55,7 @@ export default function InstallPrompt({ raised }) {
     // Offered once the visitor has had time to look around, then again after DISMISS_DAYS.
     useEffect(() => {
         if (!mode || later()) return;
-        const t = setTimeout(() => setShow(true), DELAY_MS);
+        const t = setTimeout(() => { if (!later()) setShow(true); }, DELAY_MS); // the beta pop-up may have snoozed it meanwhile
         return () => clearTimeout(t);
     }, [mode]);
 

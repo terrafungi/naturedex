@@ -697,3 +697,12 @@ CREATE TABLE IF NOT EXISTS framing_reports (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (card_id, user_id)
 );
+
+-- Closed beta of the Android app: addresses left in the site pop-up (testers join the Google Group themselves)
+CREATE TABLE IF NOT EXISTS beta_signups (
+    email TEXT PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    ip TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS beta_signups_ip ON beta_signups (ip, created_at);
