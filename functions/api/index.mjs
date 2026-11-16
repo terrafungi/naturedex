@@ -864,7 +864,7 @@ const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c
                      c.extract, c.wiki_url, c.iucn, c.stats`;
 
 const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp,
-    (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd, c.stats->'focus' AS focus, c.stats->'zoom' AS zoom`;
+    (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd, c.stats->'focus' AS focus, c.stats->'zoom' AS zoom, c.stats->'rotate' AS rotate`;
 let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
 // The catalogue builder skips article intros (too many pages to fetch in bulk):
@@ -1756,16 +1756,17 @@ const actions = {
     },
 
     // Staff: the part of the picture kept in view on the card (focus point in %, zoom 0.4-3: below 1 the whole picture
-    // fits, over a blurred copy of itself), for every player.
+    // fits, over a blurred copy of itself, rotate 0/90/180/270: quarter turns for pictures shot sideways), for every player.
     async setFraming(db, body, event) {
         const user = await requireUser(db, event);
         if (!ADMIN_IDS.has(user.id)) throw new HttpError(403, 'Réservé à l\'équipe');
         const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, Number(v) || 0));
         const { rows: [card] } = body.reset
-            ? await db.query(`UPDATE cards SET stats = COALESCE(stats, '{}') - 'focus' - 'zoom' WHERE id = $1 RETURNING stats`, [Number(body.cardId)])
-            : await db.query(`UPDATE cards SET stats = COALESCE(stats, '{}') || jsonb_build_object('focus', jsonb_build_array($2::real, $3::real), 'zoom', $4::real)
+            ? await db.query(`UPDATE cards SET stats = COALESCE(stats, '{}') - 'focus' - 'zoom' - 'rotate' WHERE id = $1 RETURNING stats`, [Number(body.cardId)])
+            : await db.query(`UPDATE cards SET stats = COALESCE(stats, '{}') || jsonb_build_object('focus', jsonb_build_array($2::real, $3::real), 'zoom', $4::real, 'rotate', $5::int)
                               WHERE id = $1 RETURNING stats`,
-                [Number(body.cardId), Math.round(clamp(body.x, 0, 100)), Math.round(clamp(body.y, 0, 100)), Math.round(clamp(body.zoom, 0.4, 3) * 100) / 100]);
+                [Number(body.cardId), Math.round(clamp(body.x, 0, 100)), Math.round(clamp(body.y, 0, 100)), Math.round(clamp(body.zoom, 0.4, 3) * 100) / 100,
+                    ((Math.round((Number(body.rotate) || 0) / 90) % 4 + 4) % 4) * 90]);
         if (!card) throw new HttpError(404, 'Carte introuvable');
         await db.query(`DELETE FROM framing_reports WHERE card_id = $1`, [Number(body.cardId)]);
         catalogCache = null;

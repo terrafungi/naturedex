@@ -163,6 +163,10 @@ body {
 /* zoomed-out framing: blurred copy of the picture behind it, filling the edges */
 .nd-card .nd-window img.nd-backdrop { position: absolute; inset: 0; transform: scale(1.15); filter: blur(3cqi) brightness(0.7); }
 .nd-card .nd-window img.nd-backdrop + img { position: relative; }
+/* quarter-turned picture: a box with the window's sides swapped (90° / 270°), turned around its centre */
+.nd-card .nd-turn-box { position: absolute; inset: 0; container-type: size; }
+.nd-card .nd-turn { position: absolute; left: 50%; top: 50%; width: 100cqw; height: 100cqh; transform: translate(-50%, -50%) rotate(var(--turn)); }
+.nd-card .nd-turn[data-side] { width: 100cqh; height: 100cqw; }
 /* keep the artwork readable: the foil passes behind it, only a soft sheen on top */
 .nd-card[data-rarity="epic"] .nd-window,
 .nd-card[data-rarity="legendary"] .nd-window,

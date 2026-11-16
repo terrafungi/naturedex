@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Camera, Check, Crop, ExternalLink, Eye, Flag, Gavel, Recycle, RotateCcw, Ruler, Weight } from 'lucide-react';
+import { ArrowLeft, Camera, Check, Crop, ExternalLink, Eye, Flag, Gavel, Recycle, RotateCcw, RotateCwSquare, RotateCcwSquare, Ruler, Weight } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
 import { IUCN, RARITIES, TYPES, formatViews } from '../game.jsx';
@@ -26,7 +26,7 @@ export default function CardPage() {
     const { user, setUser, refreshCollection, catalog } = useGame();
     const [card, setCard] = useState(null);
     const [error, setError] = useState('');
-    const [framing, setFraming] = useState(null); // staff: draft { x, y, zoom } while reframing
+    const [framing, setFraming] = useState(null); // staff: draft { x, y, zoom, rotate } while reframing
 
     useEffect(() => {
         setCard(null);
@@ -82,7 +82,7 @@ export default function CardPage() {
                             <FavoriteStar card={card} className="absolute -bottom-3 -left-3 z-10 !w-12 !h-12" />
                         </>}
                     {user.admin && !framing && (
-                        <button onClick={() => setFraming({ x: stats.focus?.[0] ?? 50, y: stats.focus?.[1] ?? 50, zoom: Number(stats.zoom) || 1 })}
+                        <button onClick={() => setFraming({ x: stats.focus?.[0] ?? 50, y: stats.focus?.[1] ?? 50, zoom: Number(stats.zoom) || 1, rotate: Number(stats.rotate) || 0 })}
                             className="mt-6 mx-auto flex items-center gap-2 px-4 py-2 rounded-full nd-btn text-sm font-semibold">
                             <Crop className="w-4 h-4" />Recadrer l'image
                         </button>
@@ -172,7 +172,8 @@ export function FramingEditor({ card, number, total, draft, setDraft, onDone }) 
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-    const preview = { ...card, focus: [draft.x, draft.y], zoom: draft.zoom };
+    const preview = { ...card, focus: [draft.x, draft.y], zoom: draft.zoom, rotate: draft.rotate || 0 };
+    const turn = (by) => setDraft({ ...draft, rotate: ((draft.rotate || 0) + by + 360) % 360 });
 
     function down(e) {
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -182,8 +183,12 @@ export function FramingEditor({ card, number, total, draft, setDraft, onDone }) 
         const d = drag.current;
         if (!d) return;
         const { width, height } = box.current.getBoundingClientRect();
+        // the drag measured along the turned picture's own axes
+        const a = (draft.rotate || 0) * Math.PI / 180;
+        const sx = (e.clientX - d.px) / width, sy = (e.clientY - d.py) / height;
+        const dx = sx * Math.cos(a) + sy * Math.sin(a), dy = -sx * Math.sin(a) + sy * Math.cos(a);
         // moving the picture right shows more of its left side: the focus point goes left
-        setDraft({ ...draft, x: clamp(d.x - (e.clientX - d.px) / width * 150 / draft.zoom, 0, 100), y: clamp(d.y - (e.clientY - d.py) / height * 150 / draft.zoom, 0, 100) });
+        setDraft({ ...draft, x: clamp(d.x - dx * 150 / draft.zoom, 0, 100), y: clamp(d.y - dy * 150 / draft.zoom, 0, 100) });
     }
     async function save() {
         setBusy(true);
@@ -204,7 +209,7 @@ export function FramingEditor({ card, number, total, draft, setDraft, onDone }) 
                 <div className="absolute inset-0 z-20 cursor-grab active:cursor-grabbing touch-none rounded-[4%] ring-2 ring-[#e9c46a] ring-offset-4 ring-offset-transparent"
                     onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} />
             </div>
-            <p className="mt-4 text-center text-sm text-ink-soft">Fais glisser l'image pour la déplacer. Zoom à gauche de ×1 : l'image entière rentre, les bords sont flous.</p>
+            <p className="mt-4 text-center text-sm text-ink-soft">Fais glisser l'image pour la déplacer. Zoom à gauche de ×1 : l'image entière rentre, les bords sont flous. Photo prise de travers : fais-la pivoter.</p>
             <label className="mt-3 flex items-center gap-3 text-sm font-semibold text-white">
                 Zoom
                 <input type="range" min="0.4" max="3" step="0.05" value={draft.zoom} onChange={(e) => setDraft({ ...draft, zoom: Number(e.target.value) })} className="flex-1 accent-[#e9c46a]" />
@@ -213,7 +218,9 @@ export function FramingEditor({ card, number, total, draft, setDraft, onDone }) 
             {error && <p className="mt-2 text-sm text-rust font-semibold">{error}</p>}
             <div className="mt-4 flex flex-wrap justify-center gap-2">
                 <button disabled={busy} onClick={save} className="nd-cta-gold px-5 py-2 rounded-full text-sm font-bold disabled:opacity-50">Enregistrer pour tous</button>
-                <button disabled={busy} onClick={() => setDraft({ x: 50, y: 50, zoom: 1 })} className="nd-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold disabled:opacity-50"><RotateCcw className="w-4 h-4" />Centrer</button>
+                <button disabled={busy} onClick={() => setDraft({ ...draft, x: 50, y: 50, zoom: 1 })} className="nd-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold disabled:opacity-50"><RotateCcw className="w-4 h-4" />Centrer</button>
+                <button disabled={busy} onClick={() => turn(-90)} title="Pivoter vers la gauche" className="nd-btn flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold disabled:opacity-50"><RotateCcwSquare className="w-4 h-4" />-90°</button>
+                <button disabled={busy} onClick={() => turn(90)} title="Pivoter vers la droite" className="nd-btn flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold disabled:opacity-50"><RotateCwSquare className="w-4 h-4" />+90°</button>
                 <button disabled={busy} onClick={() => onDone(null)} className="px-4 py-2 rounded-full text-sm font-semibold text-white/70 hover:text-white">Annuler</button>
             </div>
         </div>

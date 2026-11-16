@@ -39,7 +39,7 @@ export default function AdminCards() {
         setPage({ ...page, cards: [...page.cards, ...next.cards] });
     }
     function open(card) {
-        setEditing({ card, draft: { x: card.focus?.[0] ?? 50, y: card.focus?.[1] ?? 50, zoom: Number(card.zoom) || 1 } });
+        setEditing({ card, draft: { x: card.focus?.[0] ?? 50, y: card.focus?.[1] ?? 50, zoom: Number(card.zoom) || 1, rotate: Number(card.rotate) || 0 } });
     }
     // a reframed or dismissed card leaves the « signalées » list
     function resolved(id, change) {
@@ -51,7 +51,7 @@ export default function AdminCards() {
         setEditing(null);
     }
     function saved(stats) {
-        if (stats) resolved(editing.card.id, { focus: stats.focus || null, zoom: stats.zoom || null });
+        if (stats) resolved(editing.card.id, { focus: stats.focus || null, zoom: stats.zoom || null, rotate: stats.rotate || null });
         else setEditing(null);
     }
     async function dismiss() {

@@ -657,7 +657,16 @@ function goldLeaf(ctx, x, y, w, h, alpha) {
 }
 
 // Draw `img` to cover the box; fx/fy (0-100) = the point of the picture kept in view (cards.stats.focus).
-function cover(ctx, img, x, y, w, h, [fx, fy] = [50, 50], zoom = 1) {
+function cover(ctx, img, x, y, w, h, [fx, fy] = [50, 50], zoom = 1, rotate = 0) {
+    if (rotate) { // quarter turn around the box centre, sides swapped for 90° / 270° (as on the cards)
+        const [rw, rh] = rotate % 180 ? [h, w] : [w, h];
+        ctx.save();
+        ctx.translate(x + w / 2, y + h / 2);
+        ctx.rotate(rotate * Math.PI / 180);
+        cover(ctx, img, -rw / 2, -rh / 2, rw, rh, [fx, fy], zoom);
+        ctx.restore();
+        return;
+    }
     if (zoom < 1) { // zoomed out: blurred copy of the picture fills the edges, as on the cards
         ctx.save();
         ctx.filter = `blur(${Math.round(w * 0.03)}px) brightness(0.7)`;
@@ -696,7 +705,7 @@ function drawBleedCard(ctx, card, img, w, h, type, rarity, frame) {
     ctx.clip();
     ctx.fillStyle = '#1b211e';
     ctx.fillRect(ix, iy, iw, ih);
-    if (img) cover(ctx, img, ix, iy, iw, ih);
+    if (img) cover(ctx, img, ix, iy, iw, ih, card.focus || undefined, Number(card.zoom) || 1, Number(card.rotate) || 0);
     const shade = ctx.createLinearGradient(0, iy, 0, iy + ih);
     shade.addColorStop(0, 'rgba(0,0,0,0.62)'); shade.addColorStop(0.24, 'rgba(0,0,0,0.12)'); shade.addColorStop(0.42, 'rgba(0,0,0,0)');
     shade.addColorStop(0.55, 'rgba(0,0,0,0)'); shade.addColorStop(0.75, 'rgba(0,0,0,0.6)'); shade.addColorStop(1, 'rgba(0,0,0,0.88)');
@@ -809,7 +818,7 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     ctx.clip();
     ctx.fillStyle = type.color;
     ctx.fillRect(ix, iy, iw, ih);
-    if (img) cover(ctx, img, ix, iy, iw, ih, card.focus || undefined, Number(card.zoom) || 1);
+    if (img) cover(ctx, img, ix, iy, iw, ih, card.focus || undefined, Number(card.zoom) || 1, Number(card.rotate) || 0);
     // holo: a light glitter on the picture
     if (holo) {
         rainbow(ctx, ix, iy, iw, ih, 0.12);

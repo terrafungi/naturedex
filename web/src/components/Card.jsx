@@ -55,6 +55,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     // where the subject sits in the photo (computed once per card): the 4:3 window crops around it
     const focus = card.focus || card.stats?.focus;
     const zoom = Number(card.zoom || card.stats?.zoom) || 1;
+    const rotate = Number(card.rotate ?? card.stats?.rotate) || 0; // quarter turns, for pictures shot sideways
     // scaling around the focus point keeps it in place (matches cover() in showcase.js)
     // zoomed out (< 1): the whole picture fits, a blurred copy of it fills the edges
     const framing = focus || zoom !== 1 ? {
@@ -112,6 +113,12 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
         else ref.current?.style.setProperty('--act', '0');
     }
 
+    const picture = <>
+        {zoom < 1 && <img className="nd-backdrop" src={card.thumb_url} alt="" aria-hidden draggable="false" />}
+        <img src={bleed ? sharper(card.thumb_url) : card.thumb_url} alt={card.name} loading="lazy" draggable="false" onError={fallbackToOriginal}
+            style={framing} />
+    </>;
+
     return (
         <div className="nd-box">
         <div
@@ -144,9 +151,11 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                     </div>
                 </div>
                 <div className="nd-window">
-                    {zoom < 1 && <img className="nd-backdrop" src={card.thumb_url} alt="" aria-hidden draggable="false" />}
-                    <img src={bleed ? sharper(card.thumb_url) : card.thumb_url} alt={card.name} loading="lazy" draggable="false" onError={fallbackToOriginal}
-                        style={framing} />
+                    {rotate ? (
+                        <div className="nd-turn-box">
+                            <div className="nd-turn" data-side={rotate % 180 ? '' : undefined} style={{ '--turn': `${rotate}deg` }}>{picture}</div>
+                        </div>
+                    ) : picture}
                 </div>
                 <div className="nd-strip">
                     <span className="nd-sci">{card.sci_name || t.label}</span>
