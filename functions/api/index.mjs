@@ -786,10 +786,15 @@ async function applixirCallback(db, q) {
     const text = (body, statusCode = 200) => ({ statusCode, headers: { 'Content-Type': 'text/plain' }, body });
     const same = (a, b) => { const x = Buffer.from(String(a || '')), y = Buffer.from(String(b || '')); return x.length === y.length && crypto.timingSafeEqual(x, y); };
     const secret = process.env.APPLIXIR_SECRET;
+    // trace every call (never the secret) so a silent or rejected AppLixir callback shows in the logs
+    console.log('applixir callback', JSON.stringify({ gameId: q.gameId, userId: q.userId, tid: q.tid, keyOk: same(q.gameApiKey, APPLIXIR_API_KEY), hasSignature: !!q.signature, hasSecretKey: !!q.secretKey }));
     if (!secret || !same(q.gameApiKey, APPLIXIR_API_KEY)) return text('forbidden', 403);
     const signature = crypto.createHash('md5')
         .update([q.gameApiKey, q.gameId, q.userId, q.tid].map((v) => v || '').join('') + secret).digest('hex');
-    if (!(q.signature ? same(String(q.signature).toLowerCase(), signature) : same(q.secretKey, secret))) return text('forbidden', 403);
+    if (!(q.signature ? same(String(q.signature).toLowerCase(), signature) : same(q.secretKey, secret))) {
+        console.log('applixir callback rejected: bad signature');
+        return text('forbidden', 403);
+    }
     const userId = Number(q.userId);
     if (!Number.isInteger(userId) || userId <= 0 || !/^[0-9a-f]{16,64}$/i.test(q.tid || '')) return text('ignored');
     return inTransaction(db, async (client) => {
@@ -3123,7 +3128,9 @@ export const handler = async (event) => {
     }
     if (event.rawPath === '/applixir-callback') {
         try {
-            return await applixirCallback(getPool(), event.queryStringParameters || {});
+            const res = await applixirCallback(getPool(), event.queryStringParameters || {});
+            console.log('applixir callback ->', res.statusCode, res.body);
+            return res;
         } catch (error) {
             if (error.code === '23505') return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: 'duplicate' }; // same tid at the same time
             console.error('applixir', error.message);
