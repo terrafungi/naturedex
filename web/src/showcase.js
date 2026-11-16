@@ -657,8 +657,8 @@ function goldLeaf(ctx, x, y, w, h, alpha) {
 }
 
 // Draw `img` to cover the box; fx/fy (0-100) = the point of the picture kept in view (cards.stats.focus).
-function cover(ctx, img, x, y, w, h, [fx, fy] = [50, 50]) {
-    const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+function cover(ctx, img, x, y, w, h, [fx, fy] = [50, 50], zoom = 1) {
+    const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight) * Math.max(1, zoom);
     const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
     ctx.drawImage(img, x - (dw - w) * fx / 100, y - (dh - h) * fy / 100, dw, dh);
 }
@@ -803,7 +803,7 @@ function drawCard(ctx, card, img, cx, cy, w, rot = 0) {
     ctx.clip();
     ctx.fillStyle = type.color;
     ctx.fillRect(ix, iy, iw, ih);
-    if (img) cover(ctx, img, ix, iy, iw, ih, card.focus || undefined);
+    if (img) cover(ctx, img, ix, iy, iw, ih, card.focus || undefined, Number(card.zoom) || 1);
     // holo: a light glitter on the picture
     if (holo) {
         rainbow(ctx, ix, iy, iw, ih, 0.12);

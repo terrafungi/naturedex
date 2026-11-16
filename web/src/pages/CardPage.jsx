@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Camera, ExternalLink, Eye, Gavel, Recycle, Ruler, Weight } from 'lucide-react';
+import { ArrowLeft, Camera, Crop, ExternalLink, Eye, Gavel, Recycle, RotateCcw, Ruler, Weight } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
 import { IUCN, RARITIES, TYPES, formatViews } from '../game.jsx';
@@ -26,9 +26,11 @@ export default function CardPage() {
     const { user, setUser, refreshCollection, catalog } = useGame();
     const [card, setCard] = useState(null);
     const [error, setError] = useState('');
+    const [framing, setFraming] = useState(null); // staff: draft { x, y, zoom } while reframing
 
     useEffect(() => {
         setCard(null);
+        setFraming(null);
         api('card', { id }).then(({ card }) => setCard(card)).catch((err) => setError(err.message));
     }, [id]);
 
@@ -73,8 +75,18 @@ export default function CardPage() {
             <BackLink className="inline-flex items-center gap-2 text-sm font-semibold text-white"><ArrowLeft className="w-4 h-4" />Collection</BackLink>
             <div className="mt-6 grid md:grid-cols-[minmax(0,380px)_1fr] gap-10 lg:gap-16 items-start">
                 <div className="relative w-full max-w-[380px] mx-auto">
-                    <Card card={card} number={number} total={catalog?.total} tilt />
-                    <FavoriteStar card={card} className="absolute -bottom-3 -left-3 z-10 !w-12 !h-12" />
+                    {framing ? <FramingEditor card={card} number={number} total={catalog?.total} draft={framing} setDraft={setFraming}
+                        onDone={(stats) => { if (stats) { setCard({ ...card, stats }); refreshCollection(); } setFraming(null); }} />
+                        : <>
+                            <Card card={card} number={number} total={catalog?.total} tilt />
+                            <FavoriteStar card={card} className="absolute -bottom-3 -left-3 z-10 !w-12 !h-12" />
+                        </>}
+                    {user.admin && !framing && (
+                        <button onClick={() => setFraming({ x: stats.focus?.[0] ?? 50, y: stats.focus?.[1] ?? 50, zoom: Number(stats.zoom) || 1 })}
+                            className="mt-6 mx-auto flex items-center gap-2 px-4 py-2 rounded-full nd-btn text-sm font-semibold">
+                            <Crop className="w-4 h-4" />Recadrer l'image
+                        </button>
+                    )}
                 </div>
                 <div>
                     <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider">
@@ -148,5 +160,61 @@ function FieldSection({ cardId }) {
                 : <p className="mt-3 text-white/60">Aucun joueur ne l'a encore photographiée : la première observation rapporte +50 graines si tu as pioché la carte dans un booster.</p>}
             <FieldViewer obs={open} onClose={() => setOpen(null)} onDeleted={() => { setOpen(null); api('cardObservations', { cardId }).then(setData); }} />
         </section>
+    );
+}
+
+// Staff tool: drag the picture to choose what stays in view, zoom with the slider.
+// Saved on the card itself, so every player sees the new framing.
+function FramingEditor({ card, number, total, draft, setDraft, onDone }) {
+    const box = useRef(null);
+    const drag = useRef(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const preview = { ...card, focus: [draft.x, draft.y], zoom: draft.zoom };
+
+    function down(e) {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { px: e.clientX, py: e.clientY, x: draft.x, y: draft.y };
+    }
+    function move(e) {
+        const d = drag.current;
+        if (!d) return;
+        const { width, height } = box.current.getBoundingClientRect();
+        // moving the picture right shows more of its left side: the focus point goes left
+        setDraft({ ...draft, x: clamp(d.x - (e.clientX - d.px) / width * 150 / draft.zoom, 0, 100), y: clamp(d.y - (e.clientY - d.py) / height * 150 / draft.zoom, 0, 100) });
+    }
+    async function save() {
+        setBusy(true);
+        setError('');
+        try {
+            const { stats } = await api('setFraming', { cardId: card.id, ...draft });
+            onDone(stats);
+        } catch (err) {
+            setError(err.message);
+            setBusy(false);
+        }
+    }
+
+    return (
+        <div>
+            <div ref={box} className="relative">
+                <Card card={preview} number={number} total={total} />
+                <div className="absolute inset-0 z-20 cursor-grab active:cursor-grabbing touch-none rounded-[4%] ring-2 ring-[#e9c46a] ring-offset-4 ring-offset-transparent"
+                    onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} />
+            </div>
+            <p className="mt-4 text-center text-sm text-ink-soft">Fais glisser l'image pour la déplacer, règle le zoom en dessous.</p>
+            <label className="mt-3 flex items-center gap-3 text-sm font-semibold text-white">
+                Zoom
+                <input type="range" min="1" max="3" step="0.05" value={draft.zoom} onChange={(e) => setDraft({ ...draft, zoom: Number(e.target.value) })} className="flex-1 accent-[#e9c46a]" />
+                <span className="w-12 text-right tabular-nums">×{draft.zoom.toFixed(2)}</span>
+            </label>
+            {error && <p className="mt-2 text-sm text-rust font-semibold">{error}</p>}
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button disabled={busy} onClick={save} className="nd-cta-gold px-5 py-2 rounded-full text-sm font-bold disabled:opacity-50">Enregistrer pour tous</button>
+                <button disabled={busy} onClick={() => setDraft({ x: 50, y: 50, zoom: 1 })} className="nd-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold disabled:opacity-50"><RotateCcw className="w-4 h-4" />Centrer</button>
+                <button disabled={busy} onClick={() => onDone(null)} className="px-4 py-2 rounded-full text-sm font-semibold text-white/70 hover:text-white">Annuler</button>
+            </div>
+        </div>
     );
 }

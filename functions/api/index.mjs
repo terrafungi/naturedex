@@ -56,6 +56,8 @@ const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
 // Turn APPLIXIR_LIVE on once AppLixir has approved the site (dashboard status no longer "Under Review");
 // until then it can be tried by opening the site with ?applixir (that browser only).
 const APPLIXIR_LIVE = false;
+// Game staff (the owner's account): may reframe card pictures for every player.
+const ADMIN_IDS = new Set([2]);
 const APPLIXIR_API_KEY = '257e3b5b-61cc-4fd9-b279-6662eb0abd24'; // public: the site sends it to the ad player
 const AD_DAILY = 5; // bonus boosters per Paris day
 const AD_MIN_SECONDS = 12; // minimum time between starting and claiming an ad
@@ -195,6 +197,7 @@ async function publicUser(db, user) {
         avatar: avatarOf(user),
         newsSeen: user.news_seen,
         joinedAt: user.created_at,
+        admin: ADMIN_IDS.has(user.id) || undefined,
         ...rows[0],
     };
 }
@@ -860,7 +863,7 @@ const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c
                      c.extract, c.wiki_url, c.iucn, c.stats`;
 
 const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp,
-    (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd, c.stats->'focus' AS focus`;
+    (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd, c.stats->'focus' AS focus, c.stats->'zoom' AS zoom`;
 let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
 // The catalogue builder skips article intros (too many pages to fetch in bulk):
@@ -1701,6 +1704,21 @@ const actions = {
         if (!card.count) return { card: { id: card.id, num: card.num, type: card.type, rarity: card.rarity, count: 0 } };
         if (!card.extract) card.extract = await fillExtract(db, card);
         return { card };
+    },
+
+    // Staff: the part of the picture kept in view on the card (focus point in %, zoom >= 1), for every player.
+    async setFraming(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!ADMIN_IDS.has(user.id)) throw new HttpError(403, 'Réservé à l\'équipe');
+        const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, Number(v) || 0));
+        const { rows: [card] } = body.reset
+            ? await db.query(`UPDATE cards SET stats = COALESCE(stats, '{}') - 'focus' - 'zoom' WHERE id = $1 RETURNING stats`, [Number(body.cardId)])
+            : await db.query(`UPDATE cards SET stats = COALESCE(stats, '{}') || jsonb_build_object('focus', jsonb_build_array($2::real, $3::real), 'zoom', $4::real)
+                              WHERE id = $1 RETURNING stats`,
+                [Number(body.cardId), Math.round(clamp(body.x, 0, 100)), Math.round(clamp(body.y, 0, 100)), Math.round(clamp(body.zoom, 1, 3) * 100) / 100]);
+        if (!card) throw new HttpError(404, 'Carte introuvable');
+        catalogCache = null;
+        return { stats: card.stats };
     },
 
     // Full sheet of a card put up for auction, even one the player has not discovered yet:

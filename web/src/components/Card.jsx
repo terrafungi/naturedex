@@ -54,6 +54,13 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     const fact = bleed || trainer ? null : card.fact;
     // where the subject sits in the photo (computed once per card): the 4:3 window crops around it
     const focus = card.focus || card.stats?.focus;
+    const zoom = Number(card.zoom || card.stats?.zoom) || 1;
+    // scaling around the focus point keeps it in place (matches cover() in showcase.js)
+    const framing = focus || zoom > 1 ? {
+        objectPosition: focus ? `${focus[0]}% ${focus[1]}%` : undefined,
+        transform: zoom > 1 ? `scale(${zoom})` : undefined,
+        transformOrigin: focus ? `${focus[0]}% ${focus[1]}%` : undefined,
+    } : undefined;
 
     // Tilt mode (card sheet, booster): the card follows the finger / mouse in 3D on a spring, like a
     // real foil card turned in the light, then wobbles back flat when let go.
@@ -137,7 +144,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                 </div>
                 <div className="nd-window">
                     <img src={bleed ? sharper(card.thumb_url) : card.thumb_url} alt={card.name} loading="lazy" draggable="false" onError={fallbackToOriginal}
-                        style={focus && !bleed ? { objectPosition: `${focus[0]}% ${focus[1]}%` } : undefined} />
+                        style={framing} />
                 </div>
                 <div className="nd-strip">
                     <span className="nd-sci">{card.sci_name || t.label}</span>
