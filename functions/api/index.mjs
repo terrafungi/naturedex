@@ -56,7 +56,7 @@ const DAILY_COOLDOWN_MS = 20 * 3600 * 1000;
 // Turn APPLIXIR_LIVE on once AppLixir has approved the site (dashboard status no longer "Under Review");
 // until then it can be tried by opening the site with ?applixir (that browser only).
 const APPLIXIR_LIVE = false;
-const APPLIXIR_API_KEY = 'd127191f-1eea-49d5-a7e6-d54914014da5'; // public: the site sends it to the ad player
+const APPLIXIR_API_KEY = '257e3b5b-61cc-4fd9-b279-6662eb0abd24'; // public: the site sends it to the ad player
 const AD_DAILY = 5; // bonus boosters per Paris day
 const AD_MIN_SECONDS = 12; // minimum time between starting and claiming an ad
 const SESSION_DAYS = 60;

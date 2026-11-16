@@ -3,7 +3,7 @@
 // - 'applixir': AppLixir SDK v6.1.0. Its servers confirm each completed ad to our API, which grants the booster.
 const ADSENSE_CLIENT = 'ca-pub-2706263813199995';
 const APPLIXIR_SDK = 'https://cdn.applixir.com/applixir.app.v6.1.0.js';
-const APPLIXIR_API_KEY = 'd127191f-1eea-49d5-a7e6-d54914014da5'; // public client key
+const APPLIXIR_API_KEY = '257e3b5b-61cc-4fd9-b279-6662eb0abd24'; // public client key
 const APPLIXIR_CONTAINER = 'applixir-ad-container';
 
 let loaded = '';
