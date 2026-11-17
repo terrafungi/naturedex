@@ -181,7 +181,7 @@ const quizPerDay = (user) => QUIZ_PER_DAY + (passActive(user) ? PASS.quizzes : 0
 let cardTotal, cardTotalAt = 0;
 async function cardsTotal(db) {
     if (cardTotal === undefined || Date.now() - cardTotalAt > 300_000) {
-        cardTotal = (await db.query(`SELECT COUNT(*)::int AS n FROM cards`)).rows[0].n;
+        cardTotal = (await db.query(`SELECT COUNT(*)::int AS n FROM cards WHERE source <> 'event'`)).rows[0].n;
         cardTotalAt = Date.now();
     }
     return cardTotal;
@@ -1730,7 +1730,7 @@ const actions = {
     // and rarity, plus a sample of cards for the landing page and the demo booster.
     async catalog(db) {
         if (!catalogCache || Date.now() - catalogAt > 600_000) {
-            const { rows: counts } = await db.query(`SELECT type, rarity, COUNT(*)::int AS n FROM cards GROUP BY 1, 2`);
+            const { rows: counts } = await db.query(`SELECT type, rarity, COUNT(*)::int AS n FROM cards WHERE source <> 'event' GROUP BY 1, 2`);
             const { rows: cards } = await db.query(
                 `(SELECT * FROM (SELECT ${LIGHT_FIELDS}, row_number() OVER (PARTITION BY c.type, c.rarity ORDER BY c.views DESC) AS k
                     FROM cards c WHERE c.rarity IN ('legendary', 'epic') AND c.source <> 'event') t WHERE k <= 4)
