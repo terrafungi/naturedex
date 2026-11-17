@@ -50,7 +50,7 @@ function Reveal({ shown, onClose }) {
                 <div className={`mt-3 ${state === 'missed' ? 'grayscale-[0.7] opacity-70' : ''}`}>
                     <Card card={card} tilt />
                 </div>
-                {card.note && <p className="mt-4 text-sm leading-relaxed text-white/80 italic">« {card.note} »</p>}
+                {card.note && <p className="mt-4 text-sm leading-relaxed text-white/80 italic">«&nbsp;{card.note}&nbsp;»</p>}
                 {state === 'missed' && <p className="mt-2 text-sm text-[#ffb4a2]">Cette case n'a pas été ouverte le {card.day} décembre : la carte est perdue.</p>}
                 <div className="mt-5 flex justify-center gap-2">
                     {state !== 'missed' && <Link to={`/carte/${card.id}`} className="nd-cta-glass px-4 py-2.5 rounded-full text-sm font-semibold text-white">Voir la fiche</Link>}
@@ -99,7 +99,7 @@ export default function Advent() {
                     </h1>
                     <p className="mt-4 max-w-xl text-white/75">
                         Une carte de Noël derrière chaque case : sapins, épices, animaux du Grand Nord et présents des Rois mages.
-                        Elles ne sortent jamais dans les boosters. <b className="text-white">Une case non ouverte le jour même est perdue.</b>
+                        Elles ne sortent jamais dans les boosters. <b className="text-white">Une case non ouverte le jour même est perdue.</b>{' '}
                         Le 23, le renne en full art légendaire ; le 24, le père Noël… avec une chance sur dix de le recevoir en version secrète.
                     </p>
                 </motion.div>
