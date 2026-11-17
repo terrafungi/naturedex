@@ -1,14 +1,15 @@
-import { Flag, Images, ScanEye } from 'lucide-react';
+import { Bell, CalendarDays, Gift, Sparkles } from 'lucide-react';
 
 // « Nouveautés » pop-up shown once per account at the next visit. To announce new features,
 // replace the items and give NEWS a new id (the date): every player who joined before it sees it once.
 export const NEWS = {
-    id: '2026-11-17',
-    title: 'Le recadrage des images : ce qu\'il faut savoir',
+    id: '2026-11-18',
+    title: 'Le calendrier de l\'Avent arrive le 1er décembre !',
     items: [
-        { Icon: Images, title: 'Des photos de partout', text: 'Les images des cartes viennent de photographes et de naturalistes du monde entier, dans tous les formats. Le recadrage ne sera donc pas toujours parfait.', to: '/collection' },
-        { Icon: ScanEye, title: 'On garde l\'essentiel', text: 'Quand l\'animal ou la plante ne rentre pas en entier dans la carte, on privilégie ce qui compte : la tête, la fleur, ou la composition de la photo.', to: '/collection' },
-        { Icon: Flag, title: 'Continue de signaler', text: 'Une image vraiment ratée ? Ouvre la carte et touche « Image mal cadrée ? Signaler » : on regarde chaque signalement.', to: '/collection' },
+        { Icon: CalendarDays, title: '24 cases, 24 cartes de Noël', text: 'Du 1er au 24 décembre, une case à ouvrir chaque jour : sapins, épices, animaux du Grand Nord et présents des Rois mages. Communes, holo ou full art.', to: '/avent' },
+        { Icon: Gift, title: 'Introuvables ailleurs', text: 'Ces cartes portent le tag « Avent 2026 » et ne sortent jamais dans les boosters. Attention : une case non ouverte le jour même est perdue.', to: '/avent' },
+        { Icon: Sparkles, title: 'Un final légendaire', text: 'Le 23, un renne légendaire en full art. Le 24, le père Noël… avec une chance sur dix de le recevoir en version secrète.', to: '/avent' },
+        { Icon: Bell, title: 'Ne rate aucune case', text: 'Active les notifications dans ton profil : un rappel chaque matin tant que la case du jour n\'est pas ouverte.', to: '/profil' },
     ],
 };
 
