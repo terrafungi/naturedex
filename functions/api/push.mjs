@@ -12,6 +12,7 @@ export const PUSH_KINDS = {
     boosters: 'Boosters gratuits rechargés',
     auctions: 'Enchères : surenchère, vente, carte gagnée',
     social: 'Messages, cadeaux et demandes d\'amis',
+    advent: 'Calendrier de l\'Avent : la case du jour',
 };
 
 export const pushReady = () => !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);

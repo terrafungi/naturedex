@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Camera, Check, Crop, ExternalLink, Eye, Flag, Gavel, Recycle, RotateCcw, RotateCwSquare, RotateCcwSquare, Ruler, Weight } from 'lucide-react';
+import { ArrowLeft, Camera, Check, Crop, ExternalLink, Eye, Flag, Gavel, Recycle, RotateCcw, RotateCwSquare, RotateCcwSquare, Ruler, Snowflake, Weight } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
 import { IUCN, RARITIES, TYPES, formatViews } from '../game.jsx';
@@ -97,6 +97,15 @@ export default function CardPage() {
                     </div>
                     <h1 className="mt-4 font-display text-4xl sm:text-5xl font-semibold text-white leading-none break-words">{card.name}</h1>
                     {card.sci_name && card.sci_name !== card.name && <p className="mt-2 font-display italic text-xl text-ink-soft">{card.sci_name}</p>}
+                    {card.stats?.event && (
+                        <Link to="/avent" className="mt-6 flex items-start gap-3 max-w-prose rounded-2xl bg-[#a8161f]/30 ring-1 ring-[#f7d774]/45 px-4 py-3 hover:bg-[#a8161f]/45 transition-colors">
+                            <Snowflake className="w-5 h-5 mt-0.5 shrink-0 text-[#f7d774]" />
+                            <span className="text-sm text-white/85">
+                                <b className="block text-[#f7d774]">Calendrier de l'Avent {card.stats.event.slice(-4)} · case n°{card.stats.day}</b>
+                                {card.stats.note}
+                            </span>
+                        </Link>
+                    )}
                     <p className="mt-6 text-lg leading-relaxed max-w-prose">{card.extract}</p>
                     <a href={card.wiki_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white underline underline-offset-4">
                         Lire l'article sur Wikipédia{card.wiki_url?.includes('://en.') ? ' (en anglais)' : ''} <ExternalLink className="w-3.5 h-3.5" />

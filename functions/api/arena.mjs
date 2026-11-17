@@ -94,8 +94,8 @@ export function arenaActions({ requireUser, inTransaction, HttpError, publicUser
         if (!stageCache) {
             stageCache = await Promise.all(STAGES.map((s) => Promise.all(s.team.map(async ([type, rarity, depth]) => {
                 const { rows: [c] } = await db.query(
-                    `SELECT ${BATTLE_CARD} FROM cards c WHERE c.type = $1 AND c.rarity = $2 ORDER BY c.views DESC, c.id
-                     OFFSET floor($3::float8 * (SELECT COUNT(*) - 1 FROM cards WHERE type = $1 AND rarity = $2))::int LIMIT 1`, [type, rarity, depth]);
+                    `SELECT ${BATTLE_CARD} FROM cards c WHERE c.type = $1 AND c.rarity = $2 AND c.source <> 'event' ORDER BY c.views DESC, c.id
+                     OFFSET floor($3::float8 * (SELECT COUNT(*) - 1 FROM cards WHERE type = $1 AND rarity = $2 AND source <> 'event'))::int LIMIT 1`, [type, rarity, depth]);
                 return c;
             }))));
             // the same species twice in one team (fossil stage) would look odd
@@ -114,7 +114,7 @@ export function arenaActions({ requireUser, inTransaction, HttpError, publicUser
                 const cards = [];
                 for (const rarity of BANDS[band][1]) {
                     const { rows: [c] } = await db.query(
-                        `SELECT ${BATTLE_CARD} FROM cards c WHERE c.rarity = $1 AND NOT (c.type = ANY($2)) AND c.type <> 'naturalist' ORDER BY md5($3 || c.id) LIMIT 1`,
+                        `SELECT ${BATTLE_CARD} FROM cards c WHERE c.rarity = $1 AND c.source <> 'event' AND NOT (c.type = ANY($2)) AND c.type <> 'naturalist' ORDER BY md5($3 || c.id) LIMIT 1`,
                         [rarity, cards.map((x) => x.type), `${key}:${cards.length}`]);
                     cards.push(c);
                 }

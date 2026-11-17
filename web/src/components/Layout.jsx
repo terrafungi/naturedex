@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, BookOpen, Brain, Camera, Compass, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, MessageSquareHeart, Package, Plus, ShoppingBag, Sprout, Swords, Music, Smartphone, Trophy, User, Users, Volume2, VolumeX, X } from 'lucide-react';
+import { Award, BookOpen, Brain, Camera, Compass, Frame, Gavel, Gift, Home, Layers, LayoutGrid, Medal, MessageCircle, MessageSquareHeart, Package, Plus, ShoppingBag, Sprout, Swords, Music, Smartphone, TreePine, Trophy, User, Users, Volume2, VolumeX, X } from 'lucide-react';
 import { Nugget, Plant, Seed } from './Currency.jsx';
 import { useGame } from '../api.jsx';
 import { canVibrate, music, setPref, sfx, usePrefs } from '../sfx.js';
@@ -9,9 +9,11 @@ import AwardNotice from './AwardNotice.jsx';
 import GiftNotice from './GiftNotice.jsx';
 import NewsNotice from './NewsNotice.jsx';
 import NoticeCenter from './NoticeCenter.jsx';
+import AdventNotice from './AdventNotice.jsx';
 import DonatePrompt from './DonatePrompt.jsx';
 import InstallPrompt, { InstallLink } from './InstallPrompt.jsx';
 import BetaPrompt from './BetaPrompt.jsx';
+import { adventDay } from '../advent.js';
 
 export const NAV = [
     { to: '/', label: 'Accueil', Icon: Home, end: true },
@@ -190,8 +192,10 @@ function TabBar() {
     const { pathname } = useLocation();
     const [open, setOpen] = useState(false);
     const { badges, refreshBadges } = useGame();
-    const primary = NAV.slice(0, PRIMARY);
-    const more = NAV.slice(PRIMARY);
+    // 1 → 24 December: the Calendrier de l'Avent takes a place in the main tabs
+    const nav = adventDay() ? [NAV[0], { to: '/avent', label: 'Calendrier de l\'Avent', short: 'Avent', Icon: TreePine }, ...NAV.slice(1)] : NAV;
+    const primary = nav.slice(0, PRIMARY);
+    const more = nav.slice(PRIMARY);
     const activeMore = more.find(({ to }) => to && (pathname === to || pathname.startsWith(`${to}/`)));
     const moreBadge = more.reduce((sum, { to }) => sum + ((to && badges[to]) || 0), 0);
 
@@ -272,6 +276,7 @@ export default function Layout() {
             {user && <GiftNotice />}
             {user && <AwardNotice />}
             {user && <NoticeCenter />}
+            {user && <AdventNotice />}
             {user && <DonatePrompt />}
             <InstallPrompt raised={!!user} />
             <BetaPrompt />

@@ -117,7 +117,7 @@ function buildDeck(creatures, items) {
 
 async function foeDeck(db, level) {
     const { rows } = await db.query(
-        `SELECT ${CARD_FIELDS} FROM cards c WHERE c.rarity = ANY($1) AND c.stats ? 'hp' AND c.stats ? 'biome' AND c.stats->>'biome' <> 'none'
+        `SELECT ${CARD_FIELDS} FROM cards c WHERE c.rarity = ANY($1) AND c.source <> 'event' AND c.stats ? 'hp' AND c.stats ? 'biome' AND c.stats->>'biome' <> 'none'
          ORDER BY random() LIMIT 60`, [level.rarities]);
     const pool = Object.keys(TRAINERS).filter((k) => level.n === 3 || RARITY_ORDER.indexOf(TRAINERS[k].rarity) >= (level.n === 1 ? 3 : 2));
     const trainers = Array.from({ length: level.trainers }, (_, i) => `t:${i < 2 ? 'appareil' : pool[Math.floor(Math.random() * pool.length)]}`);

@@ -40,6 +40,7 @@ import { biomeCheckTick } from './biome-check.mjs';
 import { speciesEnrichTick } from './species-enrich.mjs';
 import { fieldActions } from './field.mjs';
 import { exploreActions } from './explore.mjs';
+import { adventActions, adventPushTick } from './advent.mjs';
 import { BOOSTER_PLANTS, CONVERT_BONUS, CONVERT_BONUS_MAX, NUGGETS_PER_SEED, convertBonusReady, gardenActions } from './garden.mjs';
 import { AVATAR_SQL, avatarActions, avatarOf } from './avatar.mjs';
 
@@ -247,7 +248,7 @@ async function getRarityPools(db) {
     if (!rarityPools || Date.now() - poolsAt > 600_000) {
         await syncNaturalistCards(db);
         const { rows } = await db.query(
-            `SELECT rarity, type = $1 AS nat, art, array_agg(id) AS ids FROM cards GROUP BY 1, 2, 3`, [NATURALIST]);
+            `SELECT rarity, type = $1 AS nat, art, array_agg(id) AS ids FROM cards WHERE source <> 'event' GROUP BY 1, 2, 3`, [NATURALIST]);
         if (!rows.length) throw new HttpError(503, 'Le catalogue de cartes est en cours de préparation');
         const pools = { naturalist: {}, god: { legendary: [], full: [], illus: [], secret: [] } };
         const push = (o, k, ids) => { o[k] = (o[k] || []).concat(ids); };
@@ -939,7 +940,8 @@ const CARD_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c
                      c.extract, c.wiki_url, c.iucn, c.stats`;
 
 const LIGHT_FIELDS = `c.id, c.num, c.name, c.sci_name, c.type, c.rarity, c.art, c.views, c.thumb_url, (c.stats->>'hp')::int AS hp,
-    (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd, c.stats->'focus' AS focus, c.stats->'zoom' AS zoom, c.stats->'rotate' AS rotate`;
+    (c.stats->>'atk')::int AS atk, (c.stats->>'def')::int AS def, (c.stats->>'spd')::int AS spd, c.stats->'focus' AS focus, c.stats->'zoom' AS zoom, c.stats->'rotate' AS rotate,
+    c.stats->>'event' AS event`;
 let catalogCache, catalogAt = 0; // per Lambda container, 10 min
 
 // The catalogue builder skips article intros (too many pages to fetch in bulk):
@@ -1731,9 +1733,9 @@ const actions = {
             const { rows: counts } = await db.query(`SELECT type, rarity, COUNT(*)::int AS n FROM cards GROUP BY 1, 2`);
             const { rows: cards } = await db.query(
                 `(SELECT * FROM (SELECT ${LIGHT_FIELDS}, row_number() OVER (PARTITION BY c.type, c.rarity ORDER BY c.views DESC) AS k
-                    FROM cards c WHERE c.rarity IN ('legendary', 'epic')) t WHERE k <= 4)
+                    FROM cards c WHERE c.rarity IN ('legendary', 'epic') AND c.source <> 'event') t WHERE k <= 4)
                  UNION ALL
-                 (SELECT ${LIGHT_FIELDS}, 0 FROM cards c WHERE c.rarity IN ('rare', 'uncommon', 'common') AND c.type <> 'naturalist' ORDER BY random() LIMIT 300)`
+                 (SELECT ${LIGHT_FIELDS}, 0 FROM cards c WHERE c.rarity IN ('rare', 'uncommon', 'common') AND c.type <> 'naturalist' AND c.source <> 'event' ORDER BY random() LIMIT 300)`
             );
             const types = {};
             for (const { type, rarity, n } of counts) (types[type] ||= {})[rarity] = n;
@@ -3081,10 +3083,10 @@ const actions = {
                     const known = questions.filter((_, i) => answers[i]?.correct).map((x) => x.about);
                     const { rows: [c] } = await client.query(
                         `SELECT c.id FROM cards c LEFT JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1
-                         WHERE c.id = ANY($2::int[]) AND c.rarity IN ('common', 'uncommon', 'rare')
+                         WHERE c.id = ANY($2::int[]) AND c.rarity IN ('common', 'uncommon', 'rare') AND c.source <> 'event'
                          ORDER BY (uc.card_id IS NULL) DESC, random() LIMIT 1`, [user.id, known]);
                     const fallback = c || (await client.query(
-                        `SELECT id FROM cards WHERE rarity = 'uncommon' AND views >= 800 AND type <> 'naturalist' ORDER BY random() LIMIT 1`)).rows[0];
+                        `SELECT id FROM cards WHERE rarity = 'uncommon' AND views >= 800 AND type <> 'naturalist' AND source <> 'event' ORDER BY random() LIMIT 1`)).rows[0];
                     rewardCard = fallback?.id || null;
                     if (rewardCard) await giveCard(client, user.id, rewardCard);
                 }
@@ -3423,6 +3425,7 @@ Object.assign(actions, fieldActions({ requireUser, inTransaction, HttpError, pub
 Object.assign(actions, exploreActions({ requireUser, inTransaction, HttpError, publicUser }));
 Object.assign(actions, gardenActions({ requireUser, publicUser, HttpError }));
 Object.assign(actions, avatarActions({ requireUser, inTransaction, HttpError, publicUser }));
+Object.assign(actions, adventActions({ requireUser, inTransaction, HttpError, publicUser, giveCard, isAdmin: (u) => ADMIN_IDS.has(u.id) }));
 
 const PUBLIC_ACTIONS = new Set(['catalog', 'register', 'login', 'logout', 'inviteInfo', 'blogLatest', 'showcaseOfWeek', 'topDonors', 'betaInfo', 'betaSignup']);
 
@@ -3435,6 +3438,7 @@ export const handler = async (event) => {
             await refreshDuePasses(getPool()).catch((err) => console.error('refreshDuePasses', err));
         }
         if (pushReady()) await notifyFullCharges(getPool()).catch((err) => console.error('notifyFullCharges', err));
+        if (pushReady()) await adventPushTick(getPool(), notify).catch((err) => console.error('adventPushTick', err));
         if (playReady() && new Date().getUTCMinutes() % 5 === 0) {
             await refreshDuePlayPasses(getPool()).catch((err) => console.error('refreshDuePlayPasses', err));
         }

@@ -156,7 +156,7 @@ const byRarity = (cards) => {
 
 async function eligibleCards(db, where, params, tail = '', extra = '') {
     const { rows } = await db.query(
-        `SELECT ${POOL_FIELDS}${extra} FROM cards WHERE ${where} AND rarity <> 'secret' AND type <> ALL($${params.length + 1}) ${tail}`, [...params, EXCLUDED_TYPES]);
+        `SELECT ${POOL_FIELDS}${extra} FROM cards WHERE ${where} AND rarity <> 'secret' AND source <> 'event' AND type <> ALL($${params.length + 1}) ${tail}`, [...params, EXCLUDED_TYPES]);
     return rows;
 }
 

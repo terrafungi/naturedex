@@ -706,3 +706,20 @@ CREATE TABLE IF NOT EXISTS beta_signups (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS beta_signups_ip ON beta_signups (ip, created_at);
+
+-- Calendrier de l'Avent (advent.mjs): one row per door opened; cards seeded by seeds/advent-2026.sql
+CREATE TABLE IF NOT EXISTS advent_claims (
+    user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    year        INT NOT NULL,
+    day         INT NOT NULL CHECK (day BETWEEN 1 AND 24),
+    card_id     INT NOT NULL REFERENCES cards(id),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, year, day)
+);
+-- the morning reminder, sent once per day
+CREATE TABLE IF NOT EXISTS advent_pushes (
+    year        INT NOT NULL,
+    day         INT NOT NULL,
+    sent_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (year, day)
+);

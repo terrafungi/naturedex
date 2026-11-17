@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Camera, Eye, HelpCircle, MapPin, Sparkles, Zap } from 'lucide-react';
+import { Camera, Eye, HelpCircle, MapPin, Snowflake, Sparkles, Zap } from 'lucide-react';
 import { RARITIES, TYPES, formatViews } from '../game.jsx';
 import { useGame } from '../api.jsx';
 import { ABILITIES, battleStats } from '../battle.js';
@@ -35,6 +35,10 @@ export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo', gold
 export const trainerOf = (card) => (card.type === 'naturalist'
     ? TRAINERS[card.stats?.trainer] || Object.values(TRAINERS).find((t) => t.name === card.name) : null);
 
+/** Event cards (Calendrier de l'Avent): « avent-2026 » → « Avent 2026 », shown as a gold tag. */
+export const eventOf = (card) => card.event || card.stats?.event || null;
+export const eventLabel = (event) => event?.replace(/^avent-/, 'Avent ');
+
 export const useMyFrame = () => useGame()?.user?.avatar?.frame;
 
 /** Full card. `card` comes from the catalog (light) or the API (full). `frame`: the owner's
@@ -51,6 +55,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     const foil = art || ['epic', 'legendary', 'secret'].includes(card.rarity);
     const ink = card.art === 'gold' ? '#7a5310' : bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
     const trainer = trainerOf(card);
+    const event = eventOf(card);
     const fact = bleed || trainer ? null : card.fact;
     // where the subject sits in the photo (computed once per card): the 4:3 window crops around it
     const focus = card.focus || card.stats?.focus;
@@ -130,7 +135,8 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
             data-art={bleed ? card.art : undefined}
             data-holo={card.art === 'holo' ? '' : undefined}
             data-gold={card.art === 'gold' ? '' : undefined}
-            data-frame={frame && frame !== 'aucun' ? frame : undefined}
+            data-event={event ? '' : undefined}
+            data-frame={frame && frame !== 'aucun' && !event ? frame : undefined}
             style={{ '--type': t.color }}
             onPointerDown={onMove}
             onPointerMove={onMove}
@@ -139,11 +145,13 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
             onPointerLeave={onLeave}
         >
             {tilt && <div className="nd-glare" aria-hidden />}
+            {event && <div className="nd-snow" aria-hidden />}
             <div className="nd-card-inner">
                 <div className="flex items-start justify-between gap-[2cqi]">
                     <div className="min-w-0">
                         <div className="nd-name line-clamp-2 break-words">{card.name}</div>
                         {art && <span className="nd-art-tag"><Sparkles />{art}</span>}
+                        {event && <span className="nd-event-tag"><Snowflake />{eventLabel(event)}</span>}
                     </div>
                     <div className="flex shrink-0 items-center gap-[1.5cqi]">
                         {hp != null && <div className="nd-hp"><small>PV </small>{hp}</div>}

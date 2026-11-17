@@ -40,6 +40,7 @@ import Battle from './pages/Battle.jsx';
 const Duel = lazy(() => import('./pages/Duel.jsx'));
 const DuelGame = lazy(() => import('./pages/DuelGame.jsx'));
 const DeckBuilder = lazy(() => import('./pages/DeckBuilder.jsx'));
+const Advent = lazy(() => import('./pages/Advent.jsx'));
 
 // Every page but the home needs an account; visitors are sent to the sign-up form
 // (Auth switches to log-in for returning players).
@@ -78,6 +79,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/terrain" element={<Private><Terrain /></Private>} />
                         <Route path="/jardin" element={<Private><Garden /></Private>} />
                         <Route path="/defis" element={<Private><Challenges /></Private>} />
+                        <Route path="/avent" element={<Private><Suspense fallback={null}><Advent /></Suspense></Private>} />
                         <Route path="/trophees" element={<Private><Trophies /></Private>} />
                         <Route path="/classement" element={<Private><Leaderboard /></Private>} />
                         <Route path="/inviter" element={<Private><Invite /></Private>} />

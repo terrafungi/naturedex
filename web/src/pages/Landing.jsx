@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { adventDay } from '../advent.js';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useInView } from 'motion/react';
 import { ArrowRight, Award, BookOpen, Brain, CalendarCheck, Camera, ChevronRight, Clock, Compass, Crown, Dices, Eye, Frame, Gavel, GalleryVerticalEnd, Gem, HeartHandshake, Leaf, PackageOpen, Shield, Shirt, Sparkles, Sprout, Swords, Users, Zap } from 'lucide-react';
@@ -188,10 +189,17 @@ function Hero() {
             <div className="max-w-6xl mx-auto px-5 sm:px-6 pt-24 sm:pt-28 pb-14 sm:pb-24 min-h-[640px] sm:min-h-[760px] md:min-h-[min(88vh,860px)] flex flex-col justify-end">
                 <div className="mb-auto pb-8 max-w-2xl"><TopDonors /></div>
                 <motion.div {...fade(0)}>
+                    {user && adventDay() ? (
+                        <Link to="/avent" className="inline-flex items-center gap-2 rounded-full nd-glass pl-1.5 pr-3.5 py-1.5 text-xs font-semibold text-white/90 hover:bg-white/10 transition-colors">
+                            <span className="rounded-full bg-[#c41e2a] text-[#ffe9a6] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">Case n°{adventDay()}</span>
+                            Calendrier de l'Avent : ta carte de Noël du jour<ChevronRight className="w-3.5 h-3.5 text-white/60" />
+                        </Link>
+                    ) : (
                     <Link to={user ? '/exploration' : '#fonctionnalites'} onClick={user ? undefined : jump('fonctionnalites')} className="inline-flex items-center gap-2 rounded-full nd-glass pl-1.5 pr-3.5 py-1.5 text-xs font-semibold text-white/90 hover:bg-white/10 transition-colors">
                         <span className="rounded-full bg-[#4fd18b] text-[#05130d] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">Nouveau</span>
                         Exploration sur la carte · Avatar 3D<ChevronRight className="w-3.5 h-3.5 text-white/60" />
                     </Link>
+                    )}
                 </motion.div>
                 <motion.h1 {...fade(0.1)} className="mt-5 font-display font-medium leading-[0.98] text-[clamp(3.1rem,11vw,6.6rem)] text-white drop-shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                     Collectionne<br /><span className="text-[#a8f0c6] italic">la Nature</span>

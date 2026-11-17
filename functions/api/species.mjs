@@ -11,7 +11,7 @@ const PAGE_SIZE = 60;
 const SITEMAP_SIZE = 10000;
 const MIN_EXTRACT = 200; // characters of Wikipédia text for a page to be worth indexing
 // cards c; the enriched text is looked up by id, so this works in any query on cards
-const INDEXABLE = `c.art IS DISTINCT FROM 'illus' AND c.type <> 'naturalist' AND (length(coalesce(c.extract, '')) >= ${MIN_EXTRACT}
+const INDEXABLE = `c.art IS DISTINCT FROM 'illus' AND c.type <> 'naturalist' AND c.source <> 'event' AND (length(coalesce(c.extract, '')) >= ${MIN_EXTRACT}
     OR EXISTS (SELECT 1 FROM species_texts t WHERE t.card_id = c.id AND t.status = 'ok'))`;
 
 const TYPES = {
@@ -87,11 +87,11 @@ ${cta('Chaque espèce est une carte à collectionner : ouvre des boosters gratui
 async function typePage(db, type, page) {
     const names = TYPES[type];
     if (!names) return null;
-    const { rows: [{ total }] } = await db.query(`SELECT count(*)::int AS total FROM cards WHERE type = $1 AND art IS DISTINCT FROM 'illus'`, [type]);
+    const { rows: [{ total }] } = await db.query(`SELECT count(*)::int AS total FROM cards WHERE type = $1 AND art IS DISTINCT FROM 'illus' AND source <> 'event'`, [type]);
     const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     if (page > pages) return null;
     const { rows } = await db.query(
-        `SELECT id, name, sci_name, thumb_url FROM cards WHERE type = $1 AND art IS DISTINCT FROM 'illus' ORDER BY views DESC, id LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`, [type]);
+        `SELECT id, name, sci_name, thumb_url FROM cards WHERE type = $1 AND art IS DISTINCT FROM 'illus' AND source <> 'event' ORDER BY views DESC, id LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`, [type]);
     const label = names[1];
     const title = `${label} : ${total.toLocaleString('fr-FR')} espèces en photos${page > 1 ? ` – page ${page}` : ''} | NatureDex`;
     const description = `Découvre ${total.toLocaleString('fr-FR')} espèces de ${label.toLowerCase()} classées par popularité, avec photo, nom scientifique et statut de conservation${page > 1 ? ` (page ${page} sur ${pages})` : ''}.`;
@@ -122,8 +122,8 @@ async function speciesPage(db, id, slug) {
     if (slug !== slugify(c.name)) return { statusCode: 301, headers: { Location: url, 'Cache-Control': 'public, max-age=86400' }, body: '' };
     // neighbours in popularity within the same group: the internal links that let crawlers reach every page
     const [{ rows: related }, { rows: posts }] = await Promise.all([
-        db.query(`(SELECT id, name, sci_name, thumb_url FROM cards WHERE type = $1 AND art IS DISTINCT FROM 'illus' AND id <> $2 AND views >= $3 ORDER BY views LIMIT 6)
-                  UNION ALL (SELECT id, name, sci_name, thumb_url FROM cards WHERE type = $1 AND art IS DISTINCT FROM 'illus' AND id <> $2 AND views < $3 ORDER BY views DESC LIMIT 6)`, [c.type, c.id, c.views]),
+        db.query(`(SELECT id, name, sci_name, thumb_url FROM cards WHERE type = $1 AND art IS DISTINCT FROM 'illus' AND source <> 'event' AND id <> $2 AND views >= $3 ORDER BY views LIMIT 6)
+                  UNION ALL (SELECT id, name, sci_name, thumb_url FROM cards WHERE type = $1 AND art IS DISTINCT FROM 'illus' AND source <> 'event' AND id <> $2 AND views < $3 ORDER BY views DESC LIMIT 6)`, [c.type, c.id, c.views]),
         db.query(`SELECT slug, title, published_at FROM blog_posts WHERE status = 'published' AND $1 = ANY(card_ids) ORDER BY published_at DESC LIMIT 5`, [c.id]),
     ]);
     const [typeLabel, typePlural] = TYPES[c.type] || [c.type, c.type];
