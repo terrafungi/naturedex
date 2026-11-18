@@ -723,3 +723,7 @@ CREATE TABLE IF NOT EXISTS advent_pushes (
     sent_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (year, day)
 );
+
+-- Suppression de messages: "pour moi" hides the message on one side only, "pour tout le monde" deletes the row
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS hidden_by_from BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS hidden_by_to BOOLEAN NOT NULL DEFAULT false;

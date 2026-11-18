@@ -232,7 +232,7 @@ async function socialCounts(db, userId) {
                 (SELECT COUNT(*)::int FROM trades WHERE to_id = $1 AND status = 'pending') AS "tradeOffers",
                 (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND mode = 'classic' AND day = (now() AT TIME ZONE 'Europe/Paris')::date) AS "quizPlayed",
                 (SELECT COUNT(*)::int FROM quizzes WHERE user_id = $1 AND mode = 'daily' AND day = (now() AT TIME ZONE 'Europe/Paris')::date) AS "quizDaily",
-                (SELECT COUNT(*)::int FROM messages WHERE to_id = $1 AND read_at IS NULL) AS "unreadMessages",
+                (SELECT COUNT(*)::int FROM messages WHERE to_id = $1 AND read_at IS NULL AND NOT hidden_by_to) AS "unreadMessages",
                 (SELECT COUNT(*)::int FROM gifts WHERE to_id = $1 AND seen_at IS NULL) AS "newGifts"`,
         [userId]
     );
@@ -2629,11 +2629,12 @@ const actions = {
         const [{ rows: conversations }, { rows: friends }] = await Promise.all([
             db.query(
                 `SELECT u.username, m.body, m.created_at, m.from_id = $1 AS mine,
-                        (SELECT COUNT(*)::int FROM messages WHERE from_id = u.id AND to_id = $1 AND read_at IS NULL) AS unread,
+                        (SELECT COUNT(*)::int FROM messages WHERE from_id = u.id AND to_id = $1 AND read_at IS NULL AND NOT hidden_by_to) AS unread,
                         EXISTS (SELECT 1 FROM friendships f WHERE f.status = 'accepted'
                                 AND ((f.requester_id = $1 AND f.addressee_id = u.id) OR (f.requester_id = u.id AND f.addressee_id = $1))) AS friend
                  FROM (SELECT DISTINCT ON (other) * FROM (
-                          SELECT *, CASE WHEN from_id = $1 THEN to_id ELSE from_id END AS other FROM messages WHERE $1 IN (from_id, to_id)
+                          SELECT *, CASE WHEN from_id = $1 THEN to_id ELSE from_id END AS other FROM messages
+                          WHERE $1 IN (from_id, to_id) AND NOT ((from_id = $1 AND hidden_by_from) OR (to_id = $1 AND hidden_by_to))
                        ) x ORDER BY other, id DESC) m
                  JOIN users u ON u.id = m.other
                  ORDER BY m.id DESC LIMIT 100`, [user.id]),
@@ -2654,14 +2655,47 @@ const actions = {
         const { rows } = await db.query(
             `SELECT * FROM (
                 SELECT id, body, gift, created_at, read_at, from_id = $1 AS mine FROM messages
-                WHERE ((from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1)) AND id > $3
+                WHERE ((from_id = $1 AND to_id = $2 AND NOT hidden_by_from) OR (from_id = $2 AND to_id = $1 AND NOT hidden_by_to)) AND id > $3
                 ORDER BY id DESC LIMIT ${THREAD_LIMIT}) t ORDER BY id`,
             [user.id, other.id, after]
         );
         const { rowCount: read } = await db.query(
             `UPDATE messages SET read_at = now() WHERE from_id = $2 AND to_id = $1 AND read_at IS NULL`, [user.id, other.id]);
+        // On a refresh, the ids still visible since the first one shown, so messages deleted meanwhile drop out.
+        const since = Number(body.since) || 0;
+        const alive = since && after ? (await db.query(
+            `SELECT id FROM messages WHERE ((from_id = $1 AND to_id = $2 AND NOT hidden_by_from) OR (from_id = $2 AND to_id = $1 AND NOT hidden_by_to))
+             AND id >= $3 AND id <= $4`, [user.id, other.id, since, after])).rows.map((r) => String(r.id)) : undefined;
         const f = await relation(db, user.id, other.id);
-        return { username: other.username, friend: f?.status === 'accepted' || isOwner(user) || isOwner(other), messages: rows, read };
+        return { username: other.username, friend: f?.status === 'accepted' || isOwner(user) || isOwner(other), messages: rows, read, alive };
+    },
+
+    // "me": hide the message on my side only (either side may do it). "all": delete it for both, own messages only.
+    async deleteMessage(db, body, event) {
+        const user = await requireUser(db, event);
+        const id = Number(body.id);
+        if (!Number.isInteger(id)) throw new HttpError(400, 'Message invalide');
+        const { rows: [m] } = await db.query(`SELECT from_id, to_id FROM messages WHERE id = $1`, [id]);
+        if (!m || (m.from_id !== user.id && m.to_id !== user.id)) throw new HttpError(404, 'Message introuvable');
+        if (body.mode === 'all') {
+            if (m.from_id !== user.id) throw new HttpError(403, 'Tu ne peux supprimer pour tout le monde que tes propres messages');
+            await db.query(`DELETE FROM messages WHERE id = $1`, [id]);
+        } else if (m.from_id === user.id) {
+            await db.query(`UPDATE messages SET hidden_by_from = true WHERE id = $1`, [id]);
+        } else {
+            await db.query(`UPDATE messages SET hidden_by_to = true, read_at = COALESCE(read_at, now()) WHERE id = $1`, [id]);
+        }
+        return { ok: true };
+    },
+
+    // Hides the whole conversation on my side; it comes back with the next message.
+    async deleteConversation(db, body, event) {
+        const user = await requireUser(db, event);
+        const other = await findUser(db, body.username);
+        await db.query(`UPDATE messages SET hidden_by_from = true WHERE from_id = $1 AND to_id = $2`, [user.id, other.id]);
+        await db.query(
+            `UPDATE messages SET hidden_by_to = true, read_at = COALESCE(read_at, now()) WHERE from_id = $2 AND to_id = $1`, [user.id, other.id]);
+        return { ok: true };
     },
 
     async sendMessage(db, body, event) {

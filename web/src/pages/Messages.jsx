@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, MessageCircle, Send, UserPlus } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Send, Trash2, UserPlus } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import PlayerAvatar from '../components/PlayerAvatar.jsx';
 
@@ -75,12 +75,20 @@ function Thread({ username, onActivity }) {
     const [sending, setSending] = useState(false);
     const scroller = useRef(null);
     const lastId = useRef(0);
+    const [menu, setMenu] = useState(null);
 
     // Full load, then only messages newer than the last one we have.
     const load = useCallback(async (initial) => {
-        const res = await api('thread', { username, after: initial ? 0 : lastId.current });
+        const after = initial ? 0 : lastId.current;
+        const res = await api('thread', { username, after, since: initial ? 0 : firstId.current });
         if (res.messages.length) lastId.current = Number(res.messages.at(-1).id);
-        setThread((prev) => (initial || !prev ? res : { ...res, messages: [...prev.messages, ...res.messages.filter((m) => !prev.messages.some((p) => p.id === m.id))] }));
+        setThread((prev) => {
+            if (initial || !prev) return res;
+            // Drop what was deleted meanwhile (by me elsewhere, or by them "pour tout le monde").
+            const alive = res.alive && new Set(res.alive);
+            const kept = alive ? prev.messages.filter((p) => alive.has(String(p.id)) || Number(p.id) > after) : prev.messages;
+            return { ...res, messages: [...kept, ...res.messages.filter((m) => !kept.some((p) => p.id === m.id))] };
+        });
         if (res.read) { refreshBadges(); onActivity(); }
         return res;
     }, [username, refreshBadges, onActivity]);
@@ -94,6 +102,32 @@ function Thread({ username, onActivity }) {
         const t = setInterval(() => document.visibilityState === 'visible' && load(false).catch(() => {}), POLL_MS);
         return () => { live = false; clearInterval(t); };
     }, [load]);
+
+    const firstId = useRef(0);
+    firstId.current = Number(thread?.messages[0]?.id) || 0;
+
+    async function remove(m, mode) {
+        setMenu(null);
+        setError('');
+        try {
+            await api('deleteMessage', { id: m.id, mode });
+            setThread((prev) => ({ ...prev, messages: prev.messages.filter((p) => p.id !== m.id) }));
+            onActivity();
+        } catch (err) {
+            setError(err.message);
+        }
+    }
+
+    async function removeAll() {
+        if (!window.confirm(`Supprimer toute la conversation avec ${thread?.username || username} ? Elle disparaîtra seulement de ton côté.`)) return;
+        try {
+            await api('deleteConversation', { username });
+            onActivity();
+            navigate('/messages');
+        } catch (err) {
+            setError(err.message);
+        }
+    }
 
     const count = thread?.messages.length || 0;
     useLayoutEffect(() => {
@@ -127,6 +161,9 @@ function Thread({ username, onActivity }) {
                 <button onClick={() => navigate('/messages')} className="lg:hidden grid place-items-center w-9 h-9 rounded-full hover:bg-white/10 text-white" aria-label="Retour aux conversations"><ArrowLeft className="w-5 h-5" /></button>
                 <PlayerAvatar name={name} size={36} />
                 <p className="font-display text-lg font-semibold text-white truncate">{name}</p>
+                {thread?.messages.length > 0 && (
+                    <button onClick={removeAll} className="ml-auto grid place-items-center w-9 h-9 rounded-full hover:bg-white/10 text-ink-soft hover:text-white" title="Supprimer la conversation" aria-label="Supprimer la conversation"><Trash2 className="w-4.5 h-4.5" /></button>
+                )}
             </div>
             <div ref={scroller} className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1.5">
                 {!thread && !error && <p className="text-center text-ink-soft">Chargement…</p>}
@@ -136,7 +173,13 @@ function Thread({ username, onActivity }) {
                     const gap = !prev || prev.mine !== m.mine || new Date(m.created_at) - new Date(prev.created_at) > 10 * 60_000;
                     return (
                         <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'} ${gap && i ? 'pt-2' : ''}`}>
-                            <p className={`max-w-[80%] px-3.5 py-2 rounded-2xl whitespace-pre-wrap break-words text-[15px] leading-snug ${m.gift ? 'bg-[#e9c46a] text-[#05130d] font-semibold ring-2 ring-[#e9c46a]/40 shadow-[0_0_24px_rgba(233,196,106,0.35)]' : m.mine ? 'bg-[#4fd18b] text-[#05130d]' : 'bg-white/10 text-white'} ${m.mine ? 'rounded-br-md' : 'rounded-bl-md'}`}>{m.body}</p>
+                            <p onClick={() => setMenu(menu === m.id ? null : m.id)} className={`cursor-pointer max-w-[80%] px-3.5 py-2 rounded-2xl whitespace-pre-wrap break-words text-[15px] leading-snug ${m.gift ? 'bg-[#e9c46a] text-[#05130d] font-semibold ring-2 ring-[#e9c46a]/40 shadow-[0_0_24px_rgba(233,196,106,0.35)]' : m.mine ? 'bg-[#4fd18b] text-[#05130d]' : 'bg-white/10 text-white'} ${m.mine ? 'rounded-br-md' : 'rounded-bl-md'}`}>{m.body}</p>
+                            {menu === m.id && (
+                                <span className="mt-1 flex flex-wrap gap-1.5">
+                                    <button onClick={() => remove(m, 'me')} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-xs font-semibold text-white"><Trash2 className="w-3.5 h-3.5" />Supprimer pour moi</button>
+                                    {m.mine && <button onClick={() => remove(m, 'all')} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#ff6b6b]/20 hover:bg-[#ff6b6b]/30 text-xs font-semibold text-[#ff9b9b]"><Trash2 className="w-3.5 h-3.5" />Supprimer pour tout le monde</button>}
+                                </span>
+                            )}
                             {gap && <span className="mt-0.5 px-1 text-[10.5px] text-ink-soft">{when(m.created_at)}{m.mine && m.read_at && i === thread.messages.length - 1 ? ' · Lu' : ''}</span>}
                         </div>
                     );
