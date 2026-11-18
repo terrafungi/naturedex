@@ -1137,9 +1137,9 @@ function cardSearchSql(p) {
 const MAX_TRADE_ITEMS = 30;
 const MAX_PENDING_TRADES = 20;
 // What one player may give, or receive, without anything of the same value in return, per Paris day.
-// Counted in recycling points (RECYCLE_VALUE): 300 = 150 communes, 30 rares or 5 légendaires.
+// Counted in recycling points (RECYCLE_VALUE): 600 = 300 communes, 60 rares or 10 légendaires.
 // Applied on the receiving side too, so a crowd of side accounts can't funnel their boosters into one player.
-const TRADE_IMBALANCE_MAX = 300;
+const TRADE_IMBALANCE_MAX = 600;
 const CARD_VALUE_SQL = `CASE c.rarity ${Object.entries(RECYCLE_VALUE).map(([r, v]) => `WHEN '${r}' THEN ${v}`).join(' ')} ELSE 0 END`;
 
 // Value received minus value given in trades accepted today.
