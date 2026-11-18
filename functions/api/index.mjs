@@ -77,6 +77,8 @@ const INVITE_REWARD = { coins: 1000, nuggets: 150 };
 const INVITEE_BONUS = { coins: 300, nuggets: 50 };
 const INVITE_DAYS = 2;
 const INVITE_CAP = 30;
+// ...and not if the invitee has given the sponsor more than this, in card value (RECYCLE_VALUE), or any gift
+const INVITE_FEED_MAX = 50;
 const SHARE_COINS = 100; // once per account, for sharing the game link
 // pépites per recycled duplicate
 const RECYCLE_VALUE = { common: 2, uncommon: 4, rare: 10, epic: 25, legendary: 60, secret: 400 };
@@ -1134,6 +1136,39 @@ function cardSearchSql(p) {
 // ---- Friends & trades ----
 const MAX_TRADE_ITEMS = 30;
 const MAX_PENDING_TRADES = 20;
+// What one player may give, or receive, without anything of the same value in return, per Paris day.
+// Counted in recycling points (RECYCLE_VALUE): 300 = 150 communes, 30 rares or 5 légendaires.
+// Applied on the receiving side too, so a crowd of side accounts can't funnel their boosters into one player.
+const TRADE_IMBALANCE_MAX = 300;
+const CARD_VALUE_SQL = `CASE c.rarity ${Object.entries(RECYCLE_VALUE).map(([r, v]) => `WHEN '${r}' THEN ${v}`).join(' ')} ELSE 0 END`;
+
+// Value received minus value given in trades accepted today.
+async function tradeNetToday(db, userId) {
+    const { rows: [{ net }] } = await db.query(
+        `SELECT COALESCE(SUM(CASE WHEN ti.owner_id = $1 THEN -1 ELSE 1 END * ti.qty * ${CARD_VALUE_SQL}), 0)::int AS net
+         FROM trades t JOIN trade_items ti ON ti.trade_id = t.id JOIN cards c ON c.id = ti.card_id
+         WHERE t.status = 'accepted' AND t.resolved_at >= ${PARIS_TODAY} AND $1 IN (t.from_id, t.to_id)`, [userId]);
+    return net;
+}
+
+// Throws when a trade would push one side over TRADE_IMBALANCE_MAX for today. a/b: { id, username },
+// items: [{ owner_id, card_id, qty }]; me: the player making the request, addressed as « tu ».
+async function checkTradeBalance(db, a, b, items, me) {
+    const { rows } = await db.query(`SELECT id, ${CARD_VALUE_SQL} AS v FROM cards c WHERE id = ANY($1::int[])`, [items.map((it) => it.card_id)]);
+    const value = new Map(rows.map((r) => [r.id, r.v]));
+    const net = items.reduce((sum, it) => sum + (it.owner_id === a.id ? 1 : -1) * it.qty * (value.get(it.card_id) || 0), 0);
+    if (!net) return;
+    const [giver, receiver] = net > 0 ? [a, b] : [b, a];
+    const amount = Math.abs(net);
+    const [given, received] = await Promise.all([tradeNetToday(db, giver.id).then((n) => -n), tradeNetToday(db, receiver.id)]);
+    const retry = 'Équilibre l\'échange avec des cartes de valeur proche, ou réessaie demain.';
+    if (Math.max(given, 0) + amount > TRADE_IMBALANCE_MAX) {
+        throw new HttpError(429, `${giver.id === me ? 'Tu as' : `${giver.username} a`} déjà donné beaucoup de cartes sans contrepartie aujourd'hui. ${retry}`);
+    }
+    if (Math.max(received, 0) + amount > TRADE_IMBALANCE_MAX) {
+        throw new HttpError(429, `${receiver.id === me ? 'Tu as' : `${receiver.username} a`} déjà reçu beaucoup de cartes sans contrepartie aujourd'hui. ${retry}`);
+    }
+}
 
 async function findUser(db, username) {
     const { rows: [u] } = await db.query(`SELECT id, username FROM users WHERE lower(username) = lower($1)`, [String(username || '').trim()]);
@@ -2243,6 +2278,11 @@ const actions = {
             const { rowCount } = await client.query(
                 `UPDATE users SET invite_rewarded_at = now() WHERE id IN (
                     SELECT u.id FROM users u WHERE u.invited_by = $1 AND u.invite_rewarded_at IS NULL
+                      -- an invitee who passes their gifts or cards to their sponsor is a side account, not a new player
+                      AND NOT EXISTS (SELECT 1 FROM gifts g WHERE g.from_id = u.id AND g.to_id = $1)
+                      AND (SELECT COALESCE(SUM(CASE WHEN ti.owner_id = u.id THEN 1 ELSE -1 END * ti.qty * ${CARD_VALUE_SQL}), 0)
+                           FROM trades t JOIN trade_items ti ON ti.trade_id = t.id JOIN cards c ON c.id = ti.card_id
+                           WHERE t.status = 'accepted' AND u.id IN (t.from_id, t.to_id) AND $1 IN (t.from_id, t.to_id)) <= ${INVITE_FEED_MAX}
                       AND (SELECT COUNT(DISTINCT d) FROM (
                             SELECT (at AT TIME ZONE 'Europe/Paris')::date AS d FROM openings WHERE user_id = u.id
                             UNION SELECT day FROM quizzes WHERE user_id = u.id AND status = 'done') x) >= $2
@@ -2858,6 +2898,10 @@ const actions = {
         };
         await check(user.id, give, 'Tu n\'as');
         await check(other.id, get, `${other.username} n'a`);
+        await checkTradeBalance(db, user, other, [
+            ...give.map(([id, qty]) => ({ owner_id: user.id, card_id: id, qty })),
+            ...get.map(([id, qty]) => ({ owner_id: other.id, card_id: id, qty })),
+        ], user.id);
         const { rows: [{ pending }] } = await db.query(`SELECT COUNT(*)::int AS pending FROM trades WHERE from_id = $1 AND status = 'pending'`, [user.id]);
         if (pending >= MAX_PENDING_TRADES) throw new HttpError(429, `${MAX_PENDING_TRADES} propositions en attente au maximum`);
         return inTransaction(db, async (client) => {
@@ -2895,6 +2939,8 @@ const actions = {
             // Lock both players' collections in a fixed order so two trades can't deadlock.
             await client.query(`SELECT 1 FROM users WHERE id = ANY($1::int[]) ORDER BY id FOR UPDATE`, [[t.from_id, t.to_id]]);
             const { rows: items } = await client.query(`SELECT * FROM trade_items WHERE trade_id = $1`, [t.id]);
+            const { rows: pair } = await client.query(`SELECT id, username FROM users WHERE id = ANY($1::int[])`, [[t.from_id, t.to_id]]);
+            await checkTradeBalance(client, pair.find((u) => u.id === t.from_id), pair.find((u) => u.id === t.to_id), items, user.id);
             for (const it of items) {
                 const to = it.owner_id === t.from_id ? t.to_id : t.from_id;
                 if (!(await moveCard(client, it.owner_id, to, it.card_id, it.qty))) {
