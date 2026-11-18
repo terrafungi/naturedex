@@ -24,6 +24,7 @@ const WIKI = {
 export function naturalistRows() {
     const out = [];
     for (const [key, t] of Object.entries(TRAINERS)) {
+        if (t.park) continue; // the place card is the Stade
         const base = {
             name: t.name, type: NATURALIST,
             sci_name: t.kind === 'supporter' ? `${t.role || 'Naturaliste'} · ${t.years}` : KIND_LABEL[t.kind],
@@ -54,6 +55,12 @@ export async function syncNaturalistCards(db) {
          ON CONFLICT (qid) DO UPDATE SET name = EXCLUDED.name, sci_name = EXCLUDED.sci_name, type = EXCLUDED.type, rarity = EXCLUDED.rarity,
              image_url = EXCLUDED.image_url, thumb_url = EXCLUDED.thumb_url, wiki_url = EXCLUDED.wiki_url, stats = EXCLUDED.stats, art = EXCLUDED.art`,
         [JSON.stringify(rows.map((r, ord) => ({ ...r, ord })))]);
+    // the famous Parcs & jardins cards are Stades too
+    const parks = Object.entries(TRAINERS).filter(([, t]) => t.park);
+    await db.query(
+        `UPDATE cards c SET stats = c.stats || jsonb_build_object('trainer', p.key) FROM unnest($1::text[], $2::text[]) AS p(key, qid)
+         WHERE c.qid = p.qid AND c.type = 'place' AND c.stats->>'trainer' IS DISTINCT FROM p.key`,
+        [parks.map(([k]) => k), parks.map(([, t]) => t.qid)]);
     await db.query(
         `UPDATE cards f SET base_id = b.id FROM cards b
          WHERE f.type = $1 AND f.art = 'full' AND b.qid = split_part(f.qid, ':full', 1) AND f.base_id IS DISTINCT FROM b.id`, [NATURALIST]);
@@ -64,12 +71,13 @@ export async function syncNaturalistCards(db) {
 export async function ownedNaturalists(db, userId) {
     const { rows } = await db.query(
         `SELECT c.stats->>'trainer' AS key, sum(uc.count)::int AS n FROM user_cards uc JOIN cards c ON c.id = uc.card_id
-         WHERE uc.user_id = $1 AND uc.count > 0 AND c.type = $2 GROUP BY 1`, [userId, NATURALIST]);
+         WHERE uc.user_id = $1 AND uc.count > 0 AND (c.type = $2 OR c.type = 'place' AND c.stats ? 'trainer') GROUP BY 1`, [userId, NATURALIST]);
     return Object.fromEntries(rows.map((r) => [`t:${r.key}`, r.n]));
 }
 
 /** Gives the regular card of each 't:<key>' (duel rewards, starter kit). */
 export async function addNaturalists(db, userId, keys) {
+    keys = keys.filter((k) => !TRAINERS[k.slice(2)]?.park); // a park Stade only comes with its place card
     if (!keys.length) return;
     await db.query(
         `INSERT INTO user_cards (user_id, card_id, count)

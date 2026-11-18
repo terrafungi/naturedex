@@ -37,6 +37,9 @@ export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo', gold
 /** The Duel effect of a Naturaliste card (type 'naturalist'), by its trainer key or its name. */
 export const trainerOf = (card) => (card.type === 'naturalist'
     ? TRAINERS[card.stats?.trainer] || Object.values(TRAINERS).find((t) => t.name === card.name) : null);
+/** The Stade of a famous Parcs & jardins card (parks.mjs), or null. */
+export const parkStadiumOf = (card) => (card.type === 'place'
+    ? TRAINERS[card.stats?.trainer] || Object.values(TRAINERS).find((t) => t.park && (t.qid === card.qid || t.name === card.name)) || null : null);
 
 /** Event cards (Calendrier de l'Avent): « avent-2026 » → « Avent 2026 », shown as a gold tag. */
 export const eventOf = (card) => card.event || card.stats?.event || null;
@@ -59,6 +62,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     const ink = card.art === 'gold' ? '#7a5310' : bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
     const trainer = trainerOf(card);
     const place = card.type === 'place'; // a place does not fight: no PV, no battle stats
+    const stadium = parkStadiumOf(card); // ...but the most famous ones are Stades in the Duel
     const event = eventOf(card);
     const fact = bleed || trainer ? null : card.fact;
     // where the subject sits in the photo (computed once per card): the 4:3 window crops around it
@@ -177,6 +181,11 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                     <div className="nd-effect">
                         <b>{KIND_LABEL[trainer.kind]}</b>
                         <p>{trainer.text}</p>
+                    </div>
+                ) : stadium ? (
+                    <div className="nd-effect">
+                        <b>Stade · {PLACE_LABEL[card.stats?.place] || 'Lieu naturel'}</b>
+                        <p>{stadium.text}</p>
                     </div>
                 ) : place ? (
                     <div className="nd-effect">

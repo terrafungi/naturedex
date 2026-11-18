@@ -136,7 +136,8 @@ function rollRewards(n, deckBiomes, energyShare = 0.5) {
         }
         let r = Math.random() * 100;
         const rarity = Object.keys(RARITY_WEIGHT).find((k) => (r -= RARITY_WEIGHT[k]) < 0) || 'common';
-        const keys = ITEM_KEYS.filter((k) => k.startsWith('t:') && itemCard(k).rarity === rarity);
+        // park Stades are not handed out: they are the Parcs & jardins cards of the boosters
+        const keys = ITEM_KEYS.filter((k) => k.startsWith('t:') && !itemCard(k).park && itemCard(k).rarity === rarity);
         const fallback = ITEM_KEYS.filter((k) => k.startsWith('t:') && itemCard(k).rarity === 'common');
         const list = keys.length ? keys : fallback;
         out.push(list[Math.floor(Math.random() * list.length)]);

@@ -12,6 +12,7 @@
  * endangered species. First to CAPTURES_TO_WIN wins, or when the foe has no creature left.
  */
 import { battleStats, PROFILES, STRONG } from './battle.mjs';
+import { PARKS } from './parks.mjs';
 import { SCIENTISTS } from './scientists.mjs';
 
 export const DECK_MIN = 20;
@@ -87,6 +88,8 @@ export const TRAINERS = {
     pasteur: { kind: 'supporter', role: 'Chercheur', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Louis_Pasteur_%281822_-_1895%29%2C_microbiologist_and_chemist_Wellcome_V0026980.jpg/330px-Louis_Pasteur_%281822_-_1895%29%2C_microbiologist_and_chemist_Wellcome_V0026980.jpg', name: 'Louis Pasteur', rarity: 'epic', years: '1822–1895', text: 'Retire le poison de tes créatures et soigne 50 PV à ta créature active. La créature active adverse est empoisonnée.' },
     // ...et plus de 250 autres scientifiques aux effets génériques (fx)
     ...SCIENTISTS,
+    // Stades : les parcs et jardins les plus célèbres (la carte Parc & jardin elle-même)
+    ...PARKS,
 };
 
 /** Text of a generic scientist effect, in the order playFx applies it. */
@@ -122,6 +125,14 @@ const fxTarget = (fx) => (fx.heal ? 'mine' : fx.switchMine ? 'myBench' : fx.swit
 const fxSearch = (fx) => (c) => (fx.search.what === 'energy' ? c.kind === 'energy' : fx.search.what === 'stadium' ? c.kind === 'stadium'
     : c.kind === 'creature' && (fx.search.what === 'creature' || fx.search.what.includes(c.type)));
 for (const t of Object.values(TRAINERS)) if (t.fx) Object.assign(t, { text: fxText(t.fx), target: fxTarget(t.fx) });
+
+/** Text of a park Stade: « Les créatures Forêt et Prairie infligent +30 dégâts et subissent −10 dégâts. » */
+function stadiumText(t) {
+    const names = t.boost.map((b) => BIOMES[b].name);
+    const who = names.length > 1 ? `${names.slice(0, -1).join(', ')} et ${names.at(-1)}` : names[0];
+    return `Les créatures ${who} infligent +${t.n} dégâts${t.guard ? ` et subissent −${t.guard} dégâts` : ''}.`;
+}
+for (const t of Object.values(TRAINERS)) if (t.park) t.text = stadiumText(t);
 
 /** Every card that is not a species, by key: 'e:foret', 't:darwin'. */
 export function itemCard(key) {
@@ -310,7 +321,8 @@ export function attackDamage(state, side, att, attack, def) {
     let dmg = attack.damage;
     if (attack.swarm) dmg += attack.swarm * me.bench.filter((c) => c.type === 'arthropod').length;
     if (att.tool === 'loupe') dmg += 20;
-    if (state.stadium && TRAINERS[state.stadium.key].boost.includes(att.biome)) dmg += 20;
+    const stadium = state.stadium && TRAINERS[state.stadium.key];
+    if (stadium?.boost.includes(att.biome)) dmg += stadium.n || 20;
     if (me.boost) dmg += me.boost + ([].concat(me.boostType || (me.boostArthropod && 'arthropod') || []).includes(att.type) ? 20 : 0);
     if (att.weak) dmg -= att.weak;
     const chain = chainMult(att.type, def.type);
@@ -319,6 +331,7 @@ export function attackDamage(state, side, att, attack, def) {
     if (!attack.pierce) {
         dmg -= Math.floor(def.def / 60) * 10; // thick skin, shells, bark
         if (def.tool === 'gilet') dmg -= 20;
+        if (stadium?.guard && stadium.boost.includes(def.biome)) dmg -= stadium.guard;
         dmg -= def.shield;
     }
     return Math.max(0, Math.round(dmg / 10) * 10);
