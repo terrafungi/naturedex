@@ -2,6 +2,7 @@
  * The most famous Parcs & jardins cards (type 'place', import-places.mjs) double as Stades in the Duel.
  * Unlike the other Naturalistes there is no separate 'tcg:<key>' card: the place card itself is the
  * Stade (naturalists.mjs tags it with stats.trainer = key), so owning Yellowstone lets it into a deck.
+ * Each one also has a Full art copy ('tcg:<key>:full', one rarity up), which counts as the same Stade.
  * rarity = the rarity of the place card; the effect grows with it (texts in tcg.mjs stadiumText):
  * epic +20 dégâts and −10 subis, legendary +30 / −10, secret +30 / −20 for the creatures of `boost`.
  */

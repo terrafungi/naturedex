@@ -2,7 +2,7 @@
  * The Naturaliste cards of the duel (tcg.mjs TRAINERS) are also regular collection cards
  * (type 'naturalist', qid 'tcg:<key>', stats.trainer = key): they come out of boosters, can be
  * traded and recycled like any species. Stades, the first naturalists and the scientists marked `full`
- * also have a Full art, one rarity up.
+ * also have a Full art, one rarity up; so do the park Stades (parks.mjs), as a copy of their place card.
  * The duel counts 't:<key>' as every naturalist card with that trainer key the player owns.
  */
 import { TRAINERS } from './tcg.mjs';
@@ -61,6 +61,16 @@ export async function syncNaturalistCards(db) {
         `UPDATE cards c SET stats = c.stats || jsonb_build_object('trainer', p.key) FROM unnest($1::text[], $2::text[]) AS p(key, qid)
          WHERE c.qid = p.qid AND c.type = 'place' AND c.stats->>'trainer' IS DISTINCT FROM p.key`,
         [parks.map(([k]) => k), parks.map(([, t]) => t.qid)]);
+    // ...with a Full art one rarity up (a secret one stays secret), a copy of the place card
+    await db.query(
+        `INSERT INTO cards (qid, name, sci_name, type, rarity, views, image_url, thumb_url, extract, wiki_url, stats, art, base_id, num, source)
+         SELECT 'tcg:' || p.key || ':full', b.name, b.sci_name, b.type, p.rarity, b.views, b.image_url, b.thumb_url, b.extract, b.wiki_url,
+                b.stats || jsonb_build_object('trainer', p.key), 'full', b.id,
+                (SELECT COALESCE(max(num), 0) FROM cards) + row_number() OVER (ORDER BY p.ord), 'naturedex'
+         FROM unnest($1::text[], $2::text[], $3::text[]) WITH ORDINALITY AS p(key, qid, rarity, ord)
+         JOIN cards b ON b.qid = p.qid AND b.type = 'place'
+         WHERE NOT EXISTS (SELECT 1 FROM cards c WHERE c.qid = 'tcg:' || p.key || ':full')`,
+        [parks.map(([k]) => k), parks.map(([, t]) => t.qid), parks.map(([, t]) => NEXT_RARITY[t.rarity] || 'secret')]);
     await db.query(
         `UPDATE cards f SET base_id = b.id FROM cards b
          WHERE f.type = $1 AND f.art = 'full' AND b.qid = split_part(f.qid, ':full', 1) AND f.base_id IS DISTINCT FROM b.id`, [NATURALIST]);
