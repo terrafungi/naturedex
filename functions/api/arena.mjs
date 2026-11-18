@@ -114,7 +114,7 @@ export function arenaActions({ requireUser, inTransaction, HttpError, publicUser
                 const cards = [];
                 for (const rarity of BANDS[band][1]) {
                     const { rows: [c] } = await db.query(
-                        `SELECT ${BATTLE_CARD} FROM cards c WHERE c.rarity = $1 AND c.source <> 'event' AND NOT (c.type = ANY($2)) AND c.type <> 'naturalist' ORDER BY md5($3 || c.id) LIMIT 1`,
+                        `SELECT ${BATTLE_CARD} FROM cards c WHERE c.rarity = $1 AND c.source <> 'event' AND NOT (c.type = ANY($2)) AND c.type NOT IN ('naturalist', 'place') ORDER BY md5($3 || c.id) LIMIT 1`,
                         [rarity, cards.map((x) => x.type), `${key}:${cards.length}`]);
                     cards.push(c);
                 }
@@ -135,7 +135,7 @@ export function arenaActions({ requireUser, inTransaction, HttpError, publicUser
     async function teamCards(db, userId, ids) {
         if (!ids?.length) return [];
         const { rows } = await db.query(
-            `SELECT ${BATTLE_CARD}, uc.count FROM cards c JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1 WHERE c.id = ANY($2) AND c.type <> 'naturalist'`, [userId, ids]);
+            `SELECT ${BATTLE_CARD}, uc.count FROM cards c JOIN user_cards uc ON uc.card_id = c.id AND uc.user_id = $1 WHERE c.id = ANY($2) AND c.type NOT IN ('naturalist', 'place')`, [userId, ids]);
         return ids.map((id) => rows.find((r) => r.id === id)).filter(Boolean);
     }
 
@@ -282,7 +282,7 @@ export function arenaActions({ requireUser, inTransaction, HttpError, publicUser
         async arenaCards(db, body, event) {
             const user = await requireUser(db, event);
             const { rows } = await db.query(
-                `SELECT ${BATTLE_CARD}, uc.count FROM user_cards uc JOIN cards c ON c.id = uc.card_id WHERE uc.user_id = $1 AND c.type <> 'naturalist'`, [user.id]);
+                `SELECT ${BATTLE_CARD}, uc.count FROM user_cards uc JOIN cards c ON c.id = uc.card_id WHERE uc.user_id = $1 AND c.type NOT IN ('naturalist', 'place')`, [user.id]);
             return { cards: rows.map(shapeCard) };
         },
 

@@ -28,6 +28,9 @@ const sharper = (url) => url?.replace(/\/\d+px-([^/]+)$/, '/960px-$1');
 // Special finish (cards.art): 'full' / 'illus' = the picture fills the whole card and the text sits
 // on top of it; 'holo' = the regular layout with a holographic foil (some commons and uncommons);
 // 'gold' = the regular layout, all in gold: frame, background and a gilded photo (some rares and up).
+const PLACE_LABEL = { national: 'Parc national', regional: 'Parc naturel régional', botanical: 'Jardin botanique', remarkable: 'Jardin remarquable', unesco: 'Patrimoine mondial' };
+const formatArea = (km2) => (km2 >= 1 ? `${Math.round(km2).toLocaleString('fr-FR')} km²` : `${Math.round(km2 * 100).toLocaleString('fr-FR')} ha`);
+
 export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo', gold: 'Gold' };
 
 /** The signed-in player's card frame (honey shop), for their own cards. */
@@ -55,6 +58,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     const foil = art || ['epic', 'legendary', 'secret'].includes(card.rarity);
     const ink = card.art === 'gold' ? '#7a5310' : bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
     const trainer = trainerOf(card);
+    const place = card.type === 'place'; // a place does not fight: no PV, no battle stats
     const event = eventOf(card);
     const fact = bleed || trainer ? null : card.fact;
     // where the subject sits in the photo (computed once per card): the 4:3 window crops around it
@@ -154,7 +158,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                         {event && <span className="nd-event-tag"><Snowflake />{eventLabel(event)}</span>}
                     </div>
                     <div className="flex shrink-0 items-center gap-[1.5cqi]">
-                        {hp != null && <div className="nd-hp"><small>PV </small>{hp}</div>}
+                        {hp != null && !place && <div className="nd-hp"><small>PV </small>{hp}</div>}
                         <TypeBadge type={card.type} />
                     </div>
                 </div>
@@ -173,6 +177,11 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                     <div className="nd-effect">
                         <b>{KIND_LABEL[trainer.kind]}</b>
                         <p>{trainer.text}</p>
+                    </div>
+                ) : place ? (
+                    <div className="nd-effect">
+                        <b>{PLACE_LABEL[card.stats?.place] || 'Lieu naturel'}</b>
+                        <p>{card.stats?.area_km2 ? `Superficie : ${formatArea(card.stats.area_km2)}` : 'À découvrir en vrai !'}</p>
                     </div>
                 ) : (
                     <div className="nd-stats">

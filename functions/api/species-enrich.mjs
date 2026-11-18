@@ -42,10 +42,19 @@ async function sources(card) {
     ].filter(Boolean);
 }
 
+// Place cards (national parks, gardens…) are written as a place, not as a species.
+const SUBJECT = {
+    species: { what: "de l'espèce", intro: "présentent l'espèce : ce qu'elle est, où elle vit, ce qui la distingue",
+        sections: 'Description, Répartition et habitat, Mode de vie, Alimentation, Reproduction, Classification, Conservation, Relations avec l\'humain' },
+    place: { what: 'du lieu', intro: "présentent le lieu : ce qu'il est, où il se trouve, ce qui le rend remarquable",
+        sections: 'Situation et paysages, Histoire, Faune et flore, Collections et jardins, Protection, Visite' },
+};
+
 function prompt(card, docs) {
     const sci = card.sci_name && card.sci_name !== card.name ? ` (${card.sci_name})` : '';
     const text = docs.map((d) => d.text).join(' ');
-    return `Tu rédiges la fiche encyclopédique de l'espèce « ${card.name}${sci} » pour NatureDex (naturedex.fr), un site sur les espèces du vivant.
+    const subject = SUBJECT[card.type === 'place' ? 'place' : 'species'];
+    return `Tu rédiges la fiche encyclopédique ${subject.what} « ${card.name}${sci} » pour NatureDex (naturedex.fr), un site sur le vivant et les lieux de nature.
 
 ${docs.map((d, i) => `### Document ${i + 1} — ${d.publisher} : ${d.title}\n${d.text}`).join('\n\n')}
 ${DRUGS.test(text) ? `
@@ -53,14 +62,14 @@ Cette espèce a des propriétés psychoactives : reste informatif (histoire, usa
 ` : ''}
 Réponds UNIQUEMENT avec un objet JSON de cette forme :
 {
-  "intro": "2 à 3 phrases qui présentent l'espèce : ce qu'elle est, où elle vit, ce qui la distingue",
+  "intro": "2 à 3 phrases qui ${subject.intro}",
   "sections": [{ "h2": "intertitre court et descriptif", "paragraphs": ["1 à 3 paragraphes de 2 à 5 phrases"] }],
   "facts": ["0 à 4 faits marquants, une phrase courte chacun"]
 }
 Contraintes :
 - En français, ton clair et vivant de vulgarisation scientifique, vouvoiement implicite (pas de « tu »).
 - N'utilise QUE des informations présentes dans les documents. N'invente aucun chiffre, lieu, date ou comportement. Si les documents sont pauvres, écris court plutôt que de remplir.
-- Sections possibles selon ce que disent les documents : Description, Répartition et habitat, Mode de vie, Alimentation, Reproduction, Classification, Conservation, Relations avec l'humain. Omets toute section sans matière. 1 à 5 sections.
+- Sections possibles selon ce que disent les documents : ${subject.sections}. Omets toute section sans matière. 1 à 5 sections.
 - Reformule tout, ne recopie pas de phrases. Traduis ce qui vient de l'anglais.
 - Pas de markdown, pas de liens, pas d'émojis, n'évoque pas les documents.`;
 }
@@ -127,7 +136,7 @@ export async function speciesEnrichTick(db) {
         ON CONFLICT (card_id) DO UPDATE SET status = 'working', attempts = species_texts.attempts + 1, updated_at = now()
         RETURNING card_id`);
     if (!cards.length) return;
-    const { rows } = await db.query(`SELECT id, qid, name, sci_name, wiki_url FROM cards WHERE id = ANY($1)`, [cards.map((c) => c.card_id)]);
+    const { rows } = await db.query(`SELECT id, qid, name, sci_name, type, wiki_url FROM cards WHERE id = ANY($1)`, [cards.map((c) => c.card_id)]);
     const results = await Promise.all(rows.map((card) => enrich(db, card).catch(async (err) => {
         const quota = err instanceof QuotaError;
         // a quota error is not the card's fault: give the attempt back

@@ -100,12 +100,12 @@ export const DRUGS = /psilocyb|hallucinog|psychotrop|psychoacti|enth[ée]og|narc
 async function pickCards(db, cat) {
     const where = ['NOT EXISTS (SELECT 1 FROM blog_posts p WHERE c.id = ANY(p.card_ids))', 'c.image_url IS NOT NULL'];
     const params = [];
-    if (cat.types) { params.push(cat.types); where.push(`c.type = ANY($${params.length})`); } else where.push(`c.type <> 'mineral'`); // the other angles are about living species
+    if (cat.types) { params.push(cat.types); where.push(`c.type = ANY($${params.length})`); } else where.push(`c.type NOT IN ('mineral', 'place')`); // the other angles are about living species
     if (cat.rarities) { params.push(cat.rarities); where.push(`c.rarity = ANY($${params.length})`); }
     if (cat.iucn) { params.push(cat.iucn); where.push(`c.iucn = ANY($${params.length})`); }
     if (cat.living) where.push(`c.iucn IS DISTINCT FROM 'EX' AND c.iucn IS DISTINCT FROM 'EW'`);
     if (cat.sameType) {
-        const { rows: [t] } = await db.query(`SELECT type FROM cards WHERE type NOT IN ('virus','mold','bacteria','alga','mineral','naturalist') GROUP BY type ORDER BY random() LIMIT 1`);
+        const { rows: [t] } = await db.query(`SELECT type FROM cards WHERE type NOT IN ('virus','mold','bacteria','alga','mineral','naturalist','place') GROUP BY type ORDER BY random() LIMIT 1`);
         params.push(t.type); where.push(`c.type = $${params.length}`);
     }
     const { rows } = await db.query(

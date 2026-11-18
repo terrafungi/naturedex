@@ -355,7 +355,7 @@ const RARITY_ORDER = `CASE c.rarity WHEN 'secret' THEN 5 WHEN 'legendary' THEN 4
 const TYPE_NAMES = {
     mammal: 'Mammifères', bird: 'Oiseaux', reptile: 'Reptiles & amphibiens', fish: 'Poissons',
     arthropod: 'Insectes & arachnides', terrestrial: 'Mollusques terrestres', aquatic: 'Mollusques aquatiques', marine: 'Créatures aquatiques', plant: 'Plantes', tree: 'Arbres',
-    alga: 'Algues', fungus: 'Champignons', mold: 'Moisissures & levures', bacteria: 'Bactéries', virus: 'Virus', fossil: 'Fossiles', mineral: 'Minéraux',
+    alga: 'Algues', fungus: 'Champignons', mold: 'Moisissures & levures', bacteria: 'Bactéries', virus: 'Virus', fossil: 'Fossiles', mineral: 'Minéraux', place: 'Parcs & jardins',
 };
 const TIER_COINS = [30, 60, 120, 200, 300, 500, 800, 1200, 2000];
 const TIER_NUGGETS = [10, 25, 50, 80, 120, 200, 300, 500, 800];

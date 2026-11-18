@@ -66,6 +66,7 @@ export default function CardPage() {
         stats.mass_kg && { Icon: Weight, label: 'Masse', value: formatMeasure(stats.mass_kg, 'kg') },
         stats.length_m && { Icon: Ruler, label: 'Longueur', value: formatMeasure(stats.length_m, 'm') },
         stats.height_m && { Icon: Ruler, label: 'Hauteur', value: formatMeasure(stats.height_m, 'm') },
+        stats.area_km2 && { Icon: Ruler, label: 'Superficie', value: `${Number(stats.area_km2).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} km²` },
     ].filter(Boolean);
     const iucn = card.iucn && IUCN[card.iucn];
     const recycleCoins = (card.count - 1) * (user.recycleValue?.[card.rarity] || 0);
@@ -144,7 +145,7 @@ export default function CardPage() {
                     </div>
                 </div>
             </div>
-            {card.type !== 'mineral' && !naturalist && <FieldSection cardId={card.id} />}
+            {!['mineral', 'place'].includes(card.type) && !naturalist && <FieldSection cardId={card.id} />}
         </div>
     );
 }

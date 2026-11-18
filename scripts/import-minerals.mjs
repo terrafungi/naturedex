@@ -14,6 +14,7 @@
  * New cards get source = 'mineral' (build-catalog.mjs leaves them alone) and numbers after the current last card.
  */
 import pg from 'pg';
+import { pathToFileURL } from 'node:url';
 import { sleep, cache, sparql, commonsImage, qidOf, hpFor } from './build-catalog.mjs';
 
 const APPLY = process.argv.includes('--apply');
@@ -59,8 +60,8 @@ async function fetchCandidates() {
 
 // fr.wikipedia title -> yearly views estimate (last 60 days x 365/60), 50 titles per request, cached.
 // One request at a time: Wikimedia rate-limits parallel calls (HTTP 429 with a Retry-After).
-const viewsCache = cache('fr-views-60d');
-async function fetchFrViews(titles) {
+export const viewsCache = cache('fr-views-60d');
+export async function fetchFrViews(titles) {
     const todo = [...new Set(titles)].filter((t) => !(t in viewsCache.data));
     for (let i = 0; i < todo.length; i += 50) {
         const chunk = todo.slice(i, i + 50);
@@ -91,8 +92,8 @@ async function fetchFrViews(titles) {
 }
 
 // Some sitelinks are redirects to another candidate's article (Cristal de roche -> Quartz): title -> target.
-const redirectCache = cache('fr-redirects');
-async function fetchRedirects(titles) {
+export const redirectCache = cache('fr-redirects');
+export async function fetchRedirects(titles) {
     const todo = [...new Set(titles)].filter((t) => !(t in redirectCache.data));
     for (let i = 0; i < todo.length; i += 50) {
         const chunk = todo.slice(i, i + 50);
@@ -189,4 +190,5 @@ async function main() {
     await db.end();
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+// Importable (scripts/import-places.mjs reuses the helpers): only run when called directly.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((err) => { console.error(err); process.exit(1); });
