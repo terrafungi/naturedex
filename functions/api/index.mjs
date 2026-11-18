@@ -3289,8 +3289,13 @@ const actions = {
 
     // ---- Closed beta of the Android app ----
     // Hidden until BETA_GROUP (the Google Group added as testers in Play Console) is set.
-    async betaInfo() {
-        return betaLinks();
+    // signedUp: the logged-in player already left an address (the pop-up then stays closed).
+    async betaInfo(db, body, event) {
+        const links = betaLinks();
+        const user = links.open ? await requireUser(db, event).catch(() => null) : null;
+        if (!user) return links;
+        const { rows } = await db.query(`SELECT 1 FROM beta_signups WHERE user_id = $1 LIMIT 1`, [user.id]);
+        return { ...links, signedUp: rows.length > 0 };
     },
 
     // Keeps the address (to write to testers later) and returns the 3 links: join the group,

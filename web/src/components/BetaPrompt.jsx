@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, Download, Mail, UserPlus, Users, X } from 'lucide-react';
+import { Bell, Check, Download, Mail, Rocket, UserPlus, Users, X } from 'lucide-react';
 import { api } from '../api.jsx';
 import { isPlayApp } from '../play.js';
 
-const DISMISS_KEY = 'naturdex.betaLater';
+const DISMISS_KEY = 'naturdex.betaLater2'; // new key: everyone who closed the first version sees this one once
+const DONE_KEY = 'naturdex.betaDone';
 const INSTALL_KEY = 'naturdex.installLater'; // see InstallPrompt: the real app replaces the home-screen install
 const DISMISS_DAYS = 14;
 const DELAY_MS = 8_000;
 
 const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
 const isAndroid = /android/i.test(ua);
-// Already inside the app (Play Store TWA) or the installed web app: nothing to offer.
-const inApp = () => isPlayApp() || window.matchMedia('(display-mode: standalone)').matches;
-const later = () => Number(localStorage.getItem(DISMISS_KEY) || 0) > Date.now();
+// Installed web app users are shown it too (they are the ones the real app helps most); only the Play app itself is skipped.
+const later = () => localStorage.getItem(DONE_KEY) || Number(localStorage.getItem(DISMISS_KEY) || 0) > Date.now();
 const snooze = (key) => localStorage.setItem(key, String(Date.now() + DISMISS_DAYS * 86_400_000));
 
-/** Closed beta of the Android app: leave an email, get the 3 links to install it. Android visitors only. */
+/** Closed beta of the Android app: leave an email, get the 3 links to install it. Android only, until signed up. */
 export default function BetaPrompt() {
     const [show, setShow] = useState(false);
     const [email, setEmail] = useState('');
@@ -25,10 +25,11 @@ export default function BetaPrompt() {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        if (!isAndroid || inApp() || later()) return;
+        if (!isAndroid || isPlayApp() || later()) return;
         let t;
         api('betaInfo').then((b) => {
             if (!b.open) return;
+            if (b.signedUp) { localStorage.setItem(DONE_KEY, '1'); return; }
             t = setTimeout(() => { setShow(true); snooze(INSTALL_KEY); }, DELAY_MS);
         }).catch(() => {});
         return () => clearTimeout(t);
@@ -44,7 +45,7 @@ export default function BetaPrompt() {
         setError('');
         try {
             setLinks(await api('betaSignup', { email }));
-            snooze(DISMISS_KEY);
+            localStorage.setItem(DONE_KEY, '1');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -75,8 +76,14 @@ export default function BetaPrompt() {
 
                         {!links ? (
                             <form onSubmit={submit} className="mt-4">
-                                <p className="text-[13px] text-white/70 leading-snug">
-                                    NatureDex arrive sur Google Play. Inscris-toi avec l'adresse <b className="text-white">Gmail de ton compte Play Store</b> et reçois le lien de téléchargement.
+                                <ul className="space-y-2 text-[13px] text-white/70 leading-snug">
+                                    <li className="flex gap-2.5"><Bell className="w-4 h-4 mt-0.5 shrink-0 text-[#a8f0c6]" />
+                                        <span><b className="text-white">Notifications push</b> : boosters rechargés, enchère dépassée ou remportée, messages et cadeaux d'amis.</span></li>
+                                    <li className="flex gap-2.5"><Rocket className="w-4 h-4 mt-0.5 shrink-0 text-[#e9c46a]" />
+                                        <span><b className="text-white">Aide NatureDex à sortir sur le Play Store</b> : Google exige des testeurs pendant 14 jours avant la publication. Garde l'appli installée et ouvre-la de temps en temps !</span></li>
+                                </ul>
+                                <p className="mt-3 text-[13px] text-white/70 leading-snug">
+                                    Inscris-toi avec l'adresse <b className="text-white">Gmail de ton compte Play Store</b>. Gratuit, et tu retrouves ton compte et toute ta collection.
                                 </p>
                                 <label className="mt-3 flex items-center gap-2 rounded-full bg-white/[0.06] ring-1 ring-white/15 focus-within:ring-[#e9c46a]/70 px-4">
                                     <Mail className="w-4 h-4 text-white/45 shrink-0" />
@@ -108,7 +115,7 @@ export default function BetaPrompt() {
                                         <span><b className="text-white">Télécharge NatureDex</b> sur Google Play</span>
                                     </a></li>
                                 </ol>
-                                <p className="mt-3 text-[11px] text-white/50 leading-snug">Utilise le même compte Google partout. L'appli peut mettre quelques minutes à apparaître après l'étape 2.</p>
+                                <p className="mt-3 text-[11px] text-white/50 leading-snug">Utilise le même compte Google partout. L'appli peut mettre quelques minutes à apparaître après l'étape 2. Pense à activer les notifications à la première ouverture. Merci !</p>
                             </div>
                         )}
                     </motion.div>
