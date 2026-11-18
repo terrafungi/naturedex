@@ -52,7 +52,7 @@ async function fetchCandidates() {
     const out = new Map();
     for (const [kind, label, clause] of KINDS) {
         const rows = await sparql(`PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        SELECT ?item (SAMPLE(?title0) AS ?title) (SAMPLE(?sl0) AS ?sl) (SAMPLE(?img0) AS ?img) (SAMPLE(?cl0) AS ?country) (SAMPLE(?area0) AS ?area) (MAX(?len0) AS ?len) WHERE {
+        SELECT ?item (SAMPLE(?title0) AS ?title) (SAMPLE(?sl0) AS ?sl) (SAMPLE(?img0) AS ?img) (SAMPLE(?cl0) AS ?country) (COUNT(DISTINCT ?c) AS ?nc) (SAMPLE(?area0) AS ?area) (MAX(?len0) AS ?len) WHERE {
             ${clause}
             ?item wdt:P18 ?img0; wikibase:sitelinks ?sl0.
             ?article schema:about ?item; schema:isPartOf <https://fr.wikipedia.org/>; schema:name ?title0.
@@ -69,7 +69,7 @@ async function fetchCandidates() {
             out.set(qid, {
                 qid, title, kind, label, sitelinks: Number(r.sl.value),
                 image: decodeURIComponent(r.img.value.split('/Special:FilePath/').pop()),
-                country: r.country?.value || null,
+                country: Number(r.nc?.value) === 1 ? r.country?.value || null : null, // a river or sea across borders: no country
                 area: area && area < 1e9 ? Math.round(area * 100) / 100 : null,
                 length: r.len ? Math.round(Number(r.len.value) / 1000) : null, // normalized value is in m
             });
