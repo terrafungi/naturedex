@@ -28,7 +28,8 @@ const sharper = (url) => url?.replace(/\/\d+px-([^/]+)$/, '/960px-$1');
 // Special finish (cards.art): 'full' / 'illus' = the picture fills the whole card and the text sits
 // on top of it; 'holo' = the regular layout with a holographic foil (some commons and uncommons);
 // 'gold' = the regular layout, all in gold: frame, background and a gilded photo (some rares and up).
-const PLACE_LABEL = { national: 'Parc national', regional: 'Parc naturel régional', botanical: 'Jardin botanique', remarkable: 'Jardin remarquable', unesco: 'Patrimoine mondial' };
+const PLACE_LABEL = { national: 'Parc national', regional: 'Parc naturel régional', botanical: 'Jardin botanique', remarkable: 'Jardin remarquable', unesco: 'Patrimoine mondial',
+    ocean: 'Océan', sea: 'Mer', fleuve: 'Fleuve', river: 'Rivière' };
 const formatArea = (km2) => (km2 >= 1 ? `${Math.round(km2).toLocaleString('fr-FR')} km²` : `${Math.round(km2 * 100).toLocaleString('fr-FR')} ha`);
 
 export const ART = { full: 'Full art', illus: 'Illustration', holo: 'Holo', gold: 'Gold' };
@@ -61,7 +62,7 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
     const foil = art || ['epic', 'legendary', 'secret'].includes(card.rarity);
     const ink = card.art === 'gold' ? '#7a5310' : bleed || card.rarity === 'secret' ? r.color : `color-mix(in oklab, ${r.color} 72%, black)`;
     const trainer = trainerOf(card);
-    const place = card.type === 'place'; // a place does not fight: no PV, no battle stats
+    const place = card.type === 'place' || card.type === 'water'; // a place does not fight: no PV, no battle stats
     const stadium = parkStadiumOf(card); // ...but the most famous ones are Stades in the Duel
     const event = eventOf(card);
     const fact = bleed || trainer ? null : card.fact;
@@ -190,7 +191,8 @@ export function Card({ card, number, total, tilt = false, className = '', frame 
                 ) : place ? (
                     <div className="nd-effect">
                         <b>{PLACE_LABEL[card.stats?.place] || 'Lieu naturel'}</b>
-                        <p>{card.stats?.area_km2 ? `Superficie : ${formatArea(card.stats.area_km2)}` : 'À découvrir en vrai !'}</p>
+                        <p>{card.stats?.length_km ? `Longueur : ${Number(card.stats.length_km).toLocaleString('fr-FR')} km`
+                            : card.stats?.area_km2 ? `Superficie : ${formatArea(card.stats.area_km2)}` : 'À découvrir en vrai !'}</p>
                     </div>
                 ) : (
                     <div className="nd-stats">

@@ -53,7 +53,7 @@ const SUBJECT = {
 function prompt(card, docs) {
     const sci = card.sci_name && card.sci_name !== card.name ? ` (${card.sci_name})` : '';
     const text = docs.map((d) => d.text).join(' ');
-    const subject = SUBJECT[card.type === 'place' ? 'place' : 'species'];
+    const subject = SUBJECT[['place', 'water'].includes(card.type) ? 'place' : 'species'];
     return `Tu rédiges la fiche encyclopédique ${subject.what} « ${card.name}${sci} » pour NatureDex (naturedex.fr), un site sur le vivant et les lieux de nature.
 
 ${docs.map((d, i) => `### Document ${i + 1} — ${d.publisher} : ${d.title}\n${d.text}`).join('\n\n')}

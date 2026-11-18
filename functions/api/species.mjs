@@ -18,7 +18,7 @@ const TYPES = {
     mammal: ['Mammifère', 'Mammifères'], bird: ['Oiseau', 'Oiseaux'], reptile: ['Reptile & amphibien', 'Reptiles & amphibiens'],
     fish: ['Poisson', 'Poissons'], arthropod: ['Insecte & arachnide', 'Insectes & arachnides'], terrestrial: ['Mollusque terrestre', 'Mollusques terrestres'], aquatic: ['Mollusque aquatique', 'Mollusques aquatiques'], marine: ['Créature aquatique', 'Créatures aquatiques'],
     plant: ['Plante', 'Plantes'], tree: ['Arbre', 'Arbres'], alga: ['Algue', 'Algues'], fungus: ['Champignon', 'Champignons'],
-    mold: ['Moisissure & levure', 'Moisissures & levures'], bacteria: ['Bactérie', 'Bactéries'], virus: ['Virus', 'Virus'], fossil: ['Fossile', 'Fossiles'], mineral: ['Minéral & roche', 'Minéraux & roches'], place: ['Parc & jardin', 'Parcs & jardins'],
+    mold: ['Moisissure & levure', 'Moisissures & levures'], bacteria: ['Bactérie', 'Bactéries'], virus: ['Virus', 'Virus'], fossil: ['Fossile', 'Fossiles'], mineral: ['Minéral & roche', 'Minéraux & roches'], place: ['Parc & jardin', 'Parcs & jardins'], water: ['Mer & rivière', 'Mers & rivières'],
 };
 const RARITIES = {
     common: 'Commune', uncommon: 'Peu commune', rare: 'Rare', epic: 'Épique', legendary: 'Légendaire', secret: 'Secrète',
@@ -67,7 +67,7 @@ async function hubPage(db) {
     ]);
     const total = counts.reduce((a, r) => a + r.n, 0);
     const title = `Encyclopédie des espèces : ${total.toLocaleString('fr-FR')} animaux, plantes et champignons | NatureDex`;
-    const description = `Fiches de ${total.toLocaleString('fr-FR')} espèces réelles : mammifères, oiseaux, insectes, plantes, champignons, bactéries, virus, fossiles et minéraux, plus les parcs nationaux et grands jardins, avec photo, nom scientifique et statut de conservation.`;
+    const description = `Fiches de ${total.toLocaleString('fr-FR')} espèces réelles : mammifères, oiseaux, insectes, plantes, champignons, bactéries, virus, fossiles et minéraux, plus les parcs nationaux, grands jardins, mers et fleuves, avec photo, nom scientifique et statut de conservation.`;
     const body = `<main class="wrap">
 <p class="crumbs"><a href="${SITE}/">NatureDex</a> › Espèces</p>
 <h1>Toutes les espèces de NatureDex</h1>
@@ -93,15 +93,15 @@ async function typePage(db, type, page) {
     const { rows } = await db.query(
         `SELECT id, name, sci_name, thumb_url FROM cards WHERE type = $1 AND art IS DISTINCT FROM 'illus' AND source <> 'event' ORDER BY views DESC, id LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`, [type]);
     const label = names[1];
-    const place = type === 'place'; // national parks and gardens are places, not species
+    const place = type === 'place' || type === 'water'; // parks, gardens, seas and rivers are places, not species
     const title = `${label} : ${total.toLocaleString('fr-FR')} ${place ? 'lieux' : 'espèces'} en photos${page > 1 ? ` – page ${page}` : ''} | NatureDex`;
     const description = place
-        ? `Découvre ${total.toLocaleString('fr-FR')} parcs nationaux, jardins botaniques, jardins remarquables et sites naturels du patrimoine mondial, classés par popularité, avec photo${page > 1 ? ` (page ${page} sur ${pages})` : ''}.`
+        ? `Découvre ${total.toLocaleString('fr-FR')} ${type === 'water' ? 'océans, mers, fleuves et rivières' : 'parcs nationaux, jardins botaniques, jardins remarquables et sites naturels du patrimoine mondial'}, classés par popularité, avec photo${page > 1 ? ` (page ${page} sur ${pages})` : ''}.`
         : `Découvre ${total.toLocaleString('fr-FR')} espèces de ${label.toLowerCase()} classées par popularité, avec photo, nom scientifique et statut de conservation${page > 1 ? ` (page ${page} sur ${pages})` : ''}.`;
     const body = `<main class="wrap">
 <p class="crumbs"><a href="${SITE}/">NatureDex</a> › <a href="${SPECIES}">Espèces</a> › ${esc(label)}</p>
 <h1>${esc(label)}${page > 1 ? ` <span class="meta" style="font-size:1rem">page ${page} / ${pages}</span>` : ''}</h1>
-<p class="lead" style="max-width:760px">${place ? `${total.toLocaleString('fr-FR')} parcs nationaux, jardins et sites naturels du monde entier, des plus célèbres aux plus secrets.` : `${total.toLocaleString('fr-FR')} espèces de ${esc(label.toLowerCase())}, des plus connues aux plus discrètes.`}</p>
+<p class="lead" style="max-width:760px">${place ? `${total.toLocaleString('fr-FR')} ${type === 'water' ? 'océans, mers, fleuves et rivières' : 'parcs nationaux, jardins et sites naturels'} du monde entier, des plus célèbres aux plus secrets.` : `${total.toLocaleString('fr-FR')} espèces de ${esc(label.toLowerCase())}, des plus connues aux plus discrètes.`}</p>
 <div class="cards">${rows.map(tile).join('')}</div>
 <nav class="pager">${page > 1 ? `<a href="${typeUrl(type, page - 1)}">← Précédentes</a>` : ''}${page < pages ? `<a href="${typeUrl(type, page + 1)}">Suivantes →</a>` : ''}</nav>
 <nav class="cats" aria-label="Autres groupes">${Object.entries(TYPES).map(([k, n]) => `<a class="chip${k === type ? ' on' : ''}" href="${typeUrl(k)}">${esc(n[1])}</a>`).join('')}</nav>
@@ -130,7 +130,7 @@ async function speciesPage(db, id, slug) {
         db.query(`SELECT slug, title, published_at FROM blog_posts WHERE status = 'published' AND $1 = ANY(card_ids) ORDER BY published_at DESC LIMIT 5`, [c.id]),
     ]);
     const [typeLabel, typePlural] = TYPES[c.type] || [c.type, c.type];
-    const isPlace = c.type === 'place';
+    const isPlace = c.type === 'place' || c.type === 'water';
     const sci = c.sci_name && c.sci_name !== c.name ? c.sci_name : '';
     const s = c.stats || {};
     const extract = String(c.extract || '').trim();
@@ -144,6 +144,7 @@ async function speciesPage(db, id, slug) {
         s.mass_kg && ['Masse', s.mass_kg >= 1 ? `${Number(s.mass_kg).toLocaleString('fr-FR')} kg` : `${Math.round(s.mass_kg * 1000).toLocaleString('fr-FR')} g`],
         s.length_m && ['Longueur', s.length_m >= 1 ? `${Number(s.length_m).toLocaleString('fr-FR')} m` : `${Math.round(s.length_m * 100).toLocaleString('fr-FR')} cm`],
         s.height_m && ['Hauteur', `${Number(s.height_m).toLocaleString('fr-FR')} m`],
+        s.length_km && ['Longueur', `${Number(s.length_km).toLocaleString('fr-FR')} km`],
         s.area_km2 && ['Superficie', `${Number(s.area_km2).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} km²`],
         ['Rareté de la carte', esc(RARITIES[c.rarity] || c.rarity)],
         s.hp && !isPlace && ['Points de vie', s.hp],

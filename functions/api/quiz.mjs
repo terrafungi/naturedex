@@ -94,7 +94,7 @@ async function getPool(db) {
             `SELECT id, name, sci_name, type, rarity, views::int AS views, thumb_url, iucn,
                     CASE WHEN stats->>'mass_checked' = 'ok' THEN (stats->>'mass_kg')::float END AS mass, -- see mass-check.mjs
                     extract IS NOT NULL AND length(extract) > 80 AS has_extract
-             FROM cards WHERE views >= 800 AND art IS DISTINCT FROM 'illus' AND type NOT IN ('naturalist', 'place') AND source <> 'event'`
+             FROM cards WHERE views >= 800 AND art IS DISTINCT FROM 'illus' AND type NOT IN ('naturalist', 'place', 'water') AND source <> 'event'`
         );
         for (const c of rows) {
             c.band = bandOf(c.views);

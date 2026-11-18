@@ -25,7 +25,7 @@ const RARITY_ORDER = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
 
 async function ownedRows(db, userId) {
     const { rows } = await db.query(
-        `SELECT ${CARD_FIELDS}, uc.count FROM user_cards uc JOIN cards c ON c.id = uc.card_id WHERE uc.user_id = $1 AND uc.count > 0 AND c.type <> $2 AND c.type <> 'place'`, [userId, NATURALIST]);
+        `SELECT ${CARD_FIELDS}, uc.count FROM user_cards uc JOIN cards c ON c.id = uc.card_id WHERE uc.user_id = $1 AND uc.count > 0 AND c.type <> $2 AND c.type NOT IN ('place', 'water')`, [userId, NATURALIST]);
     return rows;
 }
 
@@ -79,7 +79,7 @@ async function playerDeck(db, userId, rows, items) {
 
 /** The Énergie that comes with every booster, leaning to the biomes just drawn. */
 export async function boosterBonus(client, userId, cardIds) {
-    const { rows } = await client.query(`SELECT type, stats FROM cards WHERE id = ANY($1) AND type <> $2 AND type <> 'place'`, [cardIds, NATURALIST]);
+    const { rows } = await client.query(`SELECT type, stats FROM cards WHERE id = ANY($1) AND type <> $2 AND type NOT IN ('place', 'water')`, [cardIds, NATURALIST]);
     const [key] = rollRewards(1, [...new Set(rows.map(cardBiome))], 1);
     await addItems(client, userId, [key]);
     return itemCard(key);
@@ -117,7 +117,7 @@ function buildDeck(creatures, items) {
 
 async function foeDeck(db, level) {
     const { rows } = await db.query(
-        `SELECT ${CARD_FIELDS} FROM cards c WHERE c.rarity = ANY($1) AND c.source <> 'event' AND c.type <> 'place' AND c.stats ? 'hp' AND c.stats ? 'biome' AND c.stats->>'biome' <> 'none'
+        `SELECT ${CARD_FIELDS} FROM cards c WHERE c.rarity = ANY($1) AND c.source <> 'event' AND c.type NOT IN ('place', 'water') AND c.stats ? 'hp' AND c.stats ? 'biome' AND c.stats->>'biome' <> 'none'
          ORDER BY random() LIMIT 60`, [level.rarities]);
     const pool = Object.keys(TRAINERS).filter((k) => level.n === 3 || RARITY_ORDER.indexOf(TRAINERS[k].rarity) >= (level.n === 1 ? 3 : 2));
     const trainers = Array.from({ length: level.trainers }, (_, i) => `t:${i < 2 ? 'appareil' : pool[Math.floor(Math.random() * pool.length)]}`);
