@@ -30,7 +30,9 @@ export default function AdminCards() {
     useEffect(() => {
         if (!user?.admin) return;
         setPage(null);
-        api('adminCards', { ...filters, limit: PAGE }).then(setPage).catch((err) => setError(err.message));
+        let stale = false; // a slower answer for the previous filters must not overwrite this one
+        api('adminCards', { ...filters, limit: PAGE }).then((p) => !stale && setPage(p)).catch((err) => !stale && setError(err.message));
+        return () => { stale = true; };
     }, [user?.admin, debounced, type, rarity, art, framed, photo, reported]);
 
     if (!user?.admin) return <Navigate to="/" replace />;
