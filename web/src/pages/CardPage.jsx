@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Camera, Check, Crop, ExternalLink, Eye, Flag, Gavel, Recycle, RotateCcw, RotateCwSquare, RotateCcwSquare, Ruler, Snowflake, Weight } from 'lucide-react';
+import { ArrowLeft, Camera, Check, Crop, ExternalLink, Eye, Flag, Gavel, Image as ImageIcon, Recycle, RotateCcw, RotateCwSquare, RotateCcwSquare, Ruler, Snowflake, Weight } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card, MysteryCard } from '../components/Card.jsx';
 import { IUCN, RARITIES, TYPES, formatViews } from '../game.jsx';
@@ -27,10 +27,12 @@ export default function CardPage() {
     const [card, setCard] = useState(null);
     const [error, setError] = useState('');
     const [framing, setFraming] = useState(null); // staff: draft { x, y, zoom, rotate } while reframing
+    const [picking, setPicking] = useState(false); // staff: choosing another photo
 
     useEffect(() => {
         setCard(null);
         setFraming(null);
+        setPicking(false);
         api('card', { id }).then(({ card }) => setCard(card)).catch((err) => setError(err.message));
     }, [id]);
 
@@ -79,15 +81,24 @@ export default function CardPage() {
                 <div className="relative w-full max-w-[380px] mx-auto">
                     {framing ? <FramingEditor card={card} number={number} total={catalog?.total} draft={framing} setDraft={setFraming}
                         onDone={(stats) => { if (stats) { setCard({ ...card, stats }); refreshCollection(); } setFraming(null); }} />
+                        : picking ? <PhotoPicker card={card} number={number} total={catalog?.total}
+                            onDone={(photo) => { if (photo) { setCard({ ...card, ...photo }); refreshCollection(); } setPicking(false); }} />
                         : <>
                             <Card card={card} number={number} total={catalog?.total} tilt />
                             <FavoriteStar card={card} className="absolute -bottom-3 -left-3 z-10 !w-12 !h-12" />
                         </>}
-                    {user.admin && !framing && (
-                        <button onClick={() => setFraming({ x: stats.focus?.[0] ?? 50, y: stats.focus?.[1] ?? 50, zoom: Number(stats.zoom) || 1, rotate: Number(stats.rotate) || 0 })}
-                            className="mt-6 mx-auto flex items-center gap-2 px-4 py-2 rounded-full nd-btn text-sm font-semibold">
-                            <Crop className="w-4 h-4" />Recadrer l'image
-                        </button>
+                    {user.admin && !framing && !picking && (
+                        <div className="mt-6 flex flex-wrap justify-center gap-2">
+                            <button onClick={() => setFraming({ x: stats.focus?.[0] ?? 50, y: stats.focus?.[1] ?? 50, zoom: Number(stats.zoom) || 1, rotate: Number(stats.rotate) || 0 })}
+                                className="flex items-center gap-2 px-4 py-2 rounded-full nd-btn text-sm font-semibold">
+                                <Crop className="w-4 h-4" />Recadrer l'image
+                            </button>
+                            {card.wiki_url && (
+                                <button onClick={() => setPicking(true)} className="flex items-center gap-2 px-4 py-2 rounded-full nd-btn text-sm font-semibold">
+                                    <ImageIcon className="w-4 h-4" />Changer la photo
+                                </button>
+                            )}
+                        </div>
                     )}
                     {!user.admin && <ReportFraming card={card} onReported={() => setCard({ ...card, reported: true })} />}
                 </div>
@@ -232,6 +243,60 @@ export function FramingEditor({ card, number, total, draft, setDraft, onDone }) 
                 <button disabled={busy} onClick={() => setDraft({ ...draft, x: 50, y: 50, zoom: 1 })} className="nd-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold disabled:opacity-50"><RotateCcw className="w-4 h-4" />Centrer</button>
                 <button disabled={busy} onClick={() => turn(-90)} title="Pivoter vers la gauche" className="nd-btn flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold disabled:opacity-50"><RotateCcwSquare className="w-4 h-4" />-90°</button>
                 <button disabled={busy} onClick={() => turn(90)} title="Pivoter vers la droite" className="nd-btn flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold disabled:opacity-50"><RotateCwSquare className="w-4 h-4" />+90°</button>
+                <button disabled={busy} onClick={() => onDone(null)} className="px-4 py-2 rounded-full text-sm font-semibold text-white/70 hover:text-white">Annuler</button>
+            </div>
+        </div>
+    );
+}
+
+// Staff tool: swap the card's picture for another one of its Wikipedia article (Wikimedia Commons), for every player.
+export function PhotoPicker({ card, number, total, onDone }) {
+    const [data, setData] = useState(null);
+    const [error, setError] = useState('');
+    const [pick, setPick] = useState(null);
+    const [busy, setBusy] = useState(false);
+    useEffect(() => { api('cardPhotos', { cardId: card.id }).then(setData).catch((err) => setError(err.message)); }, [card.id]);
+
+    async function save() {
+        setBusy(true);
+        setError('');
+        try {
+            onDone(await api('setCardPhoto', { cardId: card.id, file: pick.file }));
+        } catch (err) {
+            setError(err.message);
+            setBusy(false);
+        }
+    }
+
+    // the new photo starts unframed: the old framing was made for the old one
+    const { focus, zoom, rotate, ...plain } = card;
+    const { focus: f, zoom: z, rotate: r, ...stats } = card.stats || {};
+    const preview = pick ? { ...plain, stats, thumb_url: pick.thumb } : card;
+    return (
+        <div>
+            <Card card={preview} number={number} total={total} />
+            <p className="mt-4 text-center text-sm text-ink-soft">Les photos de l'article Wikipédia. Choisis-en une : elle remplace la photo de la carte pour tous les joueurs.</p>
+            {error && <p className="mt-2 text-center text-sm text-rust font-semibold">{error}</p>}
+            {!data && !error && <p className="py-6 text-center text-sm text-ink-soft">Chargement des photos…</p>}
+            {data && !data.photos.length && <p className="py-6 text-center text-sm text-ink-soft">Aucune autre photo sur la page Wikipédia.</p>}
+            {data?.photos.length > 0 && (
+                <div className="mt-3 grid grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
+                    {data.photos.map((p) => {
+                        const current = p.file === data.current;
+                        return (
+                            <button key={p.file} onClick={() => setPick(current ? null : p)} title={p.file}
+                                className={`relative aspect-square overflow-hidden rounded-xl bg-white/5 ring-2 ${pick?.file === p.file ? 'ring-[#e9c46a]' : 'ring-transparent hover:ring-white/30'}`}>
+                                <img src={p.thumb} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                {(current || p.lead) && <span className={`absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase ${current ? 'bg-white text-[#05261a]' : 'bg-[#7dffb0] text-[#05261a]'}`}>
+                                    {current ? 'Actuelle' : 'En tête de page'}
+                                </span>}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button disabled={busy || !pick} onClick={save} className="nd-cta-gold px-5 py-2 rounded-full text-sm font-bold disabled:opacity-50">Enregistrer pour tous</button>
                 <button disabled={busy} onClick={() => onDone(null)} className="px-4 py-2 rounded-full text-sm font-semibold text-white/70 hover:text-white">Annuler</button>
             </div>
         </div>

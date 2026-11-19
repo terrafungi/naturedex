@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Crop, Flag, Search, X } from 'lucide-react';
+import { Crop, Flag, Image as ImageIcon, Search, X } from 'lucide-react';
 import { api, useGame } from '../api.jsx';
 import { Card } from '../components/Card.jsx';
 import { RARITIES, TYPES } from '../game.jsx';
-import { FramingEditor } from './CardPage.jsx';
+import { FramingEditor, PhotoPicker } from './CardPage.jsx';
 
 const PAGE = 60;
 const ARTS = { plain: 'Photo classique', holo: 'Holographique', full: 'Full art', illus: 'Illustration', gold: 'Gold' };
@@ -22,7 +22,7 @@ export default function AdminCards() {
     const [framed, setFramed] = useState('');
     const [page, setPage] = useState(null);
     const [error, setError] = useState('');
-    const [editing, setEditing] = useState(null); // { card, draft }
+    const [editing, setEditing] = useState(null); // { card, draft, photo: picking another photo }
 
     useEffect(() => { const t = setTimeout(() => setDebounced(query.trim()), 300); return () => clearTimeout(t); }, [query]);
     const filters = { query: debounced, type: type || null, rarity: rarity || null, art: art || null, framed: framed || null, reported };
@@ -53,6 +53,10 @@ export default function AdminCards() {
     function saved(stats) {
         if (stats) resolved(editing.card.id, { focus: stats.focus || null, zoom: stats.zoom || null, rotate: stats.rotate || null });
         else setEditing(null);
+    }
+    function photoSaved(photo) {
+        if (photo) resolved(editing.card.id, { thumb_url: photo.thumb_url, focus: null, zoom: null, rotate: null });
+        else setEditing((e) => ({ ...e, photo: false }));
     }
     async function dismiss() {
         await api('dismissFraming', { cardId: editing.card.id });
@@ -120,8 +124,18 @@ export default function AdminCards() {
                     <div className="relative w-full max-w-sm rounded-3xl nd-glass p-5 my-8">
                         <button onClick={() => setEditing(null)} aria-label="Fermer" className="absolute top-3 right-3 grid place-items-center w-9 h-9 rounded-full text-white/70 hover:text-white hover:bg-white/10"><X className="w-5 h-5" /></button>
                         <h2 className="mb-4 pr-10 font-display text-xl text-white">{editing.card.name}</h2>
-                        <FramingEditor card={editing.card} number={editing.card.num} total={catalog?.total} draft={editing.draft}
-                            setDraft={(draft) => setEditing((e) => ({ ...e, draft }))} onDone={saved} />
+                        <div className="mb-4 flex gap-2">
+                            {[[false, Crop, 'Recadrer'], [true, ImageIcon, 'Changer la photo']].map(([photo, Icon, label]) => (
+                                <button key={label} onClick={() => setEditing((e) => ({ ...e, photo }))}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${!!editing.photo === photo ? 'bg-[#e9c46a] text-[#2a1d05]' : 'bg-white/5 border border-white/10 text-white/70 hover:text-white'}`}>
+                                    <Icon className="w-3.5 h-3.5" />{label}
+                                </button>
+                            ))}
+                        </div>
+                        {editing.photo
+                            ? <PhotoPicker card={editing.card} number={editing.card.num} total={catalog?.total} onDone={photoSaved} />
+                            : <FramingEditor card={editing.card} number={editing.card.num} total={catalog?.total} draft={editing.draft}
+                                setDraft={(draft) => setEditing((e) => ({ ...e, draft }))} onDone={saved} />}
                         {editing.card.reports > 0 && (
                             <button onClick={dismiss} className="mt-3 mx-auto block text-xs font-semibold text-white/60 hover:text-white underline underline-offset-4">
                                 L'image est bien comme ça : ignorer le signalement

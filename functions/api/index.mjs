@@ -31,7 +31,7 @@ import { PUSH_KINDS, pushReady, sendPush, vapidPublicKey } from './push.mjs';
 import { DAILY_BATTLES, DAILY_REWARDS, SEASON_MIN_RATING, arenaActions, seasonLabel, seasonRollover } from './arena.mjs';
 import { boosterBonus, duelActions } from './duel.mjs';
 import { NATURALIST, syncNaturalistCards } from './naturalists.mjs';
-import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { RARITY_STYLE, renderShareImage } from './share-image.mjs';
 import { blogRoute, blogTick, latestPosts } from './blog.mjs';
 import { speciesRoute } from './species.mjs';
@@ -507,6 +507,25 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 // Custom 1200×630 preview, rendered once per card and cached in storage (served by CloudFront under /media).
 const SHARE_IMAGE_KEY = (id) => `media/share/v1/${id}.png`;
 let s3;
+
+// Wikimedia Commons file → the card's picture URLs (same layout as the catalogue build: 500px thumbnail).
+const PHOTO_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+function commonsUrls(file) {
+    const name = file.replace(/ /g, '_');
+    const hash = crypto.createHash('md5').update(name).digest('hex');
+    const enc = encodeURIComponent(name);
+    const dir = `${hash[0]}/${hash.slice(0, 2)}`;
+    return {
+        image: `https://upload.wikimedia.org/wikipedia/commons/${dir}/${enc}`,
+        thumb: `https://upload.wikimedia.org/wikipedia/commons/thumb/${dir}/${enc}/500px-${enc}`,
+    };
+}
+const commonsFile = (url) => (url?.includes('/wikipedia/commons/') ? decodeURIComponent(url.split('/').pop()).replace(/_/g, ' ') : null);
+function wikiPage(url) {
+    const m = /^https:\/\/([a-z-]+\.wikipedia\.org)\/wiki\/(.+)$/.exec(url || '');
+    return m && { host: m[1], title: decodeURIComponent(m[2]).replace(/_/g, ' ') };
+}
+
 async function shareImage(card) {
     if (!RARITY_STYLE[card.rarity] || !process.env.STORAGE_BUCKET) return null;
     const Bucket = process.env.STORAGE_BUCKET, Key = SHARE_IMAGE_KEY(card.id);
@@ -1954,6 +1973,55 @@ const actions = {
         await db.query(`DELETE FROM framing_reports WHERE card_id = $1`, [Number(body.cardId)]);
         catalogCache = null;
         return { stats: card.stats };
+    },
+
+    // Staff: the Wikimedia Commons pictures shown on the card's Wikipedia article, to swap a poor one.
+    async cardPhotos(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!ADMIN_IDS.has(user.id)) throw new HttpError(403, 'Réservé à l\'équipe');
+        const { rows: [card] } = await db.query(`SELECT id, image_url, wiki_url FROM cards WHERE id = $1`, [Number(body.cardId)]);
+        if (!card) throw new HttpError(404, 'Carte introuvable');
+        const page = wikiPage(card.wiki_url);
+        if (!page) return { photos: [], current: commonsFile(card.image_url) };
+        const q = (params) => fetch(`https://${page.host}/w/api.php?format=json&formatversion=2&redirects=1&titles=${encodeURIComponent(page.title)}&${params}`,
+            { headers: { 'User-Agent': 'NatureDex/1.0 (https://naturedex.fr)' } }).then((r) => (r.ok ? r.json() : Promise.reject(new HttpError(502, 'Wikipédia ne répond pas, réessaie dans un instant'))));
+        const [list, lead] = await Promise.all([
+            q('generator=images&gimlimit=100&prop=imageinfo&iiprop=size|mime|url'),
+            q('prop=pageimages&piprop=name'),
+        ]);
+        const leadFile = lead.query?.pages?.[0]?.pageimage?.replace(/_/g, ' ');
+        const photos = (list.query?.pages || [])
+            .filter((p) => p.imagerepository === 'shared' && PHOTO_MIME.has(p.imageinfo?.[0]?.mime) && Math.min(p.imageinfo[0].width, p.imageinfo[0].height) >= 250)
+            .map((p) => {
+                const file = p.title.replace(/^[^:]+:/, '');
+                return { file, width: p.imageinfo[0].width, height: p.imageinfo[0].height, thumb: commonsUrls(file).thumb, lead: file === leadFile };
+            })
+            .sort((a, b) => b.lead - a.lead);
+        return { photos, current: commonsFile(card.image_url) };
+    },
+
+    // Staff: put another Commons picture on the card for every player. The old framing no longer fits it.
+    async setCardPhoto(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!ADMIN_IDS.has(user.id)) throw new HttpError(403, 'Réservé à l\'équipe');
+        const file = String(body.file || '').replace(/^[^:]+:/, '').trim();
+        const info = await fetch(`https://commons.wikimedia.org/w/api.php?format=json&formatversion=2&prop=imageinfo&iiprop=mime|size&titles=${encodeURIComponent(`File:${file}`)}`,
+            { headers: { 'User-Agent': 'NatureDex/1.0 (https://naturedex.fr)' } }).then((r) => r.json()).catch(() => null);
+        const ii = info?.query?.pages?.[0]?.imageinfo?.[0];
+        if (!file || !ii || !PHOTO_MIME.has(ii.mime)) throw new HttpError(400, 'Image introuvable sur Wikimedia Commons');
+        const { image, thumb } = commonsUrls(file);
+        const { rows: [card] } = await db.query(
+            `UPDATE cards SET image_url = $2, thumb_url = $3, stats = COALESCE(stats, '{}') - 'focus' - 'zoom' - 'rotate'
+             WHERE id = $1 RETURNING id, image_url, thumb_url, stats`, [Number(body.cardId), image, thumb]);
+        if (!card) throw new HttpError(404, 'Carte introuvable');
+        await db.query(`DELETE FROM framing_reports WHERE card_id = $1`, [card.id]);
+        // the Facebook preview is drawn from the photo: render it again on the next share
+        if (process.env.STORAGE_BUCKET) {
+            s3 ??= new S3Client({});
+            await s3.send(new DeleteObjectCommand({ Bucket: process.env.STORAGE_BUCKET, Key: SHARE_IMAGE_KEY(card.id) })).catch((e) => console.error('share image', card.id, e));
+        }
+        catalogCache = null;
+        return { image_url: card.image_url, thumb_url: card.thumb_url, stats: card.stats };
     },
 
     // Full sheet of a card put up for auction, even one the player has not discovered yet:
