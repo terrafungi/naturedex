@@ -153,7 +153,7 @@ function Picker({ username, friend, selected, onToggle, onQty, onBulk, total }) 
             </label>
             <div className="mt-2 flex flex-wrap gap-1.5">
                 <Filter label="Trier" value={sort} onChange={setSort}>
-                    <option value="">{username ? 'Trier : celles qui me manquent' : `Trier : celles qui manquent à ${friend}`}</option>
+                    <option value="">{username ? 'Trier : celles qui me manquent' : 'Trier : celles qui lui manquent'}</option>
                     {SORTS.filter(([key]) => key).map(([key, label]) => <option key={key} value={key}>Trier : {label}</option>)}
                 </Filter>
                 <Filter label="Type" value={type} onChange={setType}>
