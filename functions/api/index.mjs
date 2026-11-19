@@ -520,7 +520,11 @@ function commonsUrls(file) {
         thumb: `https://upload.wikimedia.org/wikipedia/commons/thumb/${dir}/${enc}/500px-${enc}`,
     };
 }
-const commonsFile = (url) => (url?.includes('/wikipedia/commons/') ? decodeURIComponent(url.split('/').pop()).replace(/_/g, ' ') : null);
+// original or thumbnail URL (…/commons/thumb/a/ab/File.jpg/960px-File.jpg?utm_…) → "File.jpg"
+const commonsFile = (url) => {
+    const m = /\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?#]+)/.exec(url || '');
+    return m && decodeURIComponent(m[1]).replace(/_/g, ' ');
+};
 function wikiPage(url) {
     const m = /^https:\/\/([a-z-]+\.wikipedia\.org)\/wiki\/(.+)$/.exec(url || '');
     return m && { host: m[1], title: decodeURIComponent(m[2]).replace(/_/g, ' ') };
@@ -1940,6 +1944,8 @@ const actions = {
         const q = searchText(body.query);
         const art = CARD_ARTS.includes(body.art) ? body.art : null;
         const framed = body.framed === 'yes' ? true : body.framed === 'no' ? false : null;
+        // photo: 'diff' = the card does not use the lead picture of its Wikipedia article (scripts/scan-wiki-leads.mjs), rarest first
+        const photoDiff = body.photo === 'diff';
         const search = cardSearchSql('$1');
         // reported: only the cards flagged by players, the most flagged first
         const { rows } = await db.query(
@@ -1949,9 +1955,10 @@ const actions = {
                AND ($4::text IS NULL OR c.art = $4 OR ($4 = 'plain' AND c.art IS NULL))
                AND ($5::boolean IS NULL OR (c.stats ? 'focus') = $5)
                AND (NOT $8 OR r.n IS NOT NULL)
-             ORDER BY ${body.reported ? 'r.n DESC, r.at DESC, ' : ''}c.art IS NULL, ${RARITY_ORDER} DESC, c.num
+               AND (NOT $9 OR c.photo_differs)
+             ORDER BY ${body.reported ? 'r.n DESC, r.at DESC, ' : ''}${photoDiff ? '' : 'c.art IS NULL, '}${RARITY_ORDER} DESC, c.num
              LIMIT $6 OFFSET $7`,
-            [q, body.type || null, body.rarity || null, art, framed, limit, offset, Boolean(body.reported)]
+            [q, body.type || null, body.rarity || null, art, framed, limit, offset, Boolean(body.reported), photoDiff]
         );
         const { rows: [{ n }] } = await db.query(`SELECT COUNT(DISTINCT card_id)::int AS n FROM framing_reports`);
         return { matches: rows[0]?.matches || 0, reported: n, cards: rows.map(({ matches, ...c }) => c) };
@@ -2001,6 +2008,14 @@ const actions = {
         return { photos, current: commonsFile(card.image_url) };
     },
 
+    // Staff: the card's photo is better than the lead one of its Wikipedia article, take it out of « Photo différente de Wikipédia ».
+    async keepCardPhoto(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!ADMIN_IDS.has(user.id)) throw new HttpError(403, 'Réservé à l\'équipe');
+        await db.query(`UPDATE cards SET photo_differs = false WHERE id = $1 AND photo_differs`, [Number(body.cardId)]);
+        return { ok: true };
+    },
+
     // Staff: put another Commons picture on the card for every player. The old framing no longer fits it.
     async setCardPhoto(db, body, event) {
         const user = await requireUser(db, event);
@@ -2012,7 +2027,8 @@ const actions = {
         if (!file || !ii || !PHOTO_MIME.has(ii.mime)) throw new HttpError(400, 'Image introuvable sur Wikimedia Commons');
         const { image, thumb } = commonsUrls(file);
         const { rows: [card] } = await db.query(
-            `UPDATE cards SET image_url = $2, thumb_url = $3, stats = COALESCE(stats, '{}') - 'focus' - 'zoom' - 'rotate'
+            `UPDATE cards SET image_url = $2, thumb_url = $3, stats = COALESCE(stats, '{}') - 'focus' - 'zoom' - 'rotate',
+                              photo_differs = false -- chosen by hand: out of « Photo différente de Wikipédia »
              WHERE id = $1 RETURNING id, image_url, thumb_url, stats`, [Number(body.cardId), image, thumb]);
         if (!card) throw new HttpError(404, 'Carte introuvable');
         await db.query(`DELETE FROM framing_reports WHERE card_id = $1`, [card.id]);

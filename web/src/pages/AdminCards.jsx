@@ -20,17 +20,18 @@ export default function AdminCards() {
     const [rarity, setRarity] = useState('');
     const [art, setArt] = useState('');
     const [framed, setFramed] = useState('');
+    const [photo, setPhoto] = useState(''); // 'diff': the card does not use the lead picture of its Wikipedia article
     const [page, setPage] = useState(null);
     const [error, setError] = useState('');
     const [editing, setEditing] = useState(null); // { card, draft, photo: picking another photo }
 
     useEffect(() => { const t = setTimeout(() => setDebounced(query.trim()), 300); return () => clearTimeout(t); }, [query]);
-    const filters = { query: debounced, type: type || null, rarity: rarity || null, art: art || null, framed: framed || null, reported };
+    const filters = { query: debounced, type: type || null, rarity: rarity || null, art: art || null, framed: framed || null, photo: photo || null, reported };
     useEffect(() => {
         if (!user?.admin) return;
         setPage(null);
         api('adminCards', { ...filters, limit: PAGE }).then(setPage).catch((err) => setError(err.message));
-    }, [user?.admin, debounced, type, rarity, art, framed, reported]);
+    }, [user?.admin, debounced, type, rarity, art, framed, photo, reported]);
 
     if (!user?.admin) return <Navigate to="/" replace />;
 
@@ -39,7 +40,7 @@ export default function AdminCards() {
         setPage({ ...page, cards: [...page.cards, ...next.cards] });
     }
     function open(card) {
-        setEditing({ card, draft: { x: card.focus?.[0] ?? 50, y: card.focus?.[1] ?? 50, zoom: Number(card.zoom) || 1, rotate: Number(card.rotate) || 0 } });
+        setEditing({ card, photo: photo === 'diff', draft: { x: card.focus?.[0] ?? 50, y: card.focus?.[1] ?? 50, zoom: Number(card.zoom) || 1, rotate: Number(card.rotate) || 0 } });
     }
     // a reframed or dismissed card leaves the « signalées » list
     function resolved(id, change) {
@@ -54,9 +55,20 @@ export default function AdminCards() {
         if (stats) resolved(editing.card.id, { focus: stats.focus || null, zoom: stats.zoom || null, rotate: stats.rotate || null });
         else setEditing(null);
     }
-    function photoSaved(photo) {
-        if (photo) resolved(editing.card.id, { thumb_url: photo.thumb_url, focus: null, zoom: null, rotate: null });
-        else setEditing((e) => ({ ...e, photo: false }));
+    // a new or kept photo leaves the « Photo différente de Wikipédia » list
+    function photoDone(id) {
+        if (photo !== 'diff') return;
+        if (!reported) setPage((p) => ({ ...p, matches: p.matches - 1, cards: p.cards.filter((c) => c.id !== id) })); // else resolved() did it
+        setEditing(null);
+    }
+    function photoSaved(result) {
+        if (!result) return setEditing((e) => ({ ...e, photo: false }));
+        resolved(editing.card.id, { thumb_url: result.thumb_url, focus: null, zoom: null, rotate: null });
+        photoDone(editing.card.id);
+    }
+    async function keepPhoto() {
+        await api('keepCardPhoto', { cardId: editing.card.id });
+        photoDone(editing.card.id);
     }
     async function dismiss() {
         await api('dismissFraming', { cardId: editing.card.id });
@@ -97,12 +109,17 @@ export default function AdminCards() {
                     <option value="no">Jamais recadrées</option>
                     <option value="yes">Déjà recadrées</option>
                 </select>
+                <select value={photo} onChange={(e) => setPhoto(e.target.value)} className={SELECT}>
+                    <option value="">Toutes les photos</option>
+                    <option value="diff">Photo différente de Wikipédia</option>
+                </select>
             </div>
 
             {error && <p className="mt-6 text-rust font-semibold">{error}</p>}
             {!page ? <p className="py-20 text-center font-display text-xl text-ink-soft">Chargement…</p> : (
                 <>
                     <p className="mt-5 text-sm text-ink-soft">{page.matches.toLocaleString('fr-FR')} carte{page.matches > 1 ? 's' : ''}</p>
+                    {photo === 'diff' && <p className="mt-1 text-xs text-ink-soft">Cartes dont la photo n'est pas celle en tête de leur page Wikipédia, les plus rares d'abord. Choisis une autre photo ou garde l'actuelle : la carte quitte la liste.</p>}
                     {reported && !page.matches && <p className="py-16 text-center font-display text-xl text-ink-soft">Aucune carte signalée pour l'instant.</p>}
                     <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                         {page.cards.map((c) => (
@@ -136,6 +153,11 @@ export default function AdminCards() {
                             ? <PhotoPicker card={editing.card} number={editing.card.num} total={catalog?.total} onDone={photoSaved} />
                             : <FramingEditor card={editing.card} number={editing.card.num} total={catalog?.total} draft={editing.draft}
                                 setDraft={(draft) => setEditing((e) => ({ ...e, draft }))} onDone={saved} />}
+                        {photo === 'diff' && page.cards.some((c) => c.id === editing.card.id) && (
+                            <button onClick={keepPhoto} className="mt-3 mx-auto block text-xs font-semibold text-white/60 hover:text-white underline underline-offset-4">
+                                La photo actuelle est meilleure : la garder
+                            </button>
+                        )}
                         {editing.card.reports > 0 && (
                             <button onClick={dismiss} className="mt-3 mx-auto block text-xs font-semibold text-white/60 hover:text-white underline underline-offset-4">
                                 L'image est bien comme ça : ignorer le signalement

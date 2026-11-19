@@ -727,3 +727,10 @@ CREATE TABLE IF NOT EXISTS advent_pushes (
 -- Suppression de messages: "pour moi" hides the message on one side only, "pour tout le monde" deletes the row
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS hidden_by_from BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS hidden_by_to BOOLEAN NOT NULL DEFAULT false;
+
+-- Photo de tête de la page Wikipédia (scripts/scan-wiki-leads.mjs): '' = pas de photo exploitable (aucune, SVG, hors Commons).
+-- photo_differs: la carte n'utilise pas cette photo (filtre admin « Photo différente de Wikipédia »)
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS wiki_lead TEXT;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS wiki_lead_at TIMESTAMPTZ;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS photo_differs BOOLEAN;
+CREATE INDEX IF NOT EXISTS cards_photo_differs ON cards (id) WHERE photo_differs;
