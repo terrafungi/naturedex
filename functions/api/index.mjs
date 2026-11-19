@@ -1983,8 +1983,9 @@ const actions = {
         if (!card) throw new HttpError(404, 'Carte introuvable');
         const page = wikiPage(card.wiki_url);
         if (!page) return { photos: [], current: commonsFile(card.image_url) };
-        const q = (params) => fetch(`https://${page.host}/w/api.php?format=json&formatversion=2&redirects=1&titles=${encodeURIComponent(page.title)}&${params}`,
-            { headers: { 'User-Agent': 'NatureDex/1.0 (https://naturedex.fr)' } }).then((r) => (r.ok ? r.json() : Promise.reject(new HttpError(502, 'Wikipédia ne répond pas, réessaie dans un instant'))));
+        const q = (params) => fetch(`https://${page.host}/w/api.php?action=query&format=json&formatversion=2&redirects=1&titles=${encodeURIComponent(page.title)}&${params}`,
+            { headers: { 'User-Agent': 'NatureDex/1.0 (https://naturedex.fr)' } }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+            .catch(() => { throw new HttpError(502, 'Wikipédia ne répond pas, réessaie dans un instant'); });
         const [list, lead] = await Promise.all([
             q('generator=images&gimlimit=100&prop=imageinfo&iiprop=size|mime|url'),
             q('prop=pageimages&piprop=name'),
@@ -2005,7 +2006,7 @@ const actions = {
         const user = await requireUser(db, event);
         if (!ADMIN_IDS.has(user.id)) throw new HttpError(403, 'Réservé à l\'équipe');
         const file = String(body.file || '').replace(/^[^:]+:/, '').trim();
-        const info = await fetch(`https://commons.wikimedia.org/w/api.php?format=json&formatversion=2&prop=imageinfo&iiprop=mime|size&titles=${encodeURIComponent(`File:${file}`)}`,
+        const info = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&format=json&formatversion=2&prop=imageinfo&iiprop=mime|size&titles=${encodeURIComponent(`File:${file}`)}`,
             { headers: { 'User-Agent': 'NatureDex/1.0 (https://naturedex.fr)' } }).then((r) => r.json()).catch(() => null);
         const ii = info?.query?.pages?.[0]?.imageinfo?.[0];
         if (!file || !ii || !PHOTO_MIME.has(ii.mime)) throw new HttpError(400, 'Image introuvable sur Wikimedia Commons');
