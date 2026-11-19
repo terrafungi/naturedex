@@ -2937,11 +2937,15 @@ const actions = {
     },
 
     // ---- Trades ----
-    // Cards to pick from when building a trade: mine, or a friend's (with how many I already have).
-    // Default order: name matches, then the cards I am missing, then the rarest; `sort` picks a collection sort instead.
+    // Cards to pick from when building a trade: a friend's (`username`, with how many I already have), or mine
+    // (with how many the friend `for` already has). `have` is always the other player's count.
+    // Default order: name matches, then the cards the other player is missing, then the rarest; `sort` picks a collection sort instead.
+    // only: 'common' = cards both players have, 'new' = cards the other player is missing.
     async tradeCards(db, body, event) {
         const user = await requireUser(db, event);
-        const owner = body.username ? await requireFriend(db, user.id, body.username) : user;
+        const friend = body.username || body.for ? await requireFriend(db, user.id, body.username || body.for) : null;
+        const [owner, other] = body.username ? [friend, user] : [user, friend];
+        const only = friend && ['common', 'new'].includes(body.only) ? body.only : null;
         const q = searchText(body.query);
         const search = cardSearchSql('$5');
         const { rows } = await db.query(
@@ -2950,10 +2954,11 @@ const actions = {
              LEFT JOIN user_cards mine ON mine.user_id = $2 AND mine.card_id = uc.card_id
              WHERE uc.user_id = $1 AND ($3::text IS NULL OR c.type = $3) AND ($4::text IS NULL OR c.rarity = $4)
                AND ($5 = '' OR ${search.any})
+               ${only === 'common' ? 'AND mine.count IS NOT NULL' : only === 'new' ? 'AND mine.count IS NULL' : ''}
              ORDER BY ${CARD_SORTS[body.sort] ? CARD_SORTS[body.sort]
-                : `${q ? `(${search.byName}) DESC, ` : ''}${body.missing && owner.id !== user.id ? '(mine.count IS NULL) DESC, ' : ''}${RARITY_ORDER} DESC, c.views DESC`}
+                : `${q ? `(${search.byName}) DESC, ` : ''}${body.missing && other ? '(mine.count IS NULL) DESC, ' : ''}${RARITY_ORDER} DESC, c.views DESC`}
              LIMIT 60 OFFSET $6`,
-            [owner.id, user.id, body.type || null, body.rarity || null, q, Math.max(Number(body.offset) || 0, 0)]
+            [owner.id, other?.id ?? null, body.type || null, body.rarity || null, q, Math.max(Number(body.offset) || 0, 0)]
         );
         return { matches: rows[0]?.matches || 0, cards: rows.map(({ matches, ...c }) => c) };
     },

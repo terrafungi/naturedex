@@ -112,19 +112,21 @@ function Filter({ value, onChange, label, children }) {
     );
 }
 
-// Grid of cards to pick from, for one side of the trade.
-function Picker({ username, selected, onToggle, onQty, onBulk, total }) {
+// Grid of cards to pick from, for one side of the trade: the friend's collection (username) or mine (friend: who receives them).
+// `have` is always the other player's count, to spot the cards both already own.
+function Picker({ username, friend, selected, onToggle, onQty, onBulk, total }) {
     const [query, setQuery] = useState('');
     const [debounced, setDebounced] = useState('');
     const [sort, setSort] = useState('');
     const [type, setType] = useState('');
     const [rarity, setRarity] = useState('');
+    const [only, setOnly] = useState(''); // 'common': both have it, 'new': the other one is missing it
     const [page, setPage] = useState(null);
     useEffect(() => {
         const t = setTimeout(() => setDebounced(query.trim()), 250);
         return () => clearTimeout(t);
     }, [query]);
-    const params = useMemo(() => ({ username, query: debounced, missing: true, sort: sort || undefined, type: type || null, rarity: rarity || null }), [username, debounced, sort, type, rarity]);
+    const params = useMemo(() => ({ username, for: username ? undefined : friend, query: debounced, missing: true, sort: sort || undefined, type: type || null, rarity: rarity || null, only: only || undefined }), [username, friend, debounced, sort, type, rarity, only]);
     useEffect(() => {
         let alive = true;
         setPage(null);
@@ -151,7 +153,7 @@ function Picker({ username, selected, onToggle, onQty, onBulk, total }) {
             </label>
             <div className="mt-2 flex flex-wrap gap-1.5">
                 <Filter label="Trier" value={sort} onChange={setSort}>
-                    <option value="">{username ? 'Trier : celles qui me manquent' : 'Trier : rareté'}</option>
+                    <option value="">{username ? 'Trier : celles qui me manquent' : `Trier : celles qui manquent à ${friend}`}</option>
                     {SORTS.filter(([key]) => key).map(([key, label]) => <option key={key} value={key}>Trier : {label}</option>)}
                 </Filter>
                 <Filter label="Type" value={type} onChange={setType}>
@@ -162,6 +164,11 @@ function Picker({ username, selected, onToggle, onQty, onBulk, total }) {
                     <option value="">Toutes les raretés</option>
                     {Object.entries(RARITIES).map(([key, r]) => <option key={key} value={key}>{r.symbol} {r.label}</option>)}
                 </Filter>
+                <Filter label="En commun" value={only} onChange={setOnly}>
+                    <option value="">Toutes les cartes</option>
+                    <option value="common">En commun avec {username || friend}</option>
+                    <option value="new">{username ? 'Celles qui me manquent' : `Celles qui manquent à ${friend}`}</option>
+                </Filter>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-semibold">
                 <span className={`mr-auto ${selected.size >= MAX_ITEMS ? 'text-[#ffb4a2]' : 'text-white/55'}`}>{selected.size}/{MAX_ITEMS} cartes choisies</span>
@@ -170,7 +177,7 @@ function Picker({ username, selected, onToggle, onQty, onBulk, total }) {
                 {selected.size > 0 && <button type="button" onClick={() => onBulk(null)} className="px-3 py-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/5">Tout retirer</button>}
             </div>
             {!page ? <div className="py-12 text-center text-ink-soft">Chargement…</div> : page.cards.length === 0 ? (
-                <p className="py-12 text-center text-ink-soft">{debounced || type || rarity ? 'Aucune carte trouvée.' : 'Aucune carte dans cette collection.'}</p>
+                <p className="py-12 text-center text-ink-soft">{debounced || type || rarity || only ? 'Aucune carte trouvée.' : 'Aucune carte dans cette collection.'}</p>
             ) : (
                 <>
                     <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
@@ -181,7 +188,8 @@ function Picker({ username, selected, onToggle, onQty, onBulk, total }) {
                                     <button type="button" onClick={() => onToggle(c)} className={`block w-full text-left rounded-2xl transition ${qty ? 'ring-[3px] ring-[#e9c46a] scale-[0.97]' : 'hover:-translate-y-0.5'}`}>
                                         <Card card={c} number={c.num} total={total} />
                                     </button>
-                                    {username && !c.have && <span className="absolute -top-2 left-2 z-10 whitespace-nowrap px-1.5 py-0.5 rounded-full bg-[#4fd18b] shadow text-[#05130d] text-[9px] font-bold flex items-center gap-0.5 pointer-events-none"><Sparkles className="w-2.5 h-2.5" />Nouvelle</span>}
+                                    {!c.have ? <span className="absolute -top-2 left-2 z-10 whitespace-nowrap px-1.5 py-0.5 rounded-full bg-[#4fd18b] shadow text-[#05130d] text-[9px] font-bold flex items-center gap-0.5 pointer-events-none"><Sparkles className="w-2.5 h-2.5" />{username ? 'Nouvelle' : `Nouvelle pour ${friend}`}</span>
+                                        : <span className="absolute -top-2 left-2 z-10 max-w-[85%] truncate px-1.5 py-0.5 rounded-full bg-white/85 shadow text-[#05130d] text-[9px] font-bold pointer-events-none">{username ? 'Tu l\'as déjà' : `${friend} l'a déjà`}{c.have > 1 ? ` ×${c.have}` : ''}</span>}
                                     {c.count > 1 && !qty && <span className="absolute -top-1.5 -right-1.5 px-1.5 rounded-full bg-white/90 text-[#05130d] text-[11px] font-black pointer-events-none">×{c.count}</span>}
                                     {qty > 0 && (
                                         <span className="absolute -top-2 -right-2 grid place-items-center w-7 h-7 rounded-full bg-[#e9c46a] text-[#05130d] shadow-lg pointer-events-none"><Check className="w-4 h-4" strokeWidth={3} /></span>
@@ -264,12 +272,12 @@ function TradeBuilder({ friend, total, onClose, onSent }) {
                         <button type="button" onClick={() => setSide('get')} className={`py-2 rounded-full text-sm font-bold ${side === 'get' ? 'bg-[#e9c46a] text-[#05130d]' : 'text-white/75'}`}>Tu demandes{get.size ? ` (${sum(get)})` : ''}</button>
                         <button type="button" onClick={() => setSide('give')} className={`py-2 rounded-full text-sm font-bold ${side === 'give' ? 'bg-[#e9c46a] text-[#05130d]' : 'text-white/75'}`}>Tu donnes{give.size ? ` (${sum(give)})` : ''}</button>
                     </div>
-                    <p className="mt-2 text-xs text-white/50">{side === 'get' ? `La collection de ${friend} : celles qui te manquent apparaissent en premier.` : 'Ta collection. Donner ton dernier exemplaire retire la carte de ta collection.'}</p>
+                    <p className="mt-2 text-xs text-white/50">{side === 'get' ? `La collection de ${friend} : celles qui te manquent apparaissent en premier.` : `Ta collection : celles que ${friend} n'a pas apparaissent en premier. Donner ton dernier exemplaire retire la carte de ta collection.`}</p>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3">
                     {side === 'get'
                         ? <Picker key="get" username={friend} selected={get} onToggle={toggler(setGet)} onQty={qtyer(setGet)} onBulk={buller(setGet)} total={total} />
-                        : <Picker key="give" selected={give} onToggle={toggler(setGive)} onQty={qtyer(setGive)} onBulk={buller(setGive)} total={total} />}
+                        : <Picker key="give" friend={friend} selected={give} onToggle={toggler(setGive)} onQty={qtyer(setGive)} onBulk={buller(setGive)} total={total} />}
                 </div>
                 <div className="shrink-0 border-t border-white/10 p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3 bg-black/20 sm:rounded-b-[2rem]">
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm">
