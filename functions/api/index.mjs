@@ -143,6 +143,12 @@ async function createSession(db, userId) {
     return token;
 }
 
+// Closed test on Google Play: 12 testers needed for 14 days before the app can be published.
+// BETA_TESTERS_KNOWN: testers counted in Play Console before the in-app reward existed (raise it by hand if needed).
+const BETA_GOAL = 12;
+const BETA_TESTERS_KNOWN = 7;
+const BETA_REWARD = 5;
+
 // Closed-beta links. BETA_GROUP may be the group address or its URL.
 function betaLinks() {
     const g = (process.env.BETA_GROUP || '').trim();
@@ -3462,10 +3468,24 @@ const actions = {
     // signedUp: the logged-in player already left an address (the pop-up then stays closed).
     async betaInfo(db, body, event) {
         const links = betaLinks();
-        const user = links.open ? await requireUser(db, event).catch(() => null) : null;
-        if (!user) return links;
+        if (!links.open) return links;
+        const { rows: [{ n }] } = await db.query(`SELECT COUNT(*)::int AS n FROM users WHERE beta_reward_at IS NOT NULL`);
+        const info = { ...links, goal: BETA_GOAL, testers: Math.max(BETA_TESTERS_KNOWN, n), reward: BETA_REWARD };
+        const user = await requireUser(db, event).catch(() => null);
+        if (!user) return info;
         const { rows } = await db.query(`SELECT 1 FROM beta_signups WHERE user_id = $1 LIMIT 1`, [user.id]);
-        return { ...links, signedUp: rows.length > 0 };
+        return { ...info, signedUp: rows.length > 0, rewarded: !!user.beta_reward_at };
+    },
+
+    // Called by the Android app on launch: the tester reward, once per account.
+    async betaReward(db, body, event) {
+        const user = await requireUser(db, event);
+        if (!betaLinks().open) return { granted: 0 };
+        const { rows: [updated] } = await db.query(
+            `UPDATE users SET boosters = boosters + $2, beta_reward_at = now() WHERE id = $1 AND beta_reward_at IS NULL RETURNING *`,
+            [user.id, BETA_REWARD]);
+        if (!updated) return { granted: 0 };
+        return { granted: BETA_REWARD, user: await publicUser(db, updated) };
     },
 
     // Keeps the address (to write to testers later) and returns the 3 links: join the group,

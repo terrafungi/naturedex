@@ -706,6 +706,8 @@ CREATE TABLE IF NOT EXISTS beta_signups (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS beta_signups_ip ON beta_signups (ip, created_at);
+-- Tester reward: boosters given once, the first time the player opens the Android app during the closed test
+ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_reward_at TIMESTAMPTZ;
 
 -- Calendrier de l'Avent (advent.mjs): one row per door opened; cards seeded by seeds/advent-2026.sql
 CREATE TABLE IF NOT EXISTS advent_claims (
